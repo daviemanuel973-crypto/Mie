@@ -11,6 +11,8 @@ This branch packages the Survival v0.1 game as a persistent Linux desktop applic
 
 The Flatpak build disables the project's global AVX2 requirement to improve compatibility with older x86_64 Linux CPUs. Windows/developer builds keep the previous default unless `OURCRAFT_ENABLE_AVX2=OFF` is supplied.
 
+The bundled GLFW 3.3.7 build currently uses its X11 backend (`GLFW_USE_WAYLAND=OFF`), so the Flatpak exposes X11/XWayland rather than claiming native Wayland support. This works directly on X11 desktops such as Linux Mint XFCE and through XWayland on most Wayland desktops.
+
 ## Persistent game data
 
 The Flatpak launcher changes the working directory to the application's persistent XDG data directory before starting the game. On a normal desktop this maps to approximately:
@@ -97,7 +99,7 @@ After Pages and the two secrets are configured, run **Publish Flatpak Repository
 The manifest grants only the game-facing permissions currently required:
 
 - GPU/DRI for OpenGL rendering;
-- X11 fallback and Wayland sockets for the game window;
+- X11/XWayland for the game window;
 - PulseAudio for sound;
 - network access for multiplayer;
 - IPC for graphics/window-system interoperability.
