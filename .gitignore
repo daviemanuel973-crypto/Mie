@@ -10,3 +10,17 @@ resources/saves2/
 errorLogs.txt
 resources/worlds/
 playerSettings/
+
+# Flatpak local build/export state
+/.flatpak-builder/
+/build-flatpak/
+/flatpak-repo/
+.flatpak-builder/
+build-flatpak/
+flatpak-repo/
+*.flatpak
+
+# Signing material must never be committed
+flatpak-private-key.b64
+flatpak-public-key.gpg
+key-id.txt
