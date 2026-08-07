@@ -1,0 +1,70 @@
++	for (auto &c : allSurvivalClients)
++	{
++		auto &playerData = c.second->playerData;
++		if (playerData.killed) { continue; }
++
++		playerData.survivalStats.sanitize();
++		auto currentPosition = playerData.entity.position;
++		if (!playerData.hungerPositionInitialized)
++		{
++			playerData.lastHungerPosition = currentPosition;
++			playerData.hungerPositionInitialized = true;
++		}
++
++		glm::dvec2 movement = glm::dvec2(currentPosition.x - playerData.lastHungerPosition.x,
++			currentPosition.z - playerData.lastHungerPosition.z);
++		double distance = std::min(glm::length(movement), 4.0);
++		playerData.lastHungerPosition = currentPosition;
++
++		// Slow passive drain plus movement exhaustion. Four exhaustion points consume one hunger point.
++		playerData.hungerExhaustion += deltaTime * 0.15f + static_cast<float>(distance) * 0.10f;
++		bool hungerChanged = false;
++		while (playerData.hungerExhaustion >= 4.f)
++		{
++			playerData.hungerExhaustion -= 4.f;
++			if (playerData.survivalStats.hunger > 0)
++			{
++				playerData.survivalStats.hunger--;
++				hungerChanged = true;
++			}
++		}
++
++		if (playerData.survivalStats.hunger <= 0)
++		{
++			playerData.starvationTimer += deltaTime;
++			if (playerData.starvationTimer >= 4.f)
++			{
++				playerData.starvationTimer -= 4.f;
++				// Normal-difficulty style starvation: it cannot take the player below 10 HP.
++				if (playerData.newLife.life > 10)
++				{
++					playerData.applyDamageOrLife(-5);
++				}
++			}
++		}
++		else
++		{
++			playerData.starvationTimer = 0;
++		}
++
++		if (hungerChanged) { updatePlayerSurvivalStats(*c.second); }
++	}
++
++#pragma endregion
++
++
+ #pragma region calculate player healing
+ 
+ 	//TODO do a last frame life kinda stuff for players to make things easier
+@@ -2098,7 +2163,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
+ 
+ 		if (playerData.healingDelayCounterSecconds >= playerData.calculateHealingDelayTime())
+ 		{
+-			if (playerData.newLife.life < playerData.newLife.maxLife)
++			if (playerData.newLife.life < playerData.newLife.maxLife && playerData.survivalStats.hunger >= 80)
+ 			{
+ 				playerData.notIncreasedLifeSinceTimeSecconds += deltaTime;
+ 
+@@ -2108,6 +2173,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
+ 
+ 					playerData.newLife.life++;
