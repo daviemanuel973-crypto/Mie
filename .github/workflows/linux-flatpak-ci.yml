@@ -18,6 +18,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: linux-flatpak-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   flatpak-x86_64:
     runs-on: ubuntu-latest
