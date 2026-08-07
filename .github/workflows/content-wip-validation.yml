@@ -1,0 +1,35 @@
+name: WIP Content Data Validation
+
+on:
+  push:
+    branches:
+      - agent/dev-content-expansion-wip
+    paths:
+      - 'resources/gameData/content/**'
+      - 'tools/validate_content_manifest.py'
+      - 'include/gameLayer/content/**'
+      - 'src/gameLayer/content/**'
+      - '.github/workflows/content-wip-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-content-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate advanced survival manifest
+        run: python3 tools/validate_content_manifest.py
+
+      - name: Ensure WIP code is intentionally not in the shipping target yet
+        shell: bash
+        run: |
+          if grep -q 'advancedSurvivalContent.cpp' CMakeLists.txt; then
+            echo 'The WIP content registry was added to the shipping target too early.' >&2
+            exit 1
+          fi
+          echo 'WIP registry remains isolated from the shipping build, as intended.'
