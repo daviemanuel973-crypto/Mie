@@ -20,14 +20,13 @@ jobs:
           ref: agent/survival-v01
           fetch-depth: 1
 
-      - name: Restore zstd CMake files from exact upstream snapshot
+      - name: Restore full zstd build metadata from exact upstream snapshot
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri "https://github.com/meemknight/ourCraft/archive/568fa30bee158c9309cf5dbf8b4690cc5a844bce.zip" -OutFile upstream.zip
           Expand-Archive upstream.zip -DestinationPath upstream
           $src = Get-ChildItem upstream -Directory | Select-Object -First 1
-          New-Item -ItemType Directory -Force -Path thirdparty/zstd-1.5.5/build | Out-Null
-          Copy-Item -Recurse -Force "$($src.FullName)/thirdparty/zstd-1.5.5/build/cmake" "thirdparty/zstd-1.5.5/build/"
+          Copy-Item -Recurse -Force "$($src.FullName)/thirdparty/zstd-1.5.5/build" "thirdparty/zstd-1.5.5/"
 
       - name: Configure MSVC Release with legacy CMake compatibility
         shell: pwsh
@@ -36,13 +35,14 @@ jobs:
       - name: Build MSVC Release
         run: cmake --build build --config Release --parallel 2
 
-      - name: Remove one-shot workflow after successful build
+      - name: Preserve missing upstream files and remove one-shot workflow
         if: success()
         shell: pwsh
         run: |
           Remove-Item .github/workflows/validate-survival-v01.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f thirdparty/zstd-1.5.5/build
           git add -A
-          git commit -m "Remove one-shot Survival validation workflow"
+          git commit -m "Restore upstream zstd build metadata"
           git push origin HEAD:agent/survival-v01
