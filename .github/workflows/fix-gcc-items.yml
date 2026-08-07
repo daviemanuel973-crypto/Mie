@@ -23,11 +23,17 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path('src/gameLayer/gameplay/items.cpp')
           s = p.read_text()
-          old = 'this->items[i] = {0};'
-          assert s.count(old) == 1, s.count(old)
-          p.write_text(s.replace(old, 'this->items[i] = Item{};', 1))
+          pattern = r'this->items\[i\]\s*=\s*\{\s*0\s*\};'
+          s2, count = re.subn(pattern, 'this->items[i] = Item{};', s, count=1)
+          if count != 1:
+              lines = s.splitlines()
+              for n in range(1676, min(1692, len(lines))):
+                  print(f'{n+1}: {lines[n]}')
+              raise RuntimeError(f'expected one legacy reset, found {count}')
+          p.write_text(s2)
           PY
           git diff --check
       - name: Commit source fix
