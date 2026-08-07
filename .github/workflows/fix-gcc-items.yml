@@ -26,13 +26,15 @@ jobs:
           import re
           p = Path('src/gameLayer/gameplay/items.cpp')
           s = p.read_text()
-          pattern = r'this->items\[i\]\s*=\s*\{\s*0\s*\};'
-          s2, count = re.subn(pattern, 'this->items[i] = Item{};', s, count=1)
-          if count != 1:
-              lines = s.splitlines()
-              for n in range(1676, min(1692, len(lines))):
-                  print(f'{n+1}: {lines[n]}')
-              raise RuntimeError(f'expected one legacy reset, found {count}')
+          print('items.cpp lines:', len(s.splitlines()))
+          for n, line in enumerate(s.splitlines(), 1):
+              if 'items[' in line and '= {' in line:
+                  print(f'candidate {n}: {line}')
+          pattern = r'((?:this->)?items\s*\[[^\]]+\])\s*=\s*\{\s*0\s*\};'
+          s2, count = re.subn(pattern, r'\1 = Item{};', s)
+          if count == 0:
+              raise RuntimeError('no legacy inventory slot reset found')
+          print('replaced:', count)
           p.write_text(s2)
           PY
           git diff --check
