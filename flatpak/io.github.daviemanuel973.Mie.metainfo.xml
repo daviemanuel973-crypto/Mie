@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.daviemanuel973.Mie</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Mie Survival</name>
+  <summary>Voxel survival sandbox with crafting, hunger and multiplayer</summary>
+  <description>
+    <p>
+      Mie Survival is a lightweight voxel sandbox focused on gathering resources,
+      crafting, exploration, building and survival. This Linux package includes
+      the Survival v0.1 gameplay systems, including hunger, food, armour and the
+      expanded early-game crafting progression.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.daviemanuel973.Mie.desktop</launchable>
+  <url type="homepage">https://github.com/daviemanuel973-crypto/Mie</url>
+  <url type="bugtracker">https://github.com/daviemanuel973-crypto/Mie/issues</url>
+  <developer id="io.github.daviemanuel973">
+    <name>Mie contributors</name>
+  </developer>
+  <releases>
+    <release version="0.1.0-linux" date="2026-08-07">
+      <description>
+        <p>First Flatpak-ready Linux build based on Survival v0.1.</p>
+      </description>
+    </release>
+  </releases>
+</component>
