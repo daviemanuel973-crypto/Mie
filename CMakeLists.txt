@@ -112,14 +112,25 @@ endif()
 
 if (OURCRAFT_INSTALLABLE)
 	include(GNUInstallDirs)
-	# Flatpak installs under /app; distro packages can override CMAKE_INSTALL_PREFIX.
-	set(OURCRAFT_RESOURCE_DIR "${CMAKE_INSTALL_FULL_DATADIR}/ourcraft/resources/")
-	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="${OURCRAFT_RESOURCE_DIR}")
-	set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES OUTPUT_NAME "ourcraft")
 
-	install(TARGETS "${CMAKE_PROJECT_NAME}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-	install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/"
-		DESTINATION "${CMAKE_INSTALL_DATADIR}/ourcraft/resources")
+	if (WIN32)
+		# Windows installers are relocatable. The installer/shortcut launches from
+		# the application directory, so the legacy literal-concatenation resource
+		# code can safely resolve resources/ without baking a build-machine path.
+		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="resources/")
+		set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES OUTPUT_NAME "Mie")
+		install(TARGETS "${CMAKE_PROJECT_NAME}" RUNTIME DESTINATION ".")
+		install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/" DESTINATION "resources")
+	else()
+		# Flatpak has a fixed /app prefix, while writable save/settings data is
+		# provided by its launcher in the app's private XDG data directory.
+		set(OURCRAFT_RESOURCE_DIR "${CMAKE_INSTALL_FULL_DATADIR}/ourcraft/resources/")
+		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="${OURCRAFT_RESOURCE_DIR}")
+		set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES OUTPUT_NAME "ourcraft")
+		install(TARGETS "${CMAKE_PROJECT_NAME}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+		install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/"
+			DESTINATION "${CMAKE_INSTALL_DATADIR}/ourcraft/resources")
+	endif()
 else()
 	# Developer build: load assets directly from the checkout.
 	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/resources/")
