@@ -5,6 +5,14 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# GCC 15 defaults C sources to GNU C23, but the bundled raudio version predates
+# C23 and defines false/true as enum constants. Keep vendor C code on GNU C17.
+if (NOT MSVC)
+	set(CMAKE_C_STANDARD 17)
+	set(CMAKE_C_STANDARD_REQUIRED ON)
+	set(CMAKE_C_EXTENSIONS ON)
+endif()
+
 project(ourCraft)
 
 option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
@@ -53,6 +61,14 @@ add_subdirectory(thirdparty/stb_image)
 add_subdirectory(thirdparty/stb_truetype)
 add_subdirectory(thirdparty/gl2d)
 add_subdirectory(thirdparty/raudio)
+
+# GCC 14+ promotes this old raudio API mismatch to an error. The bundled dr_*
+# APIs use an ABI-compatible 64-bit unsigned type on x86_64; preserve the
+# legacy source as a warning instead of modifying vendor code.
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+	target_compile_options(raudio PRIVATE -Wno-error=incompatible-pointer-types)
+endif()
+
 add_subdirectory(thirdparty/glm)
 add_subdirectory(thirdparty/imgui-docking)
 add_subdirectory(thirdparty/FastNoiseSIMD)
