@@ -540,6 +540,70 @@ bool ServerChunkStorer::generateStructure(StructureToGenerate s,
 							c->removeBlockWithData({inChunkX, y, inChunkZ}, oldBlock.getType());
 							b = newBlock; //we set the new block!
 
+							// Exploration loot: structure chests get deterministic supplies the first
+							// time they are generated. Existing/player chest contents are never replaced.
+							if (isChest(b.getType()))
+							{
+								auto *chest = c->blockData.getOrCreateChestBlock(inChunkX, y, inChunkZ);
+								bool emptyChest = true;
+								for (const auto &item : chest->items)
+								{
+									if (item.type != 0) { emptyChest = false; break; }
+								}
+
+								if (emptyChest)
+								{
+									const std::uint32_t lootSeed =
+										static_cast<std::uint32_t>(x) * 73856093u ^
+										static_cast<std::uint32_t>(y) * 19349663u ^
+										static_cast<std::uint32_t>(z) * 83492791u ^
+										static_cast<std::uint32_t>(s.type) * 2654435761u;
+
+									auto put = [&](int slot, unsigned short type, unsigned short amount)
+									{
+										if (slot >= 0 && slot < CHEST_CAPACITY && amount > 0)
+										{
+											chest->items[slot] = itemCreator(type, amount);
+										}
+									};
+
+									// Universal expedition supplies.
+									put(0, ItemTypes::bandage, 1 + (lootSeed % 2u));
+									put(1, ItemTypes::copperCoin, 4 + (lootSeed % 13u));
+
+									switch (s.type)
+									{
+									case Structure_Barn:
+										put(2, ItemTypes::wheat, 5 + (lootSeed % 8u));
+										put(3, ItemTypes::apple, 1 + (lootSeed % 3u));
+										break;
+									case Structure_GoblinTower:
+										put(2, ItemTypes::cloth, 2 + (lootSeed % 4u));
+										put(3, ItemTypes::fang, 1 + (lootSeed % 3u));
+										break;
+									case Structure_Pyramid:
+										put(2, ItemTypes::silverCoin, 1 + (lootSeed % 4u));
+										if ((lootSeed % 5u) == 0u) put(3, ItemTypes::goldIngot, 1);
+										break;
+									case Structure_Igloo:
+										put(2, ItemTypes::blueBerrie, 2 + (lootSeed % 4u));
+										put(3, ItemTypes::apple, 1 + (lootSeed % 2u));
+										break;
+									case Structure_MinesDungeon:
+										put(2, ItemTypes::ironIngot, 1 + (lootSeed % 3u));
+										if ((lootSeed % 4u) == 0u) put(3, ItemTypes::silverIngot, 1);
+										break;
+									case Structure_AbandonedTrainingCamp:
+										put(2, ItemTypes::arrow, 4 + (lootSeed % 8u));
+										put(3, ItemTypes::wheat, 1 + (lootSeed % 4u));
+										break;
+									default:
+										put(2, ItemTypes::wheat, 1 + (lootSeed % 3u));
+										break;
+									}
+								}
+							}
+
 							if (sendDataToPlayers)
 							{
 								SendBlocksBack sendB;

@@ -20,6 +20,11 @@ Generation remains seed/chunk deterministic for multiplayer compatibility and re
 
 Variants intentionally reuse the current zombie model and texture so the feature adds almost no GPU/VRAM cost.
 
+## Structure loot
+- Generated structure chests receive deterministic loot based on structure type and coordinates.
+- Barns favour food/wheat; goblin towers favour cloth/fangs; pyramids favour coins/rare metal; igloos favour food; mines favour ingots; training camps favour arrows.
+- Existing chest data is never overwritten.
+
 ## Survival integration
 - 9 wheat -> 1 hay bale at a workbench.
 - 1 hay bale -> 9 wheat.
