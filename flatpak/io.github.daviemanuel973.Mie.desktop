@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Mie Survival
+Comment=Voxel survival sandbox with crafting, hunger and multiplayer
+Exec=ourcraft-flatpak
+Icon=io.github.daviemanuel973.Mie
+Terminal=false
+Categories=Game;AdventureGame;
+Keywords=voxel;survival;crafting;sandbox;multiplayer;
+StartupNotify=true
+PrefersNonDefaultGPU=true
