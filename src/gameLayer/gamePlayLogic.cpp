@@ -1776,8 +1776,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		const float shortestTimer = 0.3;
 		const float longestTimer = 0.7;
 
-		//player.entity.forces.colidesBottom() && 
-		if (isPlayerMovingSpeed)
+		if (player.entity.forces.colidesBottom() && isPlayerMovingSpeed)
 		{
 			auto blockPos = from3DPointToBlock(player.entity.position - glm::dvec3(0, 0.1, 0));
 			auto block = gameData.chunkSystem.getBlockSafe(blockPos.x, blockPos.y, blockPos.z);
