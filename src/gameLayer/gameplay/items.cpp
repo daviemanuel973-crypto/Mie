@@ -40,7 +40,7 @@ bool Item::isConsumedAfterUse()
 	return false;
 }
 
-bool Item::isEatable()
+bool Item::isFood()
 {
 	return type == apple ||
 		type == blackBerrie ||
@@ -53,10 +53,12 @@ bool Item::isEatable()
 		type == peach ||
 		type == pinapple ||
 		type == strawberry ||
-		type == applePie
-		|| isPotion()
-		
-		;
+		type == applePie;
+}
+
+bool Item::isEatable()
+{
+	return isFood() || isPotion();
 }
 
 bool Item::isArrow()
@@ -559,9 +561,7 @@ Item *PlayerInventory::getItemFromIndex(int index, ChestBlock *chestBlock)
 void PlayerInventory::formatIntoData(std::vector<unsigned char> &data)
 {
 
-	//TODO ARMOUR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-	data.reserve(data.size() + INVENTORY_CAPACITY * sizeof(Item)); //rough estimate
+	data.reserve(data.size() + (INVENTORY_CAPACITY + 4) * sizeof(Item)); //rough estimate
 
 	data.push_back(revisionNumber);
 
@@ -571,7 +571,9 @@ void PlayerInventory::formatIntoData(std::vector<unsigned char> &data)
 	}
 
 	heldInMouse.formatIntoData(data);
-
+	headArmour.formatIntoData(data);
+	chestArmour.formatIntoData(data);
+	bootsArmour.formatIntoData(data);
 
 }
 
@@ -610,7 +612,12 @@ bool PlayerInventory::readFromData(void *data, size_t size)
 
 	if (!readOne(heldInMouse)) { return 0; }
 
-	
+	// Armour was not part of the old wire format. Read it only when present so
+	// old inventory snapshots remain valid.
+	if (currentAdvance < size && !readOne(headArmour)) { return 0; }
+	if (currentAdvance < size && !readOne(chestArmour)) { return 0; }
+	if (currentAdvance < size && !readOne(bootsArmour)) { return 0; }
+
 	return true;
 }
 

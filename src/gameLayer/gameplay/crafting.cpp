@@ -141,7 +141,16 @@ static CraftingRecepie recepies[] =
 	recepie<1>(Item(BlockTypes::hardSandStone, 1),{Item(BlockTypes::sand, 2)}),
 	recepie<1>(Item(BlockTypes::stoneBrick, 1),{Item(BlockTypes::stone, 2)}),
 
-	recepie<1>(Item(BlockTypes::workBench, 1),{Item(BlockTypes::wooden_plank, 10)}),
+	// survival progression
+	recepie<1>(Item(ItemTypes::stick, 4), {Item(BlockTypes::wooden_plank, 2)}).setAnyWood(),
+	recepie<1>(Item(BlockTypes::workBench, 1),{Item(BlockTypes::wooden_plank, 4)}).setAnyWood(),
+	recepie<1>(Item(BlockTypes::furnace, 1),{Item(BlockTypes::cobblestone, 8)}).setRequiresWorkBench(),
+	recepie<2>(Item(BlockTypes::cookingPot, 1),{Item(ItemTypes::ironIngot, 5), Item(BlockTypes::wooden_plank, 2)}).setAnyWood().setRequiresWorkBench(),
+	recepie<1>(Item(BlockTypes::woddenChest, 1), {Item(BlockTypes::wooden_plank, 8)}).setAnyWood().setRequiresWorkBench(),
+	recepie<1>(Item(ItemTypes::bandage, 1), {Item(ItemTypes::cloth, 3)}),
+
+	// legacy alternatives stay available
+	recepie<1>(Item(BlockTypes::workBench, 1),{Item(BlockTypes::wooden_plank, 10)}).setAnyWood(),
 	recepie<3>(Item(BlockTypes::furnace, 1),{Item(BlockTypes::cobblestone, 20), Item(BlockTypes::torch, 3), Item(BlockTypes::wooden_plank, 4)}).setAnyWood().setRequiresWorkBench(),
 
 	//furniture
@@ -216,6 +225,23 @@ static CraftingRecepie recepies[] =
 	recepie<2>(Item(ItemTypes::goldAxe, 1), {Item(ItemTypes::goldIngot, 3), Item(BlockTypes::wooden_plank, 3)}).setAnyWood().setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::goldShovel, 1), {Item(ItemTypes::goldIngot, 3), Item(BlockTypes::wooden_plank, 3)}).setAnyWood().setRequiresWorkBench(),
 
+
+	//weapons
+	recepie<2>(Item(ItemTypes::copperSword, 1), {Item(ItemTypes::copperIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::leadSword, 1), {Item(ItemTypes::leadIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::ironSword, 1), {Item(ItemTypes::ironIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::silverSword, 1), {Item(ItemTypes::silverIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::goldSword, 1), {Item(ItemTypes::goldIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+
+	recepie<2>(Item(ItemTypes::copperWarHammer, 1), {Item(ItemTypes::copperIngot, 5), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::copperSpear, 1), {Item(ItemTypes::copperIngot, 3), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::copperKnife, 1), {Item(ItemTypes::copperIngot, 2), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::copperBattleAxe, 1), {Item(ItemTypes::copperIngot, 5), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
+
+	recepie<2>(Item(ItemTypes::ironWarHammer, 1), {Item(ItemTypes::ironIngot, 5), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::ironSpear, 1), {Item(ItemTypes::ironIngot, 3), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::ironKnife, 1), {Item(ItemTypes::ironIngot, 2), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::ironBattleAxe, 1), {Item(ItemTypes::ironIngot, 5), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
 
 	//armour
 

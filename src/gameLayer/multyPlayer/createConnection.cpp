@@ -783,6 +783,15 @@ void recieveDataClient(ENetEvent &event,
 		}
 		break;
 
+		case headerUpdateSurvivalStats:
+		{
+			if (sizeof(Packet_UpdateSurvivalStats) != size) { break; }
+			Packet_UpdateSurvivalStats *packetData = (Packet_UpdateSurvivalStats *)data;
+			packetData->stats.sanitize();
+			entityManager.localPlayer.survivalStats = packetData->stats;
+		}
+		break;
+
 		case headerRecieveDamage:
 		{
 			if (sizeof(Packet_UpdateLife) != size) { break; }

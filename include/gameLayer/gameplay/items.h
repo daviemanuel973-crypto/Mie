@@ -208,6 +208,8 @@ struct Item
 
 	bool isConsumedAfterUse();
 
+	bool isFood();
+
 	bool isEatable();
 
 	bool isArrow();

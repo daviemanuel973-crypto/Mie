@@ -100,3 +100,24 @@ int getItemHealing(Item &item, PlayerInventory &inventory)
 
 	return std::max(0, rez);
 }
+
+
+int getItemHungerRestore(const Item &item)
+{
+	switch (item.type)
+	{
+		case ItemTypes::apple: return 22;
+		case ItemTypes::blackBerrie: return 10;
+		case ItemTypes::blueBerrie: return 10;
+		case ItemTypes::cherries: return 12;
+		case ItemTypes::chilliPepper: return 8;
+		case ItemTypes::cocconut: return 28;
+		case ItemTypes::grapes: return 14;
+		case ItemTypes::lime: return 8;
+		case ItemTypes::peach: return 18;
+		case ItemTypes::pinapple: return 24;
+		case ItemTypes::strawberry: return 14;
+		case ItemTypes::applePie: return 45;
+		default: return 0;
+	}
+}

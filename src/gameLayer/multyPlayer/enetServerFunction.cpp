@@ -208,6 +208,14 @@ void updatePlayerEffects(Client &client)
 		true, channelEffects);
 }
 
+void updatePlayerSurvivalStats(Client &client)
+{
+	client.playerData.survivalStats.sanitize();
+	Packet_UpdateSurvivalStats packetData;
+	packetData.stats = client.playerData.survivalStats;
+	sendPacket(client.peer, headerUpdateSurvivalStats, &packetData, sizeof(packetData), true, channelEffects);
+}
+
 //create connection
 //todo anounce it to all players, both as a connection and as an entity
 void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
@@ -231,33 +239,10 @@ void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
 		c.playerData.lastChunkPositionWhenAnUpdateWasSent.x = divideChunk(c.playerData.entity.position.x);
 		c.playerData.lastChunkPositionWhenAnUpdateWasSent.y = divideChunk(c.playerData.entity.position.z);
 
-		c.playerData.otherPlayerSettings.gameMode = OtherPlayerSettings::CREATIVE;
-
-		c.playerData.inventory.items[0] = itemCreator(ItemTypes::trainingSword);
-		c.playerData.inventory.items[1] = itemCreator(ItemTypes::apple, 20);
-		c.playerData.inventory.items[2] = itemCreator(ItemTypes::goblinSpawnEgg, 400);
-		c.playerData.inventory.items[13] = Item(BlockTypes::clothBlock, 64);
-		c.playerData.inventory.items[21] = Item(BlockTypes::woodLog, 64);
-		c.playerData.inventory.items[22] = Item(BlockTypes::palm_log, 64);
-		c.playerData.inventory.items[23] = Item(BlockTypes::glowstone, 64);
-		c.playerData.inventory.items[24] = Item(BlockTypes::stoneBrick, 64);
-		c.playerData.inventory.items[26] = Item(BlockTypes::mud, 64);
-		c.playerData.inventory.items[27] = Item(BlockTypes::birch_log, 64);
-		c.playerData.inventory.items[28] = Item(BlockTypes::wooden_plank, 64);
-		c.playerData.inventory.items[29] = Item(BlockTypes::cobblestone, 64);
-		c.playerData.inventory.items[30] = Item(ItemTypes::cloth, 64);
-		c.playerData.inventory.items[36] = Item(ItemTypes::fang, 64);
-		c.playerData.inventory.items[37] = Item(BlockTypes::torchWood, 64);
-		c.playerData.inventory.items[38] = Item(ItemTypes::arrow, 64);
-		c.playerData.inventory.items[39] = Item(ItemTypes::copperIngot, 64);
-		c.playerData.inventory.items[40] = Item(ItemTypes::leadIngot, 64);
-		c.playerData.inventory.items[31] = itemCreator(ItemTypes::catSpawnEgg);
-		c.playerData.inventory.items[32] = itemCreator(ItemTypes::zombieSpawnEgg);
-		c.playerData.inventory.items[33] = itemCreator(ItemTypes::pigSpawnEgg);
-		c.playerData.inventory.items[34] = Item(BlockTypes::clay);
-		c.playerData.inventory.items[35] = Item(BlockTypes::glass);
-
-		c.playerData.inventory.items[PlayerInventory::COINS_START_INDEX] = Item(ItemTypes::copperCoin);
+		// Survival is now the default. Creative remains available through the server command.
+		c.playerData.otherPlayerSettings.gameMode = OtherPlayerSettings::SURVIVAL;
+		c.playerData.inventory = {};
+		c.playerData.survivalStats = {};
 
 		insertConnection(id, c);
 	}
@@ -272,6 +257,7 @@ void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
 		packetToSend.yourPlayerEntityId = id;
 		packetToSend.timer = getTimer();
 		packetToSend.otherSettings = getClient(id).playerData.otherPlayerSettings;
+		packetToSend.survivalStats = getClient(id).playerData.survivalStats;
 
 		//send own cid
 		sendPacket(event.peer, p, (const char *)&packetToSend,

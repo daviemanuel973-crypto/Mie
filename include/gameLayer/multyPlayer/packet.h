@@ -81,6 +81,7 @@ enum : std::uint32_t
 	headerRecieveDamage,
 	headerRecieveLife,
 	headerUpdateLife,
+	headerUpdateSurvivalStats,
 	headerKillEntity,
 	headerAttackEntity,
 	headerClientWantsToRespawn,
@@ -221,6 +222,11 @@ struct Packet_UpdateLife
 	Life life;
 };
 
+struct Packet_UpdateSurvivalStats
+{
+	SurvivalStats stats;
+};
+
 struct Packet_UpdateGenericEntity
 {
 	std::uint64_t eid = 0;
@@ -232,6 +238,7 @@ struct Packet_ReceiveCIDAndData
 {
 	Player entity = {};
 	OtherPlayerSettings otherSettings = {};
+	SurvivalStats survivalStats = {};
 	std::uint64_t timer = 0;
 	std::uint64_t yourPlayerEntityId = 0;
 

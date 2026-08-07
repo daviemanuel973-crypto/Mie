@@ -223,6 +223,7 @@ bool initGameplay(ProgramData &programData, const char *c) //GAME STUFF!
 	gameData.entityManager.localPlayer.entity = playerData.entity;
 	gameData.entityManager.localPlayer.entityId = playerData.yourPlayerEntityId;
 	gameData.entityManager.localPlayer.otherPlayerSettings = playerData.otherSettings;
+	gameData.entityManager.localPlayer.survivalStats = playerData.survivalStats;
 
 	gameData.rng.seed(time(0));
 
@@ -1309,10 +1310,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 									auto effects = getItemEffects(item, player.inventory);
 									int healing = getItemHealing(item, player.inventory);
 
-									//can't eat if satiety doesn't allow it
-									if (effects.allEffects[Effects::Saturated].timerMs > 0 &&
-										player.effects.allEffects[Effects::Saturated].timerMs > 0
-										)
+									int hungerRestore = getItemHungerRestore(item);
+									if (item.isFood() && player.survivalStats.hunger >= player.survivalStats.maxHunger)
 									{
 										allowed = 0;
 									}
@@ -1320,6 +1319,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 									{
 										player.life.life += healing;
 										player.effects.applyEffects(effects);
+										if (item.isFood()) { player.survivalStats.addHunger(hungerRestore); }
 										player.life.sanitize();
 									}
 								}

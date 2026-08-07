@@ -5,6 +5,7 @@
 
 Effects getItemEffects(Item &item, PlayerInventory &inventory);
 int getItemHealing(Item &item, PlayerInventory &inventory);
+int getItemHungerRestore(const Item &item);
 
 
 

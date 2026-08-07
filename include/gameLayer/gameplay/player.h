@@ -82,6 +82,7 @@ struct LocalPlayer
 
 	Life life = PLAYER_DEFAULT_LIFE;
 	Life lastLife = PLAYER_DEFAULT_LIFE;
+	SurvivalStats survivalStats = {};
 	float justHealedTimer = 0;
 	float justRecievedDamageTimer = 0;
 
@@ -120,6 +121,11 @@ struct PlayerServer: public ServerEntity<Player>
 
 	Life lifeLastFrame = PLAYER_DEFAULT_LIFE;
 	Life newLife = PLAYER_DEFAULT_LIFE;
+	SurvivalStats survivalStats = {};
+	float hungerExhaustion = 0;
+	float starvationTimer = 0;
+	glm::dvec3 lastHungerPosition = {};
+	bool hungerPositionInitialized = false;
 	bool forceUpdateLife = 0;
 
 	//we update the effects every 20 ticks or if we set it
@@ -164,6 +170,9 @@ struct PlayerServer: public ServerEntity<Player>
 	{
 		Armour rez{};
 
+		rez.armour += inventory.headArmour.getItemStats().armour;
+		rez.armour += inventory.chestArmour.getItemStats().armour;
+		rez.armour += inventory.bootsArmour.getItemStats().armour;
 		rez.armour += effects.getArmour();
 		rez.normalize();
 		
