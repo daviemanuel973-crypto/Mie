@@ -230,9 +230,15 @@ struct Renderer
 	{
 		float edgeMinTreshold = 0.028;
 		float edgeDarkTreshold = 0.125;
+#if defined(OURCRAFT_LOW_END_BUILD)
+		int ITERATIONS = 6;
+		float quaityMultiplier = 0.65;
+		float SUBPIXEL_QUALITY = 0.60;
+#else
 		int ITERATIONS = 12;
 		float quaityMultiplier = 0.8;
 		float SUBPIXEL_QUALITY = 0.95;
+#endif
 	}fxaaData;
 
 
@@ -447,7 +453,11 @@ struct Renderer
 	bool zprepass = 1;
 	bool renderTransparent = 1;
 	bool frustumCulling = 1;
+#if defined(OURCRAFT_LOW_END_BUILD)
+	bool ssao = 0;
+#else
 	bool ssao = 1;
+#endif
 	
 	FBO fboHBAO;
 	FBO fboMain;

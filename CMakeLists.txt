@@ -17,6 +17,7 @@ project(ourCraft)
 
 option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
+option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -91,6 +92,15 @@ add_executable("${CMAKE_PROJECT_NAME}")
 set_property(TARGET "${CMAKE_PROJECT_NAME}" PROPERTY CXX_STANDARD 17)
 
 target_sources("${CMAKE_PROJECT_NAME}" PRIVATE ${MY_SOURCES} ${SHARED_SOURCES})
+
+if (OURCRAFT_LOW_END_BUILD)
+	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC OURCRAFT_LOW_END_BUILD=1)
+	# Keep floating-point behavior conservative while still favoring Release throughput.
+	if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		target_compile_options("${CMAKE_PROJECT_NAME}" PRIVATE
+			$<$<CONFIG:Release>:-O3;-fno-math-errno;-fno-trapping-math;-fomit-frame-pointer>)
+	endif()
+endif()
 
 # The original Windows-oriented source relies on a few declarations being
 # visible before template definitions and contains a Win32-only debug picker.

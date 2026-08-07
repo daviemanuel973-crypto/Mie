@@ -38,6 +38,19 @@ std::string getSkinName();
 struct ShadingSettings
 {
 
+#if defined(OURCRAFT_LOW_END_BUILD)
+	int viewDistance = 5;
+	int tonemapper = 0;
+	int shadows = 0;
+	int waterType = 0;
+	int workerThreadsForBaking = 1;
+	int lodStrength = 5;
+	int PBR = 0;
+	int maxLights = 8;
+	int useLights = 1;
+	float lightsStrength = 1.f;
+	bool FXAA = 1;
+#else
 	int viewDistance = 15;
 	int tonemapper = 0;
 	int shadows = 0;
@@ -49,6 +62,7 @@ struct ShadingSettings
 	int useLights = 1;
 	float lightsStrength = 1.f;
 	bool FXAA = 1;
+#endif
 
 	glm::vec3 waterColor = (glm::vec3(6, 42, 52) / 255.f);
 	glm::vec3 underWaterColor = glm::vec3(0, 17, 25) / 255.f;
@@ -62,9 +76,15 @@ struct ShadingSettings
 
 	float exposure = 0;
 	float fogGradient = 16.f;
+#if defined(OURCRAFT_LOW_END_BUILD)
+	int bloom = 0;
+
+	int SSR = 0;
+#else
 	int bloom = 1;
 
 	int SSR = 1;
+#endif
 
 	float toneMapSaturation = 1;
 	float toneMapVibrance = 1;
@@ -95,6 +115,8 @@ struct ShadingSettings
 ShadingSettings &getShadingSettings();
 
 bool checkIfShadingSettingsChangedForShaderReloads();
+
+void applyLowEndPerformancePreset(ProgramData &programData);
 
 void saveShadingSettings();
 

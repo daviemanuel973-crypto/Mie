@@ -2617,7 +2617,7 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 	//filteredBloomColor.clearFBO();
 
 
-	if (filterBloomSize != glm::ivec2(screenX, screenY))
+	if (getShadingSettings().bloom && filterBloomSize != glm::ivec2(screenX, screenY))
 	{
 		filterBloomSize = glm::ivec2(screenX, screenY);
 
@@ -2680,7 +2680,10 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 
 	fboLastFrame.updateSize(screenX, screenY);
 	fboLastFramePositions.updateSize(screenX, screenY);
-	fboHBAO.updateSize(screenX / 2, screenY / 2);
+	if (ssao)
+	{
+		fboHBAO.updateSize(screenX / 2, screenY / 2);
+	}
 
 	fboSkyBox.updateSize(screenX, screenY);
 	fboSkyBox.clearFBO();
@@ -3713,6 +3716,7 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 #pragma endregion
 
 #pragma region get automatic exposure
+#if !defined(OURCRAFT_LOW_END_BUILD)
 	if(1)
 	{
 
@@ -3792,6 +3796,12 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 		adaptiveExposure.update(deltaTime, averageLuminosity);
 
 	}
+#else
+	// A full-screen mipmap chain plus async readback every other frame is expensive
+	// on integrated GPUs. Keep a stable exposure in the low-end profile.
+	averageLuminosity = 0.5f;
+	adaptiveExposure.currentExposure = 1.6f;
+#endif
 #pragma endregion
 
 	bool lastBloomChannel = 0;

@@ -15,6 +15,13 @@
 #include <chrono>
 #include <profilerLib/include/profilerLib.h>
 #include <errorReporting.h>
+#include <thread>
+#include <cstdlib>
+#include <cstring>
+
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 
 #ifdef _WIN32
@@ -328,7 +335,7 @@ namespace platform
 #pragma endregion
 
 
-int main()
+int main(int argc, char **argv)
 {
 
 #ifdef _WIN32
@@ -358,11 +365,16 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
+#if defined(OURCRAFT_LOW_END_BUILD)
+	int w = 1280;
+	int h = 720;
+#else
 	int w = 500;
 	int h = 500;
+#endif
 	wind = glfwCreateWindow(w, h, "geam", nullptr, nullptr);
 	glfwMakeContextCurrent(wind);
-	//glfwSwapInterval(1);
+	glfwSwapInterval(0);
 
 	glfwSetKeyCallback(wind, keyCallback);
 	glfwSetMouseButtonCallback(wind, mouseCallback);
@@ -374,11 +386,34 @@ int main()
 
 	permaAssertComment(gladLoadGL(), "err initializing glad");
 
-	if (!GLAD_GL_NV_bindless_texture)
+	if (glGetTextureHandleARB == nullptr || glMakeTextureHandleResidentARB == nullptr)
 	{
-		std::cout << "Error, Bindless texture extension not supported!\nUsually integrated GPUs don't support this extension, this will be fixed in the future.\n";
-		std::cout << "Press enter to try anyway...\n";
+#ifdef __linux__
+		const char *mesaDriver = std::getenv("MESA_LOADER_DRIVER_OVERRIDE");
+		if (!mesaDriver || std::strcmp(mesaDriver, "zink") != 0)
+		{
+			std::cerr << "Native OpenGL does not expose ARB_bindless_texture; retrying through Mesa Zink.\n";
+			glfwDestroyWindow(wind);
+			wind = nullptr;
+			glfwTerminate();
+			if (setenv("MESA_LOADER_DRIVER_OVERRIDE", "zink", 1) != 0)
+			{
+				std::cerr << "Could not enable the Zink compatibility path.\n";
+				return 1;
+			}
+			execv("/proc/self/exe", argv);
+			std::cerr << "Could not restart the game through Zink.\n";
+			return 1;
+		}
+		std::cerr << "ARB_bindless_texture is unavailable even through Zink.\n";
+		return 1;
+#else
+		std::cout << "Error, ARB_bindless_texture is not supported by this GPU/driver.\n";
+#ifdef _WIN32
 		system("pause");
+#endif
+		return 1;
+#endif
 	}
 
 	//enableReportGlErrors();
@@ -449,6 +484,9 @@ int main()
 
 	while (!glfwWindowShouldClose(wind))
 	{
+#if defined(OURCRAFT_LOW_END_BUILD)
+		auto frameStartLowEnd = std::chrono::steady_clock::now();
+#endif
 		//UpdateMusicStream(m);
 		//PlayMusicStream(m);
 
@@ -581,6 +619,49 @@ int main()
 		
 
 		glfwPollEvents();
+
+#if defined(OURCRAFT_LOW_END_BUILD)
+		// Favor stable frame pacing over oscillating between 30 and 60 FPS.
+		auto frameWorkEnd = std::chrono::steady_clock::now();
+		double workMs = std::chrono::duration<double, std::milli>(frameWorkEnd - frameStartLowEnd).count();
+		static double smoothedWorkMs = 16.67;
+		static int slowFrames = 0;
+		static int fastFrames = 0;
+		static bool stable30Mode = false;
+
+		smoothedWorkMs = smoothedWorkMs * 0.95 + workMs * 0.05;
+		if (!stable30Mode)
+		{
+			if (smoothedWorkMs > 20.5)
+			{
+				if (++slowFrames >= 90)
+				{
+					stable30Mode = true;
+					slowFrames = 0;
+				}
+			}
+			else
+			{
+				slowFrames = std::max(0, slowFrames - 2);
+			}
+		}
+		else
+		{
+			if (smoothedWorkMs < 13.5)
+			{
+				if (++fastFrames >= 300)
+				{
+					stable30Mode = false;
+					fastFrames = 0;
+				}
+			}
+			else { fastFrames = 0; }
+		}
+
+		auto targetFrame = !platform::isFocused() ? std::chrono::microseconds(66667) :
+			(stable30Mode ? std::chrono::microseconds(33333) : std::chrono::microseconds(16667));
+		std::this_thread::sleep_until(frameStartLowEnd + targetFrame);
+#endif
 
 	#pragma endregion
 

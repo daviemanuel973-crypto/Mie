@@ -22,6 +22,30 @@ void displayRenderSettingsMenuButton(ProgramData &programData)
 #define DEFAULT_COLOR_PICKER programData.ui.buttonTexture, programData.ui.buttonTexture, Colors_Gray, Colors_Gray
 #define DEFAULT_COLOR_PICKER_TRANSPARENT programData.ui.buttonTexture, programData.ui.buttonTexture, {(float)0x7F / 255.0f, (float)0x7F / 255.0f, (float)0x7F / 255.0f, 0.65}, {(float)0x7F / 255.0f, (float)0x7F / 255.0f, (float)0x7F / 255.0f, 0.65}
 
+void applyLowEndPerformancePreset(ProgramData &programData)
+{
+	auto &settings = getShadingSettings();
+	settings.viewDistance = 5;
+	settings.lodStrength = 5;
+	settings.workerThreadsForBaking = 1;
+	settings.shadows = 0;
+	settings.waterType = 0;
+	settings.PBR = 0;
+	settings.SSR = 0;
+	settings.bloom = 0;
+	settings.bloomMultiplier = 0.f;
+	settings.maxLights = 8;
+	settings.useLights = 1;
+	settings.FXAA = 1;
+
+	programData.renderer.frustumCulling = true;
+	programData.renderer.sortChunks = true;
+	programData.renderer.ssao = false;
+	programData.renderer.fxaaData.ITERATIONS = 6;
+	programData.renderer.fxaaData.quaityMultiplier = 0.65f;
+	programData.renderer.fxaaData.SUBPIXEL_QUALITY = 0.60f;
+}
+
 void displayRenderSettingsMenu(ProgramData &programData)
 {
 
@@ -39,6 +63,12 @@ void displayRenderSettingsMenu(ProgramData &programData)
 
 
 	programData.ui.menuRenderer.Text("Rendering Settings...", Colors_White);
+
+	if (programData.ui.menuRenderer.Button("Performance preset (Intel HD / low-end)", Colors_Gray,
+		programData.ui.buttonTexture))
+	{
+		applyLowEndPerformancePreset(programData);
+	}
 
 	programData.ui.menuRenderer.sliderInt("View Distance", &getShadingSettings().viewDistance,
 		1, 50, Colors_White, programData.ui.buttonTexture, Colors_Gray,

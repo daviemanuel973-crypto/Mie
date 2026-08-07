@@ -16,7 +16,7 @@ modules:
   - name: mie-survival
     buildsystem: simple
     build-commands:
-      - cmake -S . -B build-flatpak -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/app -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DOURCRAFT_INSTALLABLE=ON -DOURCRAFT_ENABLE_AVX2=OFF
+      - cmake -S . -B build-flatpak -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/app -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DOURCRAFT_INSTALLABLE=ON -DOURCRAFT_ENABLE_AVX2=OFF -DOURCRAFT_LOW_END_BUILD=ON
       - cmake --build build-flatpak --parallel "${FLATPAK_BUILDER_N_JOBS:-2}"
       - cmake --install build-flatpak
       - install -Dm755 flatpak/ourcraft-launcher.sh /app/bin/ourcraft-flatpak
