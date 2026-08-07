@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/survival-linux-flatpak
+      - agent/linux-lowend-performance
   pull_request:
     paths:
       - 'CMakeLists.txt'
