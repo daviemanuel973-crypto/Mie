@@ -1,9 +1,10 @@
-name: Windows MSVC CI
+name: Windows Installer CI
 
 on:
   push:
     branches:
       - agent/content-exploration-v01
+      - agent/release-packaging-stabilization
   pull_request:
     paths:
       - 'CMakeLists.txt'
@@ -11,6 +12,7 @@ on:
       - 'include/**'
       - 'shared/**'
       - 'resources/**'
+      - 'windows/**'
       - '.github/workflows/windows-msvc-ci.yml'
   workflow_dispatch:
 
@@ -18,11 +20,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-msvc-ci-${{ github.ref }}
+  group: windows-installer-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-windows-release:
+  package-windows-release:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -31,9 +33,76 @@ jobs:
       - name: Configure MSVC Release
         shell: pwsh
         run: |
-          cmake -S . -B build -A x64 "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          cmake -S . -B build -A x64 `
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
+            -DOURCRAFT_INSTALLABLE=ON `
+            -DOURCRAFT_ENABLE_AVX2=OFF
 
       - name: Build MSVC Release
         shell: pwsh
+        run: cmake --build build --config Release --parallel 2
+
+      - name: Stage install tree
+        shell: pwsh
         run: |
-          cmake --build build --config Release --parallel 2
+          cmake --install build --config Release --prefix "$PWD/stage"
+          if (-not (Test-Path "stage/Mie.exe")) { throw "stage/Mie.exe was not installed" }
+          if (-not (Test-Path "stage/resources/assets")) { throw "resources were not installed" }
+
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --no-progress -y
+            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "Inno Setup compiler not found" }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build Windows setup executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & "$env:ISCC" "windows/Mie.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "dist/Mie-Survival-Windows-x64-Setup.exe")) { throw "setup executable missing" }
+
+      - name: Smoke-test install, update and uninstall
+        shell: pwsh
+        run: |
+          $setup = (Resolve-Path "dist/Mie-Survival-Windows-x64-Setup.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "MieSmokeInstall"
+          Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+
+          # Fresh install.
+          $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$installDir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "fresh install failed: $($p.ExitCode)" }
+          if (-not (Test-Path "$installDir/Mie.exe")) { throw "Mie.exe missing after install" }
+          if (-not (Test-Path "$installDir/resources/shaders")) { throw "shader resources missing after install" }
+
+          # Simulate a player save, then run the installer again to verify update safety.
+          New-Item -ItemType Directory -Force "$installDir/resources/worlds/ci-preserve" | Out-Null
+          Set-Content -Path "$installDir/resources/worlds/ci-preserve/save.txt" -Value "keep-me"
+          $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$installDir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "update install failed: $($p.ExitCode)" }
+          if (-not (Test-Path "$installDir/resources/worlds/ci-preserve/save.txt")) { throw "update removed player save" }
+
+          # Uninstaller itself must work. User-created save files may intentionally remain.
+          $uninstaller = Get-ChildItem $installDir -Filter 'unins*.exe' | Select-Object -First 1
+          if (-not $uninstaller) { throw "uninstaller missing" }
+          $p = Start-Process -FilePath $uninstaller.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
+          if (Test-Path "$installDir/Mie.exe") { throw "Mie.exe remained after uninstall" }
+          if (-not (Test-Path "$installDir/resources/worlds/ci-preserve/save.txt")) { throw "uninstall deleted player-created save" }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mie-Survival-Windows-x64-Setup
+          path: dist/Mie-Survival-Windows-x64-Setup.exe
+          if-no-files-found: error
