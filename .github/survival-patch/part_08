@@ -1,0 +1,44 @@
+ 					playerData.newLife.sanitize();
++					playerData.hungerExhaustion += 0.35f;
+ 
+ 				}
+ 			}
+diff --git a/src/gameLayer/rendering/UiEngine.cpp b/src/gameLayer/rendering/UiEngine.cpp
+index b7e3ae3..7b9833e 100644
+--- a/src/gameLayer/rendering/UiEngine.cpp
++++ b/src/gameLayer/rendering/UiEngine.cpp
+@@ -1613,6 +1613,34 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
+ 				}
+ 
+ 
++
++				// Hunger uses ten pips, intentionally asset-free so the feature works with
++				// every existing resource pack.
++				auto hungerBox = itemsBarBox;
++				hungerBox.z = itemsBarBox.w / 3.2f;
++				hungerBox.w = hungerBox.z * 0.55f;
++				hungerBox.y -= hungerBox.w * 2.4f;
++				hungerBox.x += itemsBarBox.z - hungerBox.z * 10.f;
++
++				int hunger = player.survivalStats.hunger;
++				int maxHunger = std::max<int>(player.survivalStats.maxHunger, 1);
++				for (int i = 0; i < 10; i++)
++				{
++					renderer2d.renderRectangle(hungerBox, {0.12f, 0.12f, 0.12f, 0.75f});
++					int threshold = ((i + 1) * maxHunger) / 10;
++					if (hunger >= threshold)
++					{
++						renderer2d.renderRectangle(shrinkRectanglePercentage(hungerBox, 0.13f), {0.92f, 0.63f, 0.18f, 1.f});
++					}
++					else if (hunger > threshold - maxHunger / 10)
++					{
++						auto partial = shrinkRectanglePercentage(hungerBox, 0.13f);
++						partial.z *= 0.5f;
++						renderer2d.renderRectangle(partial, {0.92f, 0.63f, 0.18f, 1.f});
++					}
++					hungerBox.x += hungerBox.z;
++				}
++
+ 			}
+ 
+ 		}
