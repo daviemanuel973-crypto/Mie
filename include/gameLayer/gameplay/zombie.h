@@ -35,6 +35,15 @@ struct ZombieClient: public ClientEntity<Zombie, ZombieClient>
 
 struct ZombieServer: public ServerEntity<Zombie>
 {
+	enum Variant : unsigned char
+	{
+		Walker = 0,
+		Runner,
+		Brute,
+	};
+
+	Variant variant = Walker;
+	float moveSpeedMultiplier = 1.f;
 
 	glm::vec2 direction = {};
 	float waitTime = 1;

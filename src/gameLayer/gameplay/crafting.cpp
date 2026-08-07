@@ -173,8 +173,11 @@ static CraftingRecepie recepies[] =
 	recepie<4>(Item(BlockTypes::goblinChest, 1),{Item(BlockTypes::wooden_plank, 8),  Item(ItemTypes::cloth, 5),  Item(ItemTypes::fang, 2),  Item(ItemTypes::ironIngot, 1)}).setRequiresGoblin(),
 
 
-	//food
+	//food / exploration provisions
 	recepie<2>(Item(ItemTypes::applePie, 1), {Item(ItemTypes::apple, 2),  Item(ItemTypes::wheat, 3)}).setRequiresCookingPot(),
+	// Farming storage loop: compact wheat into decorative hay, then unpack it without loss.
+	recepie<1>(Item(BlockTypes::hayBalde, 1), {Item(ItemTypes::wheat, 9)}).setRequiresWorkBench(),
+	recepie<1>(Item(ItemTypes::wheat, 9), {Item(BlockTypes::hayBalde, 1)}),
 
 
 	//coins

@@ -478,7 +478,8 @@ bool ZombieServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 	}
 
 
-	auto move = 2.f * deltaTime * direction;
+	// Variant speed is server authoritative; clients receive the resulting position.
+	auto move = (2.f * moveSpeedMultiplier) * deltaTime * direction;
 	getPosition().x += move.x;
 	getPosition().z += move.y;
 	};

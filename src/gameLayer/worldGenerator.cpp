@@ -2190,6 +2190,42 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 			generateStructures.push_back(str);
 		};
 
+		auto treeHouse = [&]()
+		{
+			StructureToGenerate str;
+			str.type = Structure_TreeHouse;
+			setPosAndRandomNumbers(str);
+			str.setDefaultSmallBuildingSettings();
+			generateStructures.push_back(str);
+		};
+
+		auto pyramid = [&]()
+		{
+			StructureToGenerate str;
+			str.type = Structure_Pyramid;
+			setPosAndRandomNumbers(str);
+			str.setDefaultSmallBuildingSettings();
+			generateStructures.push_back(str);
+		};
+
+		auto igloo = [&]()
+		{
+			StructureToGenerate str;
+			str.type = Structure_Igloo;
+			setPosAndRandomNumbers(str);
+			str.setDefaultSmallBuildingSettings();
+			generateStructures.push_back(str);
+		};
+
+		auto minesDungeon = [&]()
+		{
+			StructureToGenerate str;
+			str.type = Structure_MinesDungeon;
+			setPosAndRandomNumbers(str);
+			str.setDefaultDungeonSettings();
+			generateStructures.push_back(str);
+		};
+
 		auto goblinTower = [&]()
 		{
 			StructureToGenerate str;
@@ -2258,11 +2294,34 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 					structuresChoice.push_back(nothing);
 
 					
+					// Exploration Update: each biome gets recognisable landmarks.
 					if (currentBiomeIndex == BiomesManager::hayLand)
 					{
 						structuresChoice.push_back(barn);
 						structuresChoice.push_back(barn);
 						structuresChoice.push_back(barn);
+						structuresChoice.push_back(tavern);
+					}
+					else if (currentBiomeIndex == BiomesManager::desert)
+					{
+						structuresChoice.push_back(pyramid);
+						structuresChoice.push_back(pyramid);
+						structuresChoice.push_back(smallStoneRuins);
+					}
+					else if (currentBiomeIndex == BiomesManager::snow)
+					{
+						structuresChoice.push_back(igloo);
+						structuresChoice.push_back(igloo);
+					}
+					else if (currentBiomeIndex == BiomesManager::plains)
+					{
+						structuresChoice.push_back(treeHouse);
+					}
+					else if (currentBiomeIndex == BiomesManager::wasteLand)
+					{
+						structuresChoice.push_back(smallStoneRuins);
+						structuresChoice.push_back(smallStoneRuins);
+						structuresChoice.push_back(goblinTower);
 					}
 
 					if (dataForStructureGen.lakes > 0.2 || dataForStructureGen.rivers > 0.2)
@@ -2288,6 +2347,14 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 					uint32_t randomValue = hash(c.x, c.z, seedHash++);
 					int index = randomValue % structuresChoice.size();
 					structuresChoice[index](); // Call the selected function
+
+
+					// Rare underground destination, deterministic from world seed/chunk.
+					uint32_t dungeonRoll = hash(c.x, c.z, seedHash++);
+					if (chunkDistanceFromCenter > 8 && (dungeonRoll % 24u) == 0u)
+					{
+						minesDungeon();
+					}
 
 
 				}

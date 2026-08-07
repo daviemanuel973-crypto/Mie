@@ -263,6 +263,22 @@ bool spawnZombie(
 		ZombieServer serverZombie = {};
 		serverZombie.entity = zombie;
 
+		// Deterministic variants avoid adding bytes to the current spawn protocol.
+		// 70% walkers, 20% runners, 10% brutes.
+		const unsigned int variantRoll = static_cast<unsigned int>(newId % 10u);
+		if (variantRoll == 0u)
+		{
+			serverZombie.variant = ZombieServer::Brute;
+			serverZombie.moveSpeedMultiplier = 0.72f;
+			serverZombie.entity.life = Life{320};
+		}
+		else if (variantRoll <= 2u)
+		{
+			serverZombie.variant = ZombieServer::Runner;
+			serverZombie.moveSpeedMultiplier = 1.45f;
+			serverZombie.entity.life = Life{125};
+		}
+
 		c->entityData.zombies.insert({newId, serverZombie});
 		chunkManager.entityChunkPositions[newId] = determineChunkThatIsEntityIn(serverZombie.getPosition());
 
