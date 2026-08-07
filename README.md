@@ -18,31 +18,42 @@ Go check out the videos on [YouTube about it](https://www.youtube.com/watch?v=St
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
 
+## Survival + Linux package
+
+The Mie branch adds the Survival v0.1 gameplay loop (hunger, food, crafting progression, armour and survival-first spawn) and now includes an installable Linux Flatpak target.
+
+- Flatpak app ID: `io.github.daviemanuel973.Mie`
+- Runtime: `org.freedesktop.Platform//25.08`
+- CI creates an installable `Mie-Survival-Linux-x86_64.flatpak` bundle.
+- A signed Flatpak repository workflow is included for normal `flatpak update` delivery.
+- Linux saves live in the Flatpak persistent application-data area and survive package updates.
+
+See [`docs/SURVIVAL_MODE.md`](docs/SURVIVAL_MODE.md) and [`docs/LINUX_FLATPAK.md`](docs/LINUX_FLATPAK.md).
 
 Features and todos:
 
 - [ ] Rendering system
   - [ ] Shaders:
   	- [x] Animated nice water 😻
-	- [x] No visual artifacts on textures
-	- [x] PBR pipeline
-	- [x] Lights
+  	- [x] No visual artifacts on textures
+  	- [x] PBR pipeline
+  	- [x] Lights
   	- [ ] Lights stored in cube maps
-	- [ ] Sky Box reflection
-	- [x] SSR
-	- [x] HBAO / SSAO
-	- [x] HDR, ACES tone mapping
-	- [x] Bloom
-	- [x] Automatic exposure
-	- [x] Lens flare
-	- [x] Color grading
-	- [x] Fog -(todo improve)
-	- [x] Underwater fog -(todo improve)
-	- [ ] God rays	
-	- [x] Fake Shadows for all light types (todo improve)
-  	- [x] Shadows (todo optimize)
-   	- [ ] Cascaded shadow maps
-	- [ ] Depth of field (maybe blur far stuff)
+  	- [ ] Sky Box reflection
+  	- [x] SSR
+  	- [x] HBAO / SSAO
+  	- [x] HDR, ACES tone mapping
+  	- [x] Bloom
+  	- [x] Automatic exposure
+  	- [x] Lens flare
+  	- [x] Color grading
+  	- [x] Fog -(todo improve)
+  	- [x] Underwater fog -(todo improve)
+  	- [ ] God rays	
+  	- [x] Fake Shadows for all light types (todo improve)
+  - [x] Shadows (todo optimize)
+  	- [ ] Cascaded shadow maps
+  	- [ ] Depth of field (maybe blur far stuff)
   - [ ] Use the same shader for all things in game
 	
 - [x] Chunk system
@@ -55,10 +66,3 @@ Features and todos:
   - [ ] Buffering
   - [x] Rubber banding
   - [x] Entities
-
-
-
-
-
-
-
