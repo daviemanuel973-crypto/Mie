@@ -20,8 +20,18 @@ jobs:
           ref: agent/survival-v01
           fetch-depth: 1
 
+      - name: Restore zstd CMake files from exact upstream snapshot
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/meemknight/ourCraft/archive/568fa30bee158c9309cf5dbf8b4690cc5a844bce.zip" -OutFile upstream.zip
+          Expand-Archive upstream.zip -DestinationPath upstream
+          $src = Get-ChildItem upstream -Directory | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path thirdparty/zstd-1.5.5/build | Out-Null
+          Copy-Item -Recurse -Force "$($src.FullName)/thirdparty/zstd-1.5.5/build/cmake" "thirdparty/zstd-1.5.5/build/"
+
       - name: Configure MSVC Release with legacy CMake compatibility
-        run: cmake -S . -B build -A x64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        shell: pwsh
+        run: cmake -S . -B build -A x64 "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
       - name: Build MSVC Release
         run: cmake --build build --config Release --parallel 2
