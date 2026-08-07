@@ -1,0 +1,70 @@
+-		c.playerData.inventory.items[33] = itemCreator(ItemTypes::pigSpawnEgg);
+-		c.playerData.inventory.items[34] = Item(BlockTypes::clay);
+-		c.playerData.inventory.items[35] = Item(BlockTypes::glass);
+-
+-		c.playerData.inventory.items[PlayerInventory::COINS_START_INDEX] = Item(ItemTypes::copperCoin);
++		// Survival is now the default. Creative remains available through the server command.
++		c.playerData.otherPlayerSettings.gameMode = OtherPlayerSettings::SURVIVAL;
++		c.playerData.inventory = {};
++		c.playerData.survivalStats = {};
+ 
+ 		insertConnection(id, c);
+ 	}
+@@ -272,6 +257,7 @@ void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
+ 		packetToSend.yourPlayerEntityId = id;
+ 		packetToSend.timer = getTimer();
+ 		packetToSend.otherSettings = getClient(id).playerData.otherPlayerSettings;
++		packetToSend.survivalStats = getClient(id).playerData.survivalStats;
+ 
+ 		//send own cid
+ 		sendPacket(event.peer, p, (const char *)&packetToSend,
+diff --git a/src/gameLayer/multyPlayer/tick.cpp b/src/gameLayer/multyPlayer/tick.cpp
+index c9868dd..dabec55 100644
+--- a/src/gameLayer/multyPlayer/tick.cpp
++++ b/src/gameLayer/multyPlayer/tick.cpp
+@@ -1433,10 +1433,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
+ 										auto effects = getItemEffects(*from, client->playerData.inventory);
+ 										int healing = getItemHealing(*from, client->playerData.inventory);
+ 
+-										//can't eat if satiety doesn't allow it
+-										if (effects.allEffects[Effects::Saturated].timerMs > 0 &&
+-											client->playerData.effects.allEffects[Effects::Saturated].timerMs > 0
+-											)
++										int hungerRestore = getItemHungerRestore(*from);
++										if (from->isFood() && client->playerData.survivalStats.hunger >= client->playerData.survivalStats.maxHunger)
+ 										{
+ 											allowed = 0;
+ 										}
+@@ -1444,6 +1442,11 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
+ 										{
+ 											client->playerData.applyDamageOrLife(healing);
+ 											client->playerData.effects.applyEffects(effects);
++											if (from->isFood())
++											{
++												client->playerData.survivalStats.addHunger(hungerRestore);
++												updatePlayerSurvivalStats(*client);
++											}
+ 										}
+ 
+ 
+@@ -1869,9 +1872,14 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
+ 							client->playerData.effects = {};
+ 							client->playerData.newLife = PLAYER_DEFAULT_LIFE;
+ 							client->playerData.lifeLastFrame = PLAYER_DEFAULT_LIFE;
++							client->playerData.survivalStats = {};
++							client->playerData.hungerExhaustion = 0;
++							client->playerData.starvationTimer = 0;
++							client->playerData.hungerPositionInitialized = false;
+ 							client->playerData.killed = false;
+ 							sendPlayerInventoryAndIncrementRevision(*client);
+ 							sendUpdateLifeLifePlayerPacket(*client);
++							updatePlayerSurvivalStats(*client);
+ 
+ 							Packet packet;
+ 							packet.cid = i.cid;
+@@ -2086,6 +2094,63 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
+ #pragma endregion
+ 
+ 
++#pragma region survival hunger
++
