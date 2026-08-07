@@ -92,6 +92,14 @@ set_property(TARGET "${CMAKE_PROJECT_NAME}" PROPERTY CXX_STANDARD 17)
 
 target_sources("${CMAKE_PROJECT_NAME}" PRIVATE ${MY_SOURCES} ${SHARED_SOURCES})
 
+# The original Windows-oriented source relies on a few declarations being
+# visible before template definitions and contains a Win32-only debug picker.
+# Force-include a tiny compatibility header only for GNU/Linux builds.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND UNIX AND NOT APPLE)
+	target_compile_options("${CMAKE_PROJECT_NAME}" PRIVATE
+		-include "${CMAKE_CURRENT_SOURCE_DIR}/include/platform/linuxLegacyCompat.h")
+endif()
+
 if (OURCRAFT_INSTALLABLE)
 	include(GNUInstallDirs)
 	# Flatpak installs under /app; distro packages can override CMAKE_INSTALL_PREFIX.
