@@ -26,6 +26,9 @@ jobs:
       - name: Apply deterministic source transformations
         run: python3 tools/apply_lowend_optimization.py
 
+      - name: Keep workflow files out of the bot-authored commit
+        run: git checkout -- .github/workflows/linux-flatpak-ci.yml
+
       - name: Validate resulting diff
         run: git diff --check
 
@@ -33,7 +36,6 @@ jobs:
         run: |
           rm -f patches/lowend-performance.patch
           rm -f tools/apply_lowend_optimization.py
-          rm -f .github/workflows/apply-lowend-performance.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
