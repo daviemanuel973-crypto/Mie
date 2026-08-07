@@ -1,0 +1,369 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6c5778e..0000000 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,6 +20,7 @@ project(ourCraft)
+ 
+ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
+ option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
++option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
+ 
+ # Keep the MSVC runtime statically linked for the Windows build.
+ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
+@@ -88,6 +89,16 @@ set_property(TARGET "${CMAKE_PROJECT_NAME}" PROPERTY CXX_STANDARD 17)
+ 
+ target_sources("${CMAKE_PROJECT_NAME}" PRIVATE ${MY_SOURCES} ${SHARED_SOURCES})
+ 
++if (OURCRAFT_LOW_END_BUILD)
++	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC OURCRAFT_LOW_END_BUILD=1)
++	# Favor predictable Release performance without changing floating-point
++	# semantics as aggressively as -ffast-math would.
++	if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
++		target_compile_options("${CMAKE_PROJECT_NAME}" PRIVATE
++			$<$<CONFIG:Release>:-O3;-fno-math-errno;-fno-trapping-math;-fomit-frame-pointer>)
++	endif()
++endif()
++
+ # The original Windows-oriented source relies on a few declarations being
+ # visible before template definitions and contains a Win32-only debug picker.
+ # Force-include a tiny compatibility header only for GNU/Linux builds.
+diff --git a/include/gameLayer/rendering/renderSettings.h b/include/gameLayer/rendering/renderSettings.h
+index 97db182..0000000 100644
+--- a/include/gameLayer/rendering/renderSettings.h
++++ b/include/gameLayer/rendering/renderSettings.h
+@@ -32,20 +32,35 @@ std::string getSkinName();
+ struct ShadingSettings
+ {
+ 
++#if defined(OURCRAFT_LOW_END_BUILD)
++	int viewDistance = 5;
++	int tonemapper = 0;
++	int shadows = 0;
++	int waterType = 0;
++	int workerThreadsForBaking = 1;
++	int lodStrength = 5;
++	int PBR = 0;
++	int maxLights = 8;
++	int useLights = 1;
++	float lightsStrength = 1.f;
++	bool FXAA = 1;
++#else
+ 	int viewDistance = 15;
+ 	int tonemapper = 0;
+ 	int shadows = 0;
+ 	int waterType = 1;
+-	int workerThreadsForBaking = 2; //MOVE TODO
+-	int lodStrength = 1; //MOVE TODO
++	int workerThreadsForBaking = 2;
++	int lodStrength = 1;
+ 	int PBR = 1;
+ 	int maxLights = 40;
+ 	int useLights = 1;
+ 	float lightsStrength = 1.f;
+ 	bool FXAA = 1;
++#endif
+ 
+ 	glm::vec3 waterColor = (glm::vec3(6, 42, 52) / 255.f);
+ 	glm::vec3 underWaterColor = glm::vec3(0, 17, 25) / 255.f;
+@@ -59,9 +74,15 @@ struct ShadingSettings
+ 	float bloomMultiplier = 0.5;
+ 
+ 	float exposure = 0;
+ 	float fogGradient = 16.f;
++#if defined(OURCRAFT_LOW_END_BUILD)
++	int bloom = 0;
++	int SSR = 0;
++#else
+ 	int bloom = 1;
+-
+ 	int SSR = 1;
++#endif
+ 
+ 	float toneMapSaturation = 1;
+@@ -91,6 +112,8 @@ ShadingSettings &getShadingSettings();
+ 
+ bool checkIfShadingSettingsChangedForShaderReloads();
+ 
++void applyLowEndPerformancePreset(ProgramData &programData);
++
+ void saveShadingSettings();
+ 
+ void loadShadingSettings();
+diff --git a/include/gameLayer/rendering/renderer.h b/include/gameLayer/rendering/renderer.h
+index 0000000..0000000 100644
+--- a/include/gameLayer/rendering/renderer.h
++++ b/include/gameLayer/rendering/renderer.h
+@@ -224,10 +224,17 @@ struct Renderer
+ 	struct FXAAData
+ 	{
+ 		float edgeMinTreshold = 0.028;
+ 		float edgeDarkTreshold = 0.125;
++#if defined(OURCRAFT_LOW_END_BUILD)
++		int ITERATIONS = 6;
++		float quaityMultiplier = 0.65;
++		float SUBPIXEL_QUALITY = 0.60;
++#else
+ 		int ITERATIONS = 12;
+ 		float quaityMultiplier = 0.8;
+ 		float SUBPIXEL_QUALITY = 0.95;
++#endif
+ 	}fxaaData;
+@@ -391,7 +398,11 @@ struct Renderer
+ 	bool zprepass = 1;
+ 	bool renderTransparent = 1;
+ 	bool frustumCulling = 1;
++#if defined(OURCRAFT_LOW_END_BUILD)
++	bool ssao = 0;
++#else
+ 	bool ssao = 1;
++#endif
+ 	
+ 	FBO fboHBAO;
+diff --git a/src/gameLayer/rendering/renderSettings.cpp b/src/gameLayer/rendering/renderSettings.cpp
+index d43d57e..0000000 100644
+--- a/src/gameLayer/rendering/renderSettings.cpp
++++ b/src/gameLayer/rendering/renderSettings.cpp
+@@ -18,6 +18,31 @@ void displayRenderSettingsMenuButton(ProgramData &programData)
+ #define DEFAULT_COLOR_PICKER programData.ui.buttonTexture, programData.ui.buttonTexture, Colors_Gray, Colors_Gray
+ #define DEFAULT_COLOR_PICKER_TRANSPARENT programData.ui.buttonTexture, programData.ui.buttonTexture, {(float)0x7F / 255.0f, (float)0x7F / 255.0f, (float)0x7F / 255.0f, 0.65}, {(float)0x7F / 255.0f, (float)0x7F / 255.0f, (float)0x7F / 255.0f, 0.65}
+ 
++void applyLowEndPerformancePreset(ProgramData &programData)
++{
++	auto &settings = getShadingSettings();
++	settings.viewDistance = 5;
++	settings.lodStrength = 5;
++	settings.workerThreadsForBaking = 1;
++	settings.shadows = 0;
++	settings.waterType = 0;
++	settings.PBR = 0;
++	settings.SSR = 0;
++	settings.bloom = 0;
++	settings.bloomMultiplier = 0.f;
++	settings.maxLights = 8;
++	settings.useLights = 1;
++	settings.FXAA = 1;
++
++	programData.renderer.frustumCulling = true;
++	programData.renderer.sortChunks = true;
++	programData.renderer.ssao = false;
++	programData.renderer.fxaaData.ITERATIONS = 6;
++	programData.renderer.fxaaData.quaityMultiplier = 0.65f;
++	programData.renderer.fxaaData.SUBPIXEL_QUALITY = 0.60f;
++}
++
+ void displayRenderSettingsMenu(ProgramData &programData)
+ {
+@@ -36,6 +61,12 @@ void displayRenderSettingsMenu(ProgramData &programData)
+ 
+ 	programData.ui.menuRenderer.Text("Rendering Settings...", Colors_White);
+ 
++	if (programData.ui.menuRenderer.Button("Performance preset (Intel HD / low-end)", Colors_Gray,
++		programData.ui.buttonTexture))
++	{
++		applyLowEndPerformancePreset(programData);
++	}
++
+ 	programData.ui.menuRenderer.sliderInt("View Distance", &getShadingSettings().viewDistance,
+ 		1, 50, Colors_White, programData.ui.buttonTexture, Colors_Gray,
+ 		programData.ui.buttonTexture, Colors_White);
+diff --git a/src/gameLayer/rendering/renderer.cpp b/src/gameLayer/rendering/renderer.cpp
+index 0000000..0000000 100644
+--- a/src/gameLayer/rendering/renderer.cpp
++++ b/src/gameLayer/rendering/renderer.cpp
+@@ -2607,7 +2607,7 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
+ 	//filteredBloomColor.updateSize(screenX, screenY);
+ 	//filteredBloomColor.clearFBO();
+ 
+-	if (filterBloomSize != glm::ivec2(screenX, screenY))
++	if (getShadingSettings().bloom && filterBloomSize != glm::ivec2(screenX, screenY))
+ 	{
+ 		filterBloomSize = glm::ivec2(screenX, screenY);
+@@ -2676,7 +2676,10 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
+ 
+ 	fboLastFrame.updateSize(screenX, screenY);
+ 	fboLastFramePositions.updateSize(screenX, screenY);
+-	fboHBAO.updateSize(screenX / 2, screenY / 2);
++	if (ssao)
++	{
++		fboHBAO.updateSize(screenX / 2, screenY / 2);
++	}
+ 
+ 	fboSkyBox.updateSize(screenX, screenY);
+@@ -3699,6 +3702,7 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
+ #pragma endregion
+ 
+ #pragma region get automatic exposure
++#if !defined(OURCRAFT_LOW_END_BUILD)
+ 	if(1)
+ 	{
+@@ -3768,6 +3772,10 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
+ 
+ 	}
++#else
++	averageLuminosity = 0.5f;
++	adaptiveExposure.currentExposure = 1.6f;
++#endif
+ #pragma endregion
+ 
+ 	bool lastBloomChannel = 0;
+diff --git a/src/platform/glfwMain.cpp b/src/platform/glfwMain.cpp
+index 6186773..0000000 100644
+--- a/src/platform/glfwMain.cpp
++++ b/src/platform/glfwMain.cpp
+@@ -14,6 +14,13 @@
+ #include <profilerLib/include/profilerLib.h>
+ #include <errorReporting.h>
++#include <thread>
++#include <cstdlib>
++#include <cstring>
++
++#ifdef __linux__
++#include <unistd.h>
++#endif
+ 
+ 
+ #ifdef _WIN32
+@@ -301,7 +308,7 @@ namespace platform
+ #pragma endregion
+ 
+ 
+-int main()
++int main(int argc, char **argv)
+ {
+@@ -333,11 +340,16 @@ int main()
+ 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+ 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+ 
++#if defined(OURCRAFT_LOW_END_BUILD)
++	int w = 1280;
++	int h = 720;
++#else
+ 	int w = 500;
+ 	int h = 500;
++#endif
+ 	wind = glfwCreateWindow(w, h, "geam", nullptr, nullptr);
+ 	glfwMakeContextCurrent(wind);
+-	//glfwSwapInterval(1);
++	glfwSwapInterval(0);
+@@ -355,11 +367,34 @@ int main()
+ 
+ 	permaAssertComment(gladLoadGL(), "err initializing glad");
+ 
+-	if (!GLAD_GL_NV_bindless_texture)
++	if (glGetTextureHandleARB == nullptr || glMakeTextureHandleResidentARB == nullptr)
+ 	{
+-		std::cout << "Error, Bindless texture extension not supported!\nUsually integrated GPUs don't support this extension, this will be fixed in the future.\n";
+-		std::cout << "Press enter to try anyway...\n";
+-		system("pause");
++#ifdef __linux__
++		const char *mesaDriver = std::getenv("MESA_LOADER_DRIVER_OVERRIDE");
++		if (!mesaDriver || std::strcmp(mesaDriver, "zink") != 0)
++		{
++			std::cerr << "Native OpenGL does not expose ARB_bindless_texture; retrying through Mesa Zink.\n";
++			glfwDestroyWindow(wind);
++			wind = nullptr;
++			glfwTerminate();
++			if (setenv("MESA_LOADER_DRIVER_OVERRIDE", "zink", 1) != 0)
++			{
++				std::cerr << "Could not enable the Zink compatibility path.\n";
++				return 1;
++			}
++			execv("/proc/self/exe", argv);
++			std::cerr << "Could not restart the game through Zink.\n";
++			return 1;
++		}
++		std::cerr << "ARB_bindless_texture is unavailable even through Zink.\n";
++		return 1;
++#else
++		std::cout << "Error, ARB_bindless_texture is not supported by this GPU/driver.\n";
++#ifdef _WIN32
++		system("pause");
++#endif
++		return 1;
++#endif
+ 	}
+@@ -432,6 +467,10 @@ int main()
+ 
+ 	while (!glfwWindowShouldClose(wind))
+ 	{
++#if defined(OURCRAFT_LOW_END_BUILD)
++		auto frameStartLowEnd = std::chrono::steady_clock::now();
++#endif
++
+ 		//UpdateMusicStream(m);
+ 		//PlayMusicStream(m);
+@@ -580,6 +619,47 @@ int main()
+ 
+ 		glfwPollEvents();
+ 
++#if defined(OURCRAFT_LOW_END_BUILD)
++		// Keep frame pacing predictable on weak integrated GPUs. Start at 60 FPS;
++		// if the rendering workload cannot sustain it, settle at a stable 30 FPS.
++		auto frameWorkEnd = std::chrono::steady_clock::now();
++		double workMs = std::chrono::duration<double, std::milli>(frameWorkEnd - frameStartLowEnd).count();
++		static double smoothedWorkMs = 16.67;
++		static int slowFrames = 0;
++		static int fastFrames = 0;
++		static bool stable30Mode = false;
++
++		smoothedWorkMs = smoothedWorkMs * 0.95 + workMs * 0.05;
++		if (!stable30Mode)
++		{
++			if (smoothedWorkMs > 20.5)
++			{
++				if (++slowFrames >= 90)
++				{
++					stable30Mode = true;
++					slowFrames = 0;
++				}
++			}
++			else
++			{
++				slowFrames = std::max(0, slowFrames - 2);
++			}
++		}
++		else
++		{
++			if (smoothedWorkMs < 13.5)
++			{
++				if (++fastFrames >= 300)
++				{
++					stable30Mode = false;
++					fastFrames = 0;
++				}
++			}
++			else { fastFrames = 0; }
++		}
++
++		auto targetFrame = !platform::isFocused() ? std::chrono::microseconds(66667) :
++			(stable30Mode ? std::chrono::microseconds(33333) : std::chrono::microseconds(16667));
++		std::this_thread::sleep_until(frameStartLowEnd + targetFrame);
++#endif
++
+ 	#pragma endregion
+ 
+ 	}
+diff --git a/flatpak/io.github.daviemanuel973.Mie.yml b/flatpak/io.github.daviemanuel973.Mie.yml
+index 4a985c9..0000000 100644
+--- a/flatpak/io.github.daviemanuel973.Mie.yml
++++ b/flatpak/io.github.daviemanuel973.Mie.yml
+@@ -17,7 +17,7 @@ modules:
+   - name: mie-survival
+     buildsystem: simple
+     build-commands:
+-      - cmake -S . -B build-flatpak -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/app -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DOURCRAFT_INSTALLABLE=ON -DOURCRAFT_ENABLE_AVX2=OFF
++      - cmake -S . -B build-flatpak -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/app -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DOURCRAFT_INSTALLABLE=ON -DOURCRAFT_ENABLE_AVX2=OFF -DOURCRAFT_LOW_END_BUILD=ON
+       - cmake --build build-flatpak --parallel "${FLATPAK_BUILDER_N_JOBS:-2}"
+       - cmake --install build-flatpak
+       - install -Dm755 flatpak/ourcraft-launcher.sh /app/bin/ourcraft-flatpak
+diff --git a/.github/workflows/linux-flatpak-ci.yml b/.github/workflows/linux-flatpak-ci.yml
+index ba7f676..0000000 100644
+--- a/.github/workflows/linux-flatpak-ci.yml
++++ b/.github/workflows/linux-flatpak-ci.yml
+@@ -5,6 +5,7 @@ on:
+     branches:
+       - agent/survival-linux-flatpak
++      - agent/linux-lowend-performance
+   pull_request:
+     paths:
+       - 'CMakeLists.txt'
