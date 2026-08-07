@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "content_version": "0.2-wip",
+  "status": "development",
+  "notes": "Data contract for advanced survival/exploration systems. Numeric engine IDs are intentionally not assigned here; integration must map stable keys to engine enums after asset validation.",
+  "crops": [
+    {"id":"crop.wheat","seed":"item.wheat_seed","produce":"item.wheat","growth_stages":5,"growth_seconds":420,"biomes":["plains","hayland"],"water_bonus":1.25},
+    {"id":"crop.carrot","seed":"item.carrot_seed","produce":"item.carrot","growth_stages":4,"growth_seconds":360,"biomes":["plains","forest"],"water_bonus":1.2},
+    {"id":"crop.potato","seed":"item.potato_seed","produce":"item.potato","growth_stages":4,"growth_seconds":390,"biomes":["plains","snow"],"water_bonus":1.15},
+    {"id":"crop.moonroot","seed":"item.moonroot_seed","produce":"item.moonroot","growth_stages":6,"growth_seconds":720,"biomes":["wasteland","cave_lush"],"water_bonus":1.0,"rare":true}
+  ],
+  "cooking_recipes": [
+    {"id":"cook.baked_potato","station":"station.campfire","inputs":[["item.potato",1]],"output":["food.baked_potato",1],"hunger":18},
+    {"id":"cook.vegetable_stew","station":"station.cooking_pot","inputs":[["item.carrot",1],["item.potato",1],["item.wheat",1]],"output":["food.vegetable_stew",1],"hunger":32,"buff":{"id":"buff.well_fed","seconds":90}},
+    {"id":"cook.hearty_stew","station":"station.cooking_pot","inputs":[["item.meat_raw",1],["item.potato",1],["item.carrot",1]],"output":["food.hearty_stew",1],"hunger":42,"buff":{"id":"buff.regeneration_minor","seconds":20}},
+    {"id":"cook.berry_porridge","station":"station.cooking_pot","inputs":[["item.wheat",2],["item.berry",2]],"output":["food.berry_porridge",1],"hunger":26}
+  ],
+  "backpacks": [
+    {"id":"backpack.small","extra_slots":6,"recipe":[["item.cloth",6],["item.leather",2]],"tier":1},
+    {"id":"backpack.field","extra_slots":12,"recipe":[["backpack.small",1],["item.cloth",8],["item.iron_ingot",2]],"tier":2},
+    {"id":"backpack.explorer","extra_slots":18,"recipe":[["backpack.field",1],["item.leather",6],["item.silver_ingot",2]],"tier":3}
+  ],
+  "base_tiers": [
+    {"id":"base.shelter","rank":1,"requirements":{"enclosed_blocks":48,"workstations":["station.campfire"],"storage":1},"unlocks":["recipe.backpack.small"]},
+    {"id":"base.camp","rank":2,"requirements":{"enclosed_blocks":96,"workstations":["station.workbench","station.campfire"],"storage":2},"unlocks":["recipe.backpack.field","recipe.anvil"]},
+    {"id":"base.base","rank":3,"requirements":{"enclosed_blocks":180,"workstations":["station.workbench_advanced","station.anvil","station.cooking_pot"],"storage":4},"unlocks":["upgrade.weapon.reinforced","event.raid_goblin"]},
+    {"id":"base.fortress","rank":4,"requirements":{"enclosed_blocks":320,"workstations":["station.workbench_advanced","station.anvil","station.alchemy_table"],"storage":8},"unlocks":["upgrade.weapon.tempered","treasure.vault_key"]}
+  ],
+  "workstations": [
+    {"id":"station.campfire","tier":1,"functions":["cook_basic","warmth"]},
+    {"id":"station.workbench_advanced","tier":2,"functions":["craft_advanced","backpacks"]},
+    {"id":"station.anvil","tier":2,"functions":["repair","weapon_upgrades","armor_upgrades"]},
+    {"id":"station.alchemy_table","tier":3,"functions":["potions","rare_material_processing"]}
+  ],
+  "weapon_upgrades": [
+    {"id":"upgrade.weapon.reinforced","station":"station.anvil","max_level":3,"effects":{"damage_percent_per_level":7,"durability_percent_per_level":12},"costs":["item.iron_ingot"]},
+    {"id":"upgrade.weapon.balanced","station":"station.anvil","max_level":2,"effects":{"attack_speed_percent_per_level":5,"damage_percent_per_level":2},"costs":["item.silver_ingot"]},
+    {"id":"upgrade.weapon.tempered","station":"station.anvil","max_level":1,"effects":{"damage_percent":15,"durability_percent":20},"costs":["item.gold_ingot","item.ancient_shard"]}
+  ],
+  "treasures": [
+    {"id":"treasure.ancient_lantern","rarity":"rare","source":["structure.mine_dungeon","structure.ruin"],"effect":{"light_radius_bonus":0.35}},
+    {"id":"treasure.surveyor_compass","rarity":"rare","source":["structure.pyramid","structure.tower"],"effect":{"reveals_nearest_poi":true,"cooldown_seconds":180}},
+    {"id":"treasure.miners_charm","rarity":"rare","source":["structure.mine_dungeon"],"effect":{"mining_speed_percent":10}},
+    {"id":"treasure.ancient_shard","rarity":"uncommon","source":["structure.ruin","structure.pyramid","event.meteor"],"stack":16},
+    {"id":"treasure.vault_key","rarity":"epic","source":["event.goblin_raid","structure.deep_vault"],"stack":1}
+  ],
+  "discoveries": [
+    {"id":"discovery.biome.plains","category":"biome","trigger":"enter:plains","reward_xp":5},
+    {"id":"discovery.biome.wasteland","category":"biome","trigger":"enter:wasteland","reward_xp":10},
+    {"id":"discovery.biome.snow","category":"biome","trigger":"enter:snow","reward_xp":8},
+    {"id":"discovery.structure.pyramid","category":"structure","trigger":"approach:structure.pyramid:24","reward_xp":20},
+    {"id":"discovery.structure.mine","category":"structure","trigger":"approach:structure.mine_dungeon:24","reward_xp":25},
+    {"id":"discovery.enemy.runner","category":"enemy","trigger":"see:zombie.runner","reward_xp":8},
+    {"id":"discovery.enemy.brute","category":"enemy","trigger":"see:zombie.brute","reward_xp":12},
+    {"id":"discovery.resource.ancient_shard","category":"resource","trigger":"pickup:item.ancient_shard","reward_xp":15}
+  ],
+  "world_events": [
+    {"id":"event.heavy_fog","weight":12,"min_day":2,"duration_seconds":[180,420],"effects":{"visibility_multiplier":0.55,"hostile_spawn_multiplier":1.1}},
+    {"id":"event.quiet_night","weight":8,"min_day":1,"duration_seconds":[240,480],"effects":{"hostile_spawn_multiplier":0.35}},
+    {"id":"event.blood_moon","weight":3,"min_day":5,"duration_seconds":[300,600],"effects":{"hostile_spawn_multiplier":1.8,"elite_chance":0.18,"loot_multiplier":1.25}},
+    {"id":"event.goblin_raid","weight":2,"min_day":7,"requires_base_rank":2,"duration_seconds":[240,420],"effects":{"raid_waves":[2,4]}},
+    {"id":"event.meteor","weight":1,"min_day":4,"duration_seconds":[1,1],"effects":{"creates_poi":"structure.meteor_crater","loot":["item.ancient_shard","item.iron_ingot"]}}
+  ],
+  "cave_themes": [
+    {"id":"cave.normal","depth":[20,80],"weight":70,"features":["ore_pockets","small_lakes"]},
+    {"id":"cave.lush","depth":[15,55],"weight":12,"features":["moonroot","water_pools","glow_plants"]},
+    {"id":"cave.crystal","depth":[45,110],"weight":8,"features":["crystal_clusters","rare_ore"]},
+    {"id":"cave.ruined","depth":[35,120],"weight":7,"features":["ancient_corridor","loot_room","collapsed_supports"]},
+    {"id":"cave.abyssal","depth":[85,160],"weight":3,"features":["elite_spawns","deep_vault","ancient_shards"]}
+  ],
+  "poi_expansion": [
+    {"id":"structure.meteor_crater","biomes":["plains","wasteland"],"rarity":0.002,"loot_table":"loot.meteor"},
+    {"id":"structure.deep_vault","biomes":["underground"],"rarity":0.001,"loot_table":"loot.deep_vault"},
+    {"id":"structure.abandoned_farm","biomes":["plains","hayland"],"rarity":0.008,"loot_table":"loot.farm"},
+    {"id":"structure.watchtower_ruin","biomes":["plains","wasteland","snow"],"rarity":0.006,"loot_table":"loot.watchtower"}
+  ],
+  "map_system": {"reveal_radius_chunks":1,"persist_visited_chunks":true,"show_player_markers":false,"poi_markers_require_discovery":true},
+  "night_danger": {"start_hour":19.5,"end_hour":5.5,"hostile_spawn_multiplier":1.35,"runner_chance_bonus":0.06,"brute_chance_bonus":0.03}
+}
