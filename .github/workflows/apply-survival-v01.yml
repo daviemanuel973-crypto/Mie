@@ -1,0 +1,60 @@
+name: Apply and validate Survival v0.1
+
+on:
+  push:
+    branches:
+      - agent/survival-v01
+    paths:
+      - .github/workflows/apply-survival-v01.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout survival branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/survival-v01
+          fetch-depth: 0
+
+      - name: Reassemble and verify patch
+        shell: bash
+        run: |
+          cat .github/survival-patch/part_* > /tmp/survival_v01.patch
+          git apply --check /tmp/survival_v01.patch
+
+      - name: Apply Survival v0.1
+        shell: bash
+        run: |
+          git apply /tmp/survival_v01.patch
+          rm -rf .github/survival-patch
+          rm -f .github/workflows/apply-survival-v01.yml
+          git add -A
+          git diff --cached --check
+
+      - name: Commit Survival v0.1
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add Survival mode v0.1"
+          git push origin HEAD:agent/survival-v01
+
+  windows-build:
+    needs: apply
+    runs-on: windows-latest
+    steps:
+      - name: Checkout applied survival branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/survival-v01
+          fetch-depth: 1
+
+      - name: Configure MSVC Release
+        run: cmake -S . -B build -A x64
+
+      - name: Build MSVC Release
+        run: cmake --build build --config Release --parallel 2
