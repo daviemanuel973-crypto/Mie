@@ -31,9 +31,8 @@ BaseBlock *BlocksWithDataHolder::getOrCreateBaseBlock(unsigned char x, unsigned 
 	}
 	else
 	{
-		baseBlocks[hash] = {};
-		found = baseBlocks.find(hash);
-		return &found->second;
+		auto inserted = baseBlocks.try_emplace(hash);
+		return &inserted.first->second;
 	}
 }
 
@@ -67,9 +66,8 @@ ChestBlock *BlocksWithDataHolder::getOrCreateChestBlock
 	}
 	else
 	{
-		chestBlocks[hash] = {};
-		found = chestBlocks.find(hash);
-		return &found->second;
+		auto inserted = chestBlocks.try_emplace(hash);
+		return &inserted.first->second;
 	}
 }
 
@@ -149,7 +147,7 @@ void BlocksWithDataHolder::loadBlockData(std::vector<unsigned char> &data,
 	int chunkXChunkSpace, int chunkZChunkSpace)
 {
 
-	*this = {};
+	*this = BlocksWithDataHolder{};
 
 	int pointer = 0;
 
