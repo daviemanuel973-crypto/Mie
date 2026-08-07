@@ -1,0 +1,36 @@
+name: Structure loot applicator
+
+on:
+  push:
+    branches:
+      - "agent/content-exploration-v01"
+    paths:
+      - ".github/workflows/apply-structure-loot.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "agent/content-exploration-v01"
+          fetch-depth: 0
+      - name: Apply structure loot
+        run: python3 .github/scripts/apply_structure_loot.py
+      - name: Validate
+        run: |
+          git diff --check
+          grep -q "Structure loot" docs/EXPLORATION_CONTENT.md
+          grep -q "Universal expedition supplies" src/gameLayer/multyPlayer/serverChunkStorer.cpp
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/apply-structure-loot.yml
+          rm .github/scripts/apply_structure_loot.py
+          git add -A
+          git commit -m "Add deterministic structure chest loot"
+          git push origin agent/content-exploration-v01
