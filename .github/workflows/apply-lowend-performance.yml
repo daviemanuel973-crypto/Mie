@@ -1,0 +1,43 @@
+name: Apply Low-End Performance Patch
+
+on:
+  push:
+    branches:
+      - agent/linux-lowend-performance
+    paths:
+      - patches/lowend-performance.patch
+      - .github/workflows/apply-lowend-performance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-performance-patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+        with:
+          ref: agent/linux-lowend-performance
+          fetch-depth: 0
+
+      - name: Validate patch
+        run: git apply --check patches/lowend-performance.patch
+
+      - name: Apply patch
+        run: git apply patches/lowend-performance.patch
+
+      - name: Validate resulting diff
+        run: git diff --check
+
+      - name: Commit optimized sources
+        run: |
+          rm patches/lowend-performance.patch
+          rm .github/workflows/apply-lowend-performance.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Optimize Linux build for low-end hardware"
+          git push origin HEAD:agent/linux-lowend-performance
