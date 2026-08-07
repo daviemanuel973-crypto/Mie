@@ -1,0 +1,121 @@
+name: Publish Flatpak Repository
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'linux-v*'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: flatpak-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder gnupg
+
+      - name: Configure Flathub
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+
+      - name: Import repository signing key
+        env:
+          FLATPAK_GPG_PRIVATE_KEY_B64: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY_B64 }}
+          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+        run: |
+          test -n "$FLATPAK_GPG_PRIVATE_KEY_B64" || { echo 'Missing FLATPAK_GPG_PRIVATE_KEY_B64 secret'; exit 1; }
+          test -n "$FLATPAK_GPG_KEY_ID" || { echo 'Missing FLATPAK_GPG_KEY_ID secret'; exit 1; }
+          printf '%s' "$FLATPAK_GPG_PRIVATE_KEY_B64" | base64 --decode | gpg --batch --import
+          gpg --batch --list-secret-keys "$FLATPAK_GPG_KEY_ID"
+
+      - name: Build signed Flatpak repository
+        env:
+          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+        run: |
+          mkdir -p site/repo
+          flatpak-builder --user --force-clean --disable-rofiles-fuse \
+            --repo=site/repo --gpg-sign="$FLATPAK_GPG_KEY_ID" \
+            build-flatpak flatpak/io.github.daviemanuel973.Mie.yml
+          flatpak build-update-repo --gpg-sign="$FLATPAK_GPG_KEY_ID" \
+            --generate-static-deltas site/repo
+
+      - name: Generate install and update metadata
+        env:
+          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+        run: |
+          PUBLIC_KEY="$(gpg --batch --export "$FLATPAK_GPG_KEY_ID" | base64 --wrap=0)"
+          REPO_URL="https://daviemanuel973-crypto.github.io/Mie/repo/"
+          RUNTIME_REPO="https://dl.flathub.org/repo/flathub.flatpakrepo"
+
+          cat > site/Mie-Survival.flatpakref <<EOF
+          [Flatpak Ref]
+          Version=1
+          Name=io.github.daviemanuel973.Mie
+          Branch=stable
+          Title=Mie Survival
+          Url=${REPO_URL}
+          SuggestRemoteName=mie-survival
+          RuntimeRepo=${RUNTIME_REPO}
+          IsRuntime=false
+          GPGKey=${PUBLIC_KEY}
+          EOF
+
+          cat > site/Mie-Survival.flatpakrepo <<EOF
+          [Flatpak Repo]
+          Title=Mie Survival
+          Url=${REPO_URL}
+          Homepage=https://github.com/daviemanuel973-crypto/Mie
+          Comment=Update repository for Mie Survival Linux builds
+          Description=Signed Flatpak repository for Mie Survival
+          GPGKey=${PUBLIC_KEY}
+          EOF
+
+          cp resources/assets/logo.png site/icon.png
+          flatpak build-bundle site/repo site/Mie-Survival-Linux-x86_64.flatpak \
+            io.github.daviemanuel973.Mie stable \
+            --runtime-repo="$RUNTIME_REPO"
+
+          cat > site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head><meta charset="utf-8"><title>Mie Survival for Linux</title></head>
+          <body>
+            <h1>Mie Survival for Linux</h1>
+            <p><a href="Mie-Survival.flatpakref">Install with Flatpak and receive updates</a></p>
+            <p><a href="Mie-Survival-Linux-x86_64.flatpak">Download standalone Flatpak bundle</a></p>
+          </body>
+          </html>
+          EOF
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy Flatpak repository
+        id: deployment
+        uses: actions/deploy-pages@v4
