@@ -1,0 +1,228 @@
+name: Apply Exploration Content v0.1
+
+on:
+  push:
+    branches: [agent/content-exploration-v01]
+    paths: [.github/workflows/apply-exploration-content.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/content-exploration-v01
+          fetch-depth: 0
+
+      - name: Apply content update
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              n = s.count(old)
+              if n != 1:
+                  raise SystemExit(f'{path}: expected exactly one anchor, found {n}')
+              p.write_text(s.replace(old, new, 1))
+
+          # World exploration landmarks using assets already shipped with the game.
+          path = 'src/gameLayer/worldGenerator.cpp'
+          old = '''\t\tauto barn = [&]()
+\t\t{
+\t\t\tStructureToGenerate str;
+\t\t\tstr.type = Structure_Barn;
+\t\t\tsetPosAndRandomNumbers(str);
+\t\t\tstr.setDefaultSmallBuildingSettings();
+\t\t\tgenerateStructures.push_back(str);
+\t\t};
+'''
+          new = old + '''
+\t\tauto treeHouse = [&]()
+\t\t{
+\t\t\tStructureToGenerate str;
+\t\t\tstr.type = Structure_TreeHouse;
+\t\t\tsetPosAndRandomNumbers(str);
+\t\t\tstr.setDefaultSmallBuildingSettings();
+\t\t\tgenerateStructures.push_back(str);
+\t\t};
+
+\t\tauto pyramid = [&]()
+\t\t{
+\t\t\tStructureToGenerate str;
+\t\t\tstr.type = Structure_Pyramid;
+\t\t\tsetPosAndRandomNumbers(str);
+\t\t\tstr.setDefaultSmallBuildingSettings();
+\t\t\tgenerateStructures.push_back(str);
+\t\t};
+
+\t\tauto igloo = [&]()
+\t\t{
+\t\t\tStructureToGenerate str;
+\t\t\tstr.type = Structure_Igloo;
+\t\t\tsetPosAndRandomNumbers(str);
+\t\t\tstr.setDefaultSmallBuildingSettings();
+\t\t\tgenerateStructures.push_back(str);
+\t\t};
+
+\t\tauto minesDungeon = [&]()
+\t\t{
+\t\t\tStructureToGenerate str;
+\t\t\tstr.type = Structure_MinesDungeon;
+\t\t\tsetPosAndRandomNumbers(str);
+\t\t\tstr.setDefaultDungeonSettings();
+\t\t\tgenerateStructures.push_back(str);
+\t\t};
+'''
+          replace_once(path, old, new)
+
+          old = '''\t\t\t\t\tif (currentBiomeIndex == BiomesManager::hayLand)
+\t\t\t\t\t{
+\t\t\t\t\t\tstructuresChoice.push_back(barn);
+\t\t\t\t\t\tstructuresChoice.push_back(barn);
+\t\t\t\t\t\tstructuresChoice.push_back(barn);
+\t\t\t\t\t}
+'''
+          new = '''\t\t\t\t\t// Exploration Update: each biome gets recognisable landmarks.
+\t\t\t\t\tif (currentBiomeIndex == BiomesManager::hayLand)
+\t\t\t\t\t{
+\t\t\t\t\t\tstructuresChoice.push_back(barn);
+\t\t\t\t\t\tstructuresChoice.push_back(barn);
+\t\t\t\t\t\tstructuresChoice.push_back(barn);
+\t\t\t\t\t\tstructuresChoice.push_back(tavern);
+\t\t\t\t\t}
+\t\t\t\t\telse if (currentBiomeIndex == BiomesManager::desert)
+\t\t\t\t\t{
+\t\t\t\t\t\tstructuresChoice.push_back(pyramid);
+\t\t\t\t\t\tstructuresChoice.push_back(pyramid);
+\t\t\t\t\t\tstructuresChoice.push_back(smallStoneRuins);
+\t\t\t\t\t}
+\t\t\t\t\telse if (currentBiomeIndex == BiomesManager::snow)
+\t\t\t\t\t{
+\t\t\t\t\t\tstructuresChoice.push_back(igloo);
+\t\t\t\t\t\tstructuresChoice.push_back(igloo);
+\t\t\t\t\t}
+\t\t\t\t\telse if (currentBiomeIndex == BiomesManager::plains)
+\t\t\t\t\t{
+\t\t\t\t\t\tstructuresChoice.push_back(treeHouse);
+\t\t\t\t\t}
+\t\t\t\t\telse if (currentBiomeIndex == BiomesManager::wasteLand)
+\t\t\t\t\t{
+\t\t\t\t\t\tstructuresChoice.push_back(smallStoneRuins);
+\t\t\t\t\t\tstructuresChoice.push_back(smallStoneRuins);
+\t\t\t\t\t\tstructuresChoice.push_back(goblinTower);
+\t\t\t\t\t}
+'''
+          replace_once(path, old, new)
+
+          old = '''\t\t\t\t\tuint32_t randomValue = hash(c.x, c.z, seedHash++);
+\t\t\t\t\tint index = randomValue % structuresChoice.size();
+\t\t\t\t\tstructuresChoice[index](); // Call the selected function
+'''
+          new = old + '''
+\n\t\t\t\t\t// Rare underground destination. Deterministic from world seed/chunk,
+\t\t\t\t\t// so multiplayer clients never disagree about generation.
+\t\t\t\t\tuint32_t dungeonRoll = hash(c.x, c.z, seedHash++);
+\t\t\t\t\tif (chunkDistanceFromCenter > 8 && (dungeonRoll % 24u) == 0u)
+\t\t\t\t\t{
+\t\t\t\t\t\tminesDungeon();
+\t\t\t\t\t}
+'''
+          replace_once(path, old, new)
+
+          # Lightweight server-side zombie variants: no new model/texture/network format.
+          path = 'include/gameLayer/gameplay/zombie.h'
+          old = '''struct ZombieServer: public ServerEntity<Zombie>
+{
+
+\tglm::vec2 direction = {};
+'''
+          new = '''struct ZombieServer: public ServerEntity<Zombie>
+{
+\tenum Variant : unsigned char
+\t{
+\t\tWalker = 0,
+\t\tRunner,
+\t\tBrute,
+\t};
+
+\tVariant variant = Walker;
+\tfloat moveSpeedMultiplier = 1.f;
+
+\tglm::vec2 direction = {};
+'''
+          replace_once(path, old, new)
+
+          path = 'src/gameLayer/gameplay/zombie.cpp'
+          old = '''\tauto move = 2.f * deltaTime * direction;
+'''
+          new = '''\t// Variant speed is server authoritative; clients receive the resulting position.
+\tauto move = (2.f * moveSpeedMultiplier) * deltaTime * direction;
+'''
+          replace_once(path, old, new)
+
+          path = 'src/gameLayer/multyPlayer/tick.cpp'
+          old = '''\t\tZombieServer serverZombie = {};
+\t\tserverZombie.entity = zombie;
+
+\t\tc->entityData.zombies.insert({newId, serverZombie});
+'''
+          new = '''\t\tZombieServer serverZombie = {};
+\t\tserverZombie.entity = zombie;
+
+\t\t// Deterministic variants avoid adding bytes to the current spawn protocol.
+\t\t// 70% walkers, 20% runners, 10% brutes.
+\t\tconst unsigned int variantRoll = static_cast<unsigned int>(newId % 10u);
+\t\tif (variantRoll == 0u)
+\t\t{
+\t\t\tserverZombie.variant = ZombieServer::Brute;
+\t\t\tserverZombie.moveSpeedMultiplier = 0.72f;
+\t\t\tserverZombie.entity.life = Life{320};
+\t\t}
+\t\telse if (variantRoll <= 2u)
+\t\t{
+\t\t\tserverZombie.variant = ZombieServer::Runner;
+\t\t\tserverZombie.moveSpeedMultiplier = 1.45f;
+\t\t\tserverZombie.entity.life = Life{125};
+\t\t}
+
+\t\tc->entityData.zombies.insert({newId, serverZombie});
+'''
+          replace_once(path, old, new)
+
+          # Survival/crafting integration: wheat can be stored/built as hay and recovered later.
+          path = 'src/gameLayer/gameplay/crafting.cpp'
+          old = '''\t//food
+\trecepie<2>(Item(ItemTypes::applePie, 1), {Item(ItemTypes::apple, 2),  Item(ItemTypes::wheat, 3)}).setRequiresCookingPot(),
+'''
+          new = '''\t//food / exploration provisions
+\trecepie<2>(Item(ItemTypes::applePie, 1), {Item(ItemTypes::apple, 2),  Item(ItemTypes::wheat, 3)}).setRequiresCookingPot(),
+\t// Farming storage loop: compact wheat into decorative hay, then unpack it without loss.
+\trecepie<1>(Item(BlockTypes::hayBalde, 1), {Item(ItemTypes::wheat, 9)}).setRequiresWorkBench(),
+\trecepie<1>(Item(ItemTypes::wheat, 9), {Item(BlockTypes::hayBalde, 1)}),
+'''
+          replace_once(path, old, new)
+
+          # Human-readable content manifest.
+          Path('docs/EXPLORATION_CONTENT.md').write_text('''# Exploration Content v0.1\n\nThis update builds on the Survival + Linux low-end branches without removing existing gameplay.\n\n## World landmarks\n\n- Desert: pyramids and stone ruins.\n- Snow: igloos.\n- Plains: rare tree houses.\n- Hayland: barns and rare taverns.\n- Wasteland: denser ruins and goblin towers.\n- Existing abandoned houses, training camps and goblin towers remain available.\n- Rare deterministic underground mine/dungeon destinations can now appear away from spawn.\n\nAll generation remains seed/chunk deterministic for multiplayer compatibility and reuses assets already shipped with the project.\n\n## Enemy variety\n\nZombies now have three server-side variants selected deterministically from entity id:\n\n- Walker (70%): original baseline.\n- Runner (20%): 125 HP, 1.45x movement speed.\n- Brute (10%): 320 HP, 0.72x movement speed.\n\nThe first version deliberately reuses the same model/texture so it adds gameplay variety without increasing VRAM or draw calls on low-end GPUs.\n\n## Survival integration\n\n- 9 wheat can be compacted into one hay bale at a workbench.\n- One hay bale can be unpacked back into 9 wheat.\n- Existing apple-pie cooking, food, hunger, workbench, furnace, loot and equipment systems remain intact.\n\n## Compatibility rule\n\nNo save format, inventory index, entity packet, block id, item id, or existing recipe was removed or renumbered in this update.\n''')
+          PY
+
+          git diff --check
+          grep -q 'Structure_Pyramid' src/gameLayer/worldGenerator.cpp
+          grep -q 'ZombieServer::Brute' src/gameLayer/multyPlayer/tick.cpp
+          grep -q 'hayBalde' src/gameLayer/gameplay/crafting.cpp
+
+      - name: Commit content update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/apply-exploration-content.yml
+          git add -A
+          git commit -m "Add exploration content v0.1"
+          git push origin agent/content-exploration-v01
