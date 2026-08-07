@@ -5,6 +5,7 @@
 #include <array>
 #include <climits>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <random>
 #include <glm/glm.hpp>
@@ -15,6 +16,7 @@ int getRandomNumber(std::minstd_rand &rng, int min, int max);
 float getRandomNumberFloat(std::minstd_rand &rng, float min, float max);
 bool getRandomChance(std::minstd_rand &rng, float chance);
 std::array<glm::ivec2, 9> *getChunkNeighboursOffsets();
+float computeRestantTimer(std::uint64_t older, std::uint64_t newer);
 
 // A tiny compatibility surface for an optional ImGui debug file picker that
 // was written directly against Win32. On Linux the editable path field remains
