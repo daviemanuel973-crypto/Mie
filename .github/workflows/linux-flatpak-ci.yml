@@ -41,6 +41,11 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 
+      - name: Apply GCC inventory reset compatibility fix
+        run: |
+          sed -i '/bool PlayerInventory::readFromData/,/size_t currentAdvance/s/\*this = {};/\*this = PlayerInventory{};/' src/gameLayer/gameplay/items.cpp
+          grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
+
       - name: Build Flatpak repository
         shell: bash
         run: |
