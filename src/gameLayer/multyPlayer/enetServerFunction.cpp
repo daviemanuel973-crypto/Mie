@@ -241,7 +241,7 @@ void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
 
 		// Survival is now the default. Creative remains available through the server command.
 		c.playerData.otherPlayerSettings.gameMode = OtherPlayerSettings::SURVIVAL;
-		c.playerData.inventory = {};
+		c.playerData.inventory = PlayerInventory{};
 		c.playerData.survivalStats = {};
 
 		insertConnection(id, c);
@@ -930,7 +930,7 @@ void enetServerFunction(std::string path)
 	StructuresManager structuresManager;
 	BiomesManager biomesManager;
 	WorldSaver worldSaver;
-	serverProfiler = {};
+	serverProfiler = Profiler{};
 
 	worldSaver.savePath = RESOURCES_PATH "worlds/"; //"saves/";
 	worldSaver.savePath += path + "/world";

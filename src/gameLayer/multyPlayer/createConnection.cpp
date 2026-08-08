@@ -365,7 +365,7 @@ void recieveDataClient(ENetEvent &event,
 					}
 					else
 					{
-						chunk->blockData.chestBlocks[blockHash] = {};
+						chunk->blockData.chestBlocks[blockHash] = ChestBlock{};
 					}
 
 
@@ -559,7 +559,7 @@ void recieveDataClient(ENetEvent &event,
 					
 					if (found == entityManager.players.end())
 					{
-						entityManager.players[entity->eid] = {};
+						entityManager.players[entity->eid] = PlayerClient{};
 						found = entityManager.players.find(entity->eid);
 						float restantTimer = computeRestantTimer(entity->timer, serverTimer);
 						found->second.restantTime = restantTimer;
