@@ -1,4 +1,4 @@
-name: Windows Installer CI
+name: Windows Release CI
 
 on:
   push:
@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-installer-ci-${{ github.ref }}
+  group: windows-release-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,12 +42,32 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release --parallel 2
 
-      - name: Stage install tree
+      - name: Stage portable Windows build
         shell: pwsh
         run: |
-          cmake --install build --config Release --prefix "$PWD/stage"
-          if (-not (Test-Path "stage/Mie.exe")) { throw "stage/Mie.exe was not installed" }
-          if (-not (Test-Path "stage/resources/assets")) { throw "resources were not installed" }
+          Remove-Item stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force stage | Out-Null
+
+          $exe = "build/Release/Mie.exe"
+          if (-not (Test-Path $exe)) { throw "Release executable missing: $exe" }
+          Copy-Item $exe "stage/Mie.exe"
+
+          if (-not (Test-Path "resources")) { throw "resources directory missing" }
+          Copy-Item "resources" "stage/resources" -Recurse -Force
+
+          if (-not (Test-Path "stage/Mie.exe")) { throw "stage/Mie.exe missing" }
+          if (-not (Test-Path "stage/resources/assets")) { throw "staged assets missing" }
+          if (-not (Test-Path "stage/resources/shaders")) { throw "staged shaders missing" }
+
+      - name: Build portable ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $zip = "dist/Mie-Survival-Windows-x64-Portable.zip"
+          Remove-Item $zip -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path "stage/*" -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path $zip)) { throw "portable ZIP missing" }
+          if ((Get-Item $zip).Length -le 0) { throw "portable ZIP is empty" }
 
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -67,7 +87,6 @@ jobs:
       - name: Build Windows setup executable
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
           & "$env:ISCC" "windows/Mie.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path "dist/Mie-Survival-Windows-x64-Setup.exe")) { throw "setup executable missing" }
@@ -99,6 +118,13 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
           if (Test-Path "$installDir/Mie.exe") { throw "Mie.exe remained after uninstall" }
           if (-not (Test-Path "$installDir/resources/worlds/ci-preserve/save.txt")) { throw "uninstall deleted player-created save" }
+
+      - name: Upload Windows portable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mie-Survival-Windows-x64-Portable
+          path: dist/Mie-Survival-Windows-x64-Portable.zip
+          if-no-files-found: error
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
