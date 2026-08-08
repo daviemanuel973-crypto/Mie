@@ -294,6 +294,7 @@ float computeMineDurationTime(BlockType type, Item &item);
 
 struct PlayerInventory
 {
+	PlayerInventory() = default;
 			
 	constexpr static int MAX_EQUIPEMENT_SLOTS = 7;
 
