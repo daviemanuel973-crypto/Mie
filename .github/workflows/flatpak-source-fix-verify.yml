@@ -20,93 +20,76 @@ jobs:
           ref: agent/release-packaging-flatpak-fix
           fetch-depth: 0
 
-      - name: Apply permanent GCC source fixes
+      - name: Apply permanent renderer GCC fixes
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          def replace_once_or_verify(path_name, old, new):
-              path = Path(path_name)
-              text = path.read_text(encoding='utf-8')
-              count = text.count(old)
-              if count > 1:
-                  raise SystemExit(f'{path_name}: expected at most one occurrence of {old!r}, found {count}')
-              if count == 1:
-                  text = text.replace(old, new, 1)
-                  path.write_text(text, encoding='utf-8')
-              elif new not in text:
-                  raise SystemExit(f'{path_name}: neither old nor corrected form was found for {old!r}')
+          cpp = Path('src/gameLayer/rendering/renderer.cpp')
+          text = cpp.read_text(encoding='utf-8')
 
-          replace_once_or_verify(
-              'src/gameLayer/multyPlayer/serverChunkStorer.cpp',
-              'position += e.second.entityBuffered.getColliderOffset();',
-              'position += e.second.entity.getColliderOffset();')
-          replace_once_or_verify(
-              'src/gameLayer/multyPlayer/serverChunkStorer.cpp',
-              'if constexpr (hasGetColliderOffset<decltype(e.second->entity)>) { positionPlayer += e.second->entityBuffered.getColliderOffset(); }',
-              '// Player has no getColliderOffset(); keep the position returned by getPosition() unchanged.')
-          replace_once_or_verify(
-              'src/gameLayer/multyPlayer/tick.cpp',
-              'false, true, channelOtherVisualThings);',
-              'nullptr, true, channelOtherVisualThings);')
-          replace_once_or_verify(
-              'src/gameLayer/multyPlayer/tick.cpp',
-              'false, true, channelChunksAndBlocks);',
-              'nullptr, true, channelChunksAndBlocks);')
+          # Visual Studio folding pragmas have no runtime meaning. GCC rejects
+          # some of them inside aggregate initializers, so preserve them as comments.
+          text, region_count = re.subn(r'^(\s*)#pragma region(.*)$', r'\1// region\2', text, flags=re.MULTILINE)
+          text, end_count = re.subn(r'^(\s*)#pragma endregion\s*$', r'\1// endregion', text, flags=re.MULTILINE)
+          if '#pragma region' in text or '#pragma endregion' in text:
+              raise SystemExit('renderer.cpp still contains region pragmas')
 
-          # Only PlayerInventory::readFromData needs the explicit typed reset.
-          replace_once_or_verify(
-              'src/gameLayer/gameplay/items.cpp',
-              'bool PlayerInventory::readFromData(void *data, size_t size)\n{\n\t*this = {};',
-              'bool PlayerInventory::readFromData(void *data, size_t size)\n{\n\t*this = PlayerInventory{};')
-          replace_once_or_verify(
-              'src/gameLayer/multyPlayer/server.cpp',
-              'unsigned int userData = (unsigned int)packet->userData;',
-              'unsigned int userData = static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(packet->userData));')
-          replace_once_or_verify(
-              'include/gameLayer/multyPlayer/doHittingThings.h',
-              'WeaponStats &weaponStats',
-              'WeaponStats weaponStats')
-          replace_once_or_verify(
-              'src/gameLayer/multyPlayer/splitUpdatesLogic.cpp',
-              'return entityData.entityGetter<X>();',
-              'return entityData.template entityGetter<X>();')
-          replace_once_or_verify(
-              'src/gameLayer/rendering/UiEngine.cpp',
-              'auto renderOneItem = [&](glm::vec4 itemBox, Item &item, float in = 0, float color = 1, gl2d::Texture icon = {})',
-              'auto renderOneItem = [&](glm::vec4 itemBox, const Item &item, float in = 0, float color = 1, gl2d::Texture icon = {})')
+          old_cpp = 'glm::mat4 &vp, glm::mat4 &projection,'
+          new_cpp = 'glm::mat4 &vp, const glm::mat4 &projection,'
+          if old_cpp in text:
+              if text.count(old_cpp) != 1:
+                  raise SystemExit(f'Unexpected renderer.cpp projection signature count: {text.count(old_cpp)}')
+              text = text.replace(old_cpp, new_cpp, 1)
+          elif new_cpp not in text:
+              raise SystemExit('renderer.cpp projection signature not found')
+          cpp.write_text(text, encoding='utf-8')
+          print(f'Converted renderer folding pragmas: {region_count} regions, {end_count} endings')
+
+          header = Path('include/gameLayer/rendering/renderer.h')
+          text = header.read_text(encoding='utf-8')
+          old_h = 'glm::mat4 &vp, glm::mat4 &projection, glm::mat4 &viewMatrix'
+          new_h = 'glm::mat4 &vp, const glm::mat4 &projection, glm::mat4 &viewMatrix'
+          if old_h in text:
+              if text.count(old_h) != 1:
+                  raise SystemExit(f'Unexpected renderer.h projection signature count: {text.count(old_h)}')
+              text = text.replace(old_h, new_h, 1)
+          elif new_h not in text:
+              raise SystemExit('renderer.h projection signature not found')
+          header.write_text(text, encoding='utf-8')
           PY
 
-          grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
+          grep -F 'const glm::mat4 &projection' src/gameLayer/rendering/renderer.cpp
+          grep -F 'const glm::mat4 &projection' include/gameLayer/rendering/renderer.h
+          if grep -Eq '#pragma (region|endregion)' src/gameLayer/rendering/renderer.cpp; then
+            echo 'renderer.cpp still contains Visual Studio region pragmas' >&2
+            exit 1
+          fi
+
+      - name: Commit renderer corrections on isolated branch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/gameLayer/rendering/renderer.cpp include/gameLayer/rendering/renderer.h
+          if git diff --cached --quiet; then
+            echo 'Renderer fixes already committed.'
+          else
+            git commit -m 'fix: make renderer source GCC-compatible'
+            git push origin HEAD:agent/release-packaging-flatpak-fix
+          fi
+
+      - name: Verify earlier permanent GCC fixes
+        run: |
           grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp
           grep -F 'nullptr, true, channelOtherVisualThings);' src/gameLayer/multyPlayer/tick.cpp
-          grep -F 'nullptr, true, channelChunksAndBlocks);' src/gameLayer/multyPlayer/tick.cpp
           grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
           grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
           grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
           grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
           grep -F 'const Item &item' src/gameLayer/rendering/UiEngine.cpp
-
-      - name: Commit corrected source on isolated branch
-        shell: bash
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add \
-            src/gameLayer/multyPlayer/serverChunkStorer.cpp \
-            src/gameLayer/multyPlayer/tick.cpp \
-            src/gameLayer/gameplay/items.cpp \
-            src/gameLayer/multyPlayer/server.cpp \
-            include/gameLayer/multyPlayer/doHittingThings.h \
-            src/gameLayer/multyPlayer/splitUpdatesLogic.cpp \
-            src/gameLayer/rendering/UiEngine.cpp
-          if git diff --cached --quiet; then
-            echo 'Permanent source fixes already committed.'
-          else
-            git commit -m 'fix: persist Linux GCC portability corrections'
-            git push origin HEAD:agent/release-packaging-flatpak-fix
-          fi
 
       - name: Install Flatpak tooling
         run: |
@@ -117,14 +100,6 @@ jobs:
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
-
-      - name: Verify permanent portability fixes
-        run: |
-          grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
-          grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
-          grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
-          grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
-          grep -F 'const Item &item' src/gameLayer/rendering/UiEngine.cpp
 
       - name: Build Flatpak repository
         shell: bash
