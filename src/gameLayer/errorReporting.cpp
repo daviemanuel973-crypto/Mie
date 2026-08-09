@@ -4,7 +4,7 @@
 
 void createErrorFile()
 {
-	std::fstream f(RESOURCES_PATH "../errorLogs.txt");
+	std::fstream f(USER_ERROR_LOG_PATH);
 	f.close();
 }
 
@@ -12,7 +12,7 @@ void createErrorFile()
 
 void reportError(const char *message)
 {
-	//std::fstream f(RESOURCES_PATH "../errorLogs.txt", std::ios::app);
+	//std::fstream f(USER_ERROR_LOG_PATH, std::ios::app);
 	//f << message << "\n";
 	//f.close();
 	std::cout << message << "\n";

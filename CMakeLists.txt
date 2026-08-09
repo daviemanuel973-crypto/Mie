@@ -123,6 +123,10 @@ if (OURCRAFT_INSTALLABLE)
 		# the application directory, so the legacy literal-concatenation resource
 		# code can safely resolve resources/ without baking a build-machine path.
 		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="resources/")
+		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC
+			USER_CONTENT_PATH="resources/"
+			USER_SETTINGS_PATH="playerSettings/"
+			USER_ERROR_LOG_PATH="errorLogs.txt")
 		set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES OUTPUT_NAME "Mie")
 		install(TARGETS "${CMAKE_PROJECT_NAME}" RUNTIME DESTINATION ".")
 		install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/" DESTINATION "resources")
@@ -131,6 +135,10 @@ if (OURCRAFT_INSTALLABLE)
 		# provided by its launcher in the app's private XDG data directory.
 		set(OURCRAFT_RESOURCE_DIR "${CMAKE_INSTALL_FULL_DATADIR}/ourcraft/resources/")
 		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="${OURCRAFT_RESOURCE_DIR}")
+		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC
+			USER_CONTENT_PATH="resources/"
+			USER_SETTINGS_PATH="playerSettings/"
+			USER_ERROR_LOG_PATH="errorLogs.txt")
 		set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES OUTPUT_NAME "ourcraft")
 		install(TARGETS "${CMAKE_PROJECT_NAME}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 		install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/"
@@ -139,6 +147,10 @@ if (OURCRAFT_INSTALLABLE)
 else()
 	# Developer build: load assets directly from the checkout.
 	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/resources/")
+	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC
+		USER_CONTENT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/resources/"
+		USER_SETTINGS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/playerSettings/"
+		USER_ERROR_LOG_PATH="${CMAKE_CURRENT_SOURCE_DIR}/errorLogs.txt")
 endif()
 
 if(MSVC)

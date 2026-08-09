@@ -40,7 +40,7 @@ namespace AudioEngine
 
 		sfs::SafeSafeKeyValueData data;
 
-		if (sfs::safeLoad(data, RESOURCES_PATH "../playerSettings/soundSettings", 0) == sfs::noError)
+		if (sfs::safeLoad(data, USER_SETTINGS_PATH "soundSettings", 0) == sfs::noError)
 		{
 
 			data.getFloat("masterVolume", masterVolume);
@@ -70,7 +70,7 @@ namespace AudioEngine
 		data.setFloat("uiVolume", uiVolume);
 		data.setFloat("soundsVolume", soundsVolume);
 
-		sfs::safeSave(data, RESOURCES_PATH "../playerSettings/soundSettings", 0);
+		sfs::safeSave(data, USER_SETTINGS_PATH "soundSettings", 0);
 
 
 	}

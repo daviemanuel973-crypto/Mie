@@ -932,7 +932,7 @@ void enetServerFunction(std::string path)
 	WorldSaver worldSaver;
 	serverProfiler = Profiler{};
 
-	worldSaver.savePath = RESOURCES_PATH "worlds/"; //"saves/";
+	worldSaver.savePath = USER_CONTENT_PATH "worlds/"; //"saves/";
 	worldSaver.savePath += path + "/world";
 
 
@@ -962,10 +962,10 @@ void enetServerFunction(std::string path)
 
 
 	//todo will remove later!
-	std::ifstream seedFile(std::string(RESOURCES_PATH "worlds/") + path + "/seed.txt");
+	std::ifstream seedFile(std::string(USER_CONTENT_PATH "worlds/") + path + "/seed.txt");
 	if (!seedFile.is_open())
 	{
-		std::ifstream worldSettingsFile(std::string(RESOURCES_PATH "worlds/") + path + "/worldGenSettings.wgenerator");
+		std::ifstream worldSettingsFile(std::string(USER_CONTENT_PATH "worlds/") + path + "/worldGenSettings.wgenerator");
 		
 		if (worldSettingsFile.is_open())
 		{

@@ -309,7 +309,7 @@ bool initGame() //main server and title screen stuff
 	srand(time(0));
 	createErrorFile();
 
-	std::filesystem::create_directory(RESOURCES_PATH "../playerSettings/");
+	std::filesystem::create_directory(USER_SETTINGS_PATH);
 
 
 	programData.GPUProfiler.initGPUProfiler();

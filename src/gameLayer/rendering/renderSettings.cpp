@@ -452,12 +452,12 @@ void displayTexturePacksSettingsMenu(ProgramData &programData)
 	//todo
 	//if (programData.ui.menuRenderer.Button("Open Folder", Colors_Gray))
 	//{
-	//	if (!std::filesystem::exists(RESOURCES_PATH "texturePacks"))
+	//	if (!std::filesystem::exists(USER_CONTENT_PATH "texturePacks"))
 	//	{
-	//		std::filesystem::create_directories(RESOURCES_PATH "texturePacks", err);
+	//		std::filesystem::create_directories(USER_CONTENT_PATH "texturePacks", err);
 	//	}
 	//	
-	//	openFolder(RESOURCES_PATH "texturePacks");
+	//	openFolder(USER_CONTENT_PATH "texturePacks");
 	//}
 
 
@@ -485,12 +485,12 @@ void displayTexturePacksSettingsMenu(ProgramData &programData)
 
 		std::vector<std::filesystem::path> allTexturePacks;
 
-		if (!std::filesystem::exists(RESOURCES_PATH "texturePacks"))
+		if (!std::filesystem::exists(USER_CONTENT_PATH "texturePacks"))
 		{
-			std::filesystem::create_directories(RESOURCES_PATH "texturePacks", err);
+			std::filesystem::create_directories(USER_CONTENT_PATH "texturePacks", err);
 		}
 
-		for (auto const &d : std::filesystem::directory_iterator{RESOURCES_PATH "texturePacks", err})
+		for (auto const &d : std::filesystem::directory_iterator{USER_CONTENT_PATH "texturePacks", err})
 		{
 			if (d.is_directory())
 			{
@@ -503,7 +503,7 @@ void displayTexturePacksSettingsMenu(ProgramData &programData)
 		for (auto &pack : allTexturePacks)
 		{
 			auto file = pack;
-			file = (RESOURCES_PATH "texturePacks") / file;
+			file = (USER_CONTENT_PATH "texturePacks") / file;
 			file /= "logo.png";
 
 			if (logoTextures.find(pack.string()) == logoTextures.end())
@@ -514,7 +514,7 @@ void displayTexturePacksSettingsMenu(ProgramData &programData)
 				if (!t.id)
 				{
 					file = pack;
-					file = (RESOURCES_PATH "texturePacks") / file;
+					file = (USER_CONTENT_PATH "texturePacks") / file;
 					file /= "pack.png";
 					t.loadFromFile(file.string().c_str(), true);
 
@@ -805,7 +805,7 @@ void saveShadingSettings()
 
 
 
-	sfs::safeSave(data, RESOURCES_PATH "../playerSettings/renderSettings", 0);
+	sfs::safeSave(data, USER_SETTINGS_PATH "renderSettings", 0);
 
 }
 
@@ -825,7 +825,7 @@ void loadShadingSettings()
 
 	sfs::SafeSafeKeyValueData data;
 
-	if (sfs::safeLoad(data, RESOURCES_PATH "../playerSettings/renderSettings", 0) == sfs::noError)
+	if (sfs::safeLoad(data, USER_SETTINGS_PATH "renderSettings", 0) == sfs::noError)
 	{
 		GET_INT(viewDistance);
 		GET_INT(lodStrength);
@@ -899,12 +899,12 @@ void displaySkinSelectorMenu(ProgramData &programData)
 	//todo
 	//if (programData.ui.menuRenderer.Button("Open Folder", Colors_Gray))
 	//{
-	//	if (!std::filesystem::exists(RESOURCES_PATH "texturePacks"))
+	//	if (!std::filesystem::exists(USER_CONTENT_PATH "texturePacks"))
 	//	{
-	//		std::filesystem::create_directories(RESOURCES_PATH "texturePacks", err);
+	//		std::filesystem::create_directories(USER_CONTENT_PATH "texturePacks", err);
 	//	}
 	//	
-	//	openFolder(RESOURCES_PATH "texturePacks");
+	//	openFolder(USER_CONTENT_PATH "texturePacks");
 	//}
 
 	glm::vec4 customWidgetTransform = {};
@@ -926,14 +926,14 @@ void displaySkinSelectorMenu(ProgramData &programData)
 		)
 	{
 
-		if (!std::filesystem::exists(RESOURCES_PATH "skins"))
+		if (!std::filesystem::exists(USER_CONTENT_PATH "skins"))
 		{
-			std::filesystem::create_directories(RESOURCES_PATH "skins", err);
+			std::filesystem::create_directories(USER_CONTENT_PATH "skins", err);
 		}
 
 		std::vector<std::string> skins;
 
-		for (auto const &d : std::filesystem::directory_iterator{RESOURCES_PATH "skins", err})
+		for (auto const &d : std::filesystem::directory_iterator{USER_CONTENT_PATH "skins", err})
 		{
 			if (!d.is_directory())
 			{
@@ -1131,13 +1131,13 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 		//folder logic
 
-		if (!std::filesystem::exists(RESOURCES_PATH "worlds"))
+		if (!std::filesystem::exists(USER_CONTENT_PATH "worlds"))
 		{
-			std::filesystem::create_directories(RESOURCES_PATH "worlds");
+			std::filesystem::create_directories(USER_CONTENT_PATH "worlds");
 		}
 			
 		std::vector<std::filesystem::path> allWorlds;
-		for (auto const &d : std::filesystem::directory_iterator{RESOURCES_PATH "worlds"})
+		for (auto const &d : std::filesystem::directory_iterator{USER_CONTENT_PATH "worlds"})
 		{
 			if (d.is_directory())
 			{
@@ -1318,7 +1318,7 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 			if (programData.ui.menuRenderer.Button("Delete", Colors_Gray, programData.ui.buttonTexture))
 			{
-				std::string deletePath = RESOURCES_PATH "worlds/";
+				std::string deletePath = USER_CONTENT_PATH "worlds/";
 				deletePath += selected;
 
 				std::error_code error;
@@ -1372,7 +1372,7 @@ void displayWorldSelectorMenu(ProgramData &programData)
 		
 		//programData.ui.menuRenderer.Toggle("Super Flat", Colors_Gray, &superFlatWorld, programData.ui.buttonTexture, programData.ui.buttonTexture);
 
-		std::string finalName = RESOURCES_PATH "worlds/";
+		std::string finalName = USER_CONTENT_PATH "worlds/";
 		finalName += name;
 
 		if (name[0] == '\0')
