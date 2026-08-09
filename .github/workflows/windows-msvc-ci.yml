@@ -5,6 +5,7 @@ on:
     branches:
       - agent/content-exploration-v01
       - agent/release-packaging-stabilization
+      - agent/release-packaging-windows-fix
   pull_request:
     paths:
       - 'CMakeLists.txt'
