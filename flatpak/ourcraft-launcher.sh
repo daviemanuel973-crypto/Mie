@@ -23,4 +23,19 @@ if [ "${1:-}" = "--prepare-data-only" ]; then
     exit 0
 fi
 
+# The renderer relies on GL_ARB_bindless_texture for block/entity texture handles.
+# Mesa's native Intel OpenGL path can expose the required GL version without a
+# reliable bindless implementation on older Intel hardware. Zink provides the
+# OpenGL API over the Vulkan driver and is the preferred Flatpak compatibility
+# path. Respect an explicit user override for debugging/other GPUs.
+if [ -z "${MESA_LOADER_DRIVER_OVERRIDE:-}" ]; then
+    export MESA_LOADER_DRIVER_OVERRIDE=zink
+fi
+
+# Keep Zink's descriptor implementation automatic so Mesa can choose the most
+# appropriate backend for the installed Vulkan driver.
+export ZINK_DESCRIPTORS="${ZINK_DESCRIPTORS:-auto}"
+
+echo "Mie: OpenGL backend override=${MESA_LOADER_DRIVER_OVERRIDE}, ZINK_DESCRIPTORS=${ZINK_DESCRIPTORS}" >&2
+
 exec /app/bin/ourcraft "$@"
