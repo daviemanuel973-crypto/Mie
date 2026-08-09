@@ -82,7 +82,12 @@ add_subdirectory(thirdparty/safeSave)
 add_subdirectory(thirdparty/profilerLib)
 add_subdirectory(thirdparty/zstd-1.5.5/build/cmake)
 add_subdirectory(noiseTool)
-add_subdirectory(PBRTool)
+
+# PBRTool is a Windows-only development utility (it includes Windows.h).
+# Keep it available on Windows builds without making Linux/Flatpak compile it.
+if (WIN32)
+	add_subdirectory(PBRTool)
+endif()
 
 # MY_SOURCES is a list of all the source files for my game.
 file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
