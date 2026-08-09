@@ -1,0 +1,120 @@
+name: Flatpak Source Fix Verification
+
+on:
+  push:
+    branches:
+      - agent/release-packaging-flatpak-fix
+    paths:
+      - '.github/workflows/flatpak-source-fix-verify.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated fix branch
+        uses: actions/checkout@v6
+        with:
+          ref: agent/release-packaging-flatpak-fix
+          fetch-depth: 0
+
+      - name: Apply permanent server collision fix
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/gameLayer/multyPlayer/serverChunkStorer.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          old_generic = 'position += e.second.entityBuffered.getColliderOffset();'
+          new_generic = 'position += e.second.entity.getColliderOffset();'
+          old_player = 'if constexpr (hasGetColliderOffset<decltype(e.second->entity)>) { positionPlayer += e.second->entityBuffered.getColliderOffset(); }'
+          new_player = '// Player has no getColliderOffset(); keep the position returned by getPosition() unchanged.'
+
+          generic_count = text.count(old_generic)
+          player_count = text.count(old_player)
+          if generic_count != 1:
+              raise SystemExit(f'Expected exactly 1 generic server offset occurrence, found {generic_count}')
+          if player_count != 1:
+              raise SystemExit(f'Expected exactly 1 player offset occurrence, found {player_count}')
+
+          text = text.replace(old_generic, new_generic, 1)
+          text = text.replace(old_player, new_player, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
+          grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp
+          if grep -Fq 'e.second->entityBuffered.getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp; then
+            echo 'Player buffered collider offset reference still exists' >&2
+            exit 1
+          fi
+
+      - name: Commit corrected source on isolated branch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/gameLayer/multyPlayer/serverChunkStorer.cpp
+          git commit -m 'fix: correct server collider offset handling for GCC'
+          git push origin HEAD:agent/release-packaging-flatpak-fix
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+
+      - name: Configure Flathub
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+
+      - name: Apply remaining GCC portability fixes for verification
+        run: |
+          sed -i '/bool PlayerInventory::readFromData/,/size_t currentAdvance/s/\*this = {};/\*this = PlayerInventory{};/' src/gameLayer/gameplay/items.cpp
+          sed -i 's/unsigned int userData = (unsigned int)packet->userData;/unsigned int userData = static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(packet->userData));/' src/gameLayer/multyPlayer/server.cpp
+          sed -i 's/WeaponStats \&weaponStats/WeaponStats weaponStats/' include/gameLayer/multyPlayer/doHittingThings.h
+          sed -i 's/return entityData.entityGetter<X>();/return entityData.template entityGetter<X>();/' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
+          grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
+          grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
+          grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
+          grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
+
+      - name: Build Flatpak repository
+        shell: bash
+        run: |
+          set -o pipefail
+          flatpak-builder --user --force-clean --disable-rofiles-fuse \
+            --repo=flatpak-repo build-flatpak flatpak/io.github.daviemanuel973.Mie.yml \
+            2>&1 | tee flatpak-build.log
+
+      - name: Upload Flatpak failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-source-fix-failure-log
+          path: flatpak-build.log
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Create installable bundle
+        run: |
+          flatpak build-bundle flatpak-repo Mie-Survival-Linux-x86_64.flatpak \
+            io.github.daviemanuel973.Mie stable \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Smoke-test installation metadata
+        run: |
+          flatpak remote-add --user --if-not-exists --no-gpg-verify mie-ci "$(pwd)/flatpak-repo"
+          flatpak install --user -y mie-ci io.github.daviemanuel973.Mie
+          flatpak info --user io.github.daviemanuel973.Mie
+
+      - name: Upload verified Linux Flatpak
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mie-Survival-Linux-x86_64-source-fix
+          path: Mie-Survival-Linux-x86_64.flatpak
+          if-no-files-found: error
