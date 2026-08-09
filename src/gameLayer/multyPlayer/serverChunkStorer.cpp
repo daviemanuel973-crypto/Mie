@@ -1590,7 +1590,7 @@ std::uint64_t genericCheckEntitiesForCollisionWithBlock(T &container, glm::ivec3
 		{
 			glm::dvec3 position = e.second.getPosition();
 
-			if constexpr (hasGetColliderOffset<decltype(e.second.entity)>) { position += e.second.entityBuffered.getColliderOffset(); }
+			if constexpr (hasGetColliderOffset<decltype(e.second.entity)>) { position += e.second.entity.getColliderOffset(); }
 
 			auto rez = boxColideBlock(position, e.second.entity.getColliderSize(), position);
 			
@@ -1617,7 +1617,7 @@ std::uint64_t callGenericCheckEntitiesForCollisionWithBlock(std::integer_sequenc
 			{
 
 				glm::dvec3 positionPlayer = e.second->getPosition();
-				if constexpr (hasGetColliderOffset<decltype(e.second->entity)>) { positionPlayer += e.second->entityBuffered.getColliderOffset(); }
+				// Player has no getColliderOffset(); keep the position returned by getPosition() unchanged.
 
 
 				auto rez = boxColideBlock(positionPlayer, e.second->entity.getColliderSize(), position);
