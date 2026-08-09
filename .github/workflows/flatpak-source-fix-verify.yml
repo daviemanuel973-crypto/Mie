@@ -26,56 +26,90 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          # Fix server-side collider access. This is idempotent so retries keep
-          # the already-correct source instead of touching the backup branch.
-          path = Path('src/gameLayer/multyPlayer/serverChunkStorer.cpp')
-          text = path.read_text(encoding='utf-8')
-          old_generic = 'position += e.second.entityBuffered.getColliderOffset();'
-          new_generic = 'position += e.second.entity.getColliderOffset();'
-          old_player = 'if constexpr (hasGetColliderOffset<decltype(e.second->entity)>) { positionPlayer += e.second->entityBuffered.getColliderOffset(); }'
-          new_player = '// Player has no getColliderOffset(); keep the position returned by getPosition() unchanged.'
-
-          if old_generic in text:
-              text = text.replace(old_generic, new_generic, 1)
-          if old_player in text:
-              text = text.replace(old_player, new_player, 1)
-          if new_generic not in text or new_player not in text:
-              raise SystemExit('Server collider fix is not in the expected state')
-          path.write_text(text, encoding='utf-8')
-
-          # broadCastNotLocked now takes ENetPeer* as its fourth argument.
-          # These two broadcasts intentionally ignore no peer, so use nullptr.
-          path = Path('src/gameLayer/multyPlayer/tick.cpp')
-          text = path.read_text(encoding='utf-8')
-          replacements = {
-              'false, true, channelOtherVisualThings);': 'nullptr, true, channelOtherVisualThings);',
-              'false, true, channelChunksAndBlocks);': 'nullptr, true, channelChunksAndBlocks);',
-          }
-          for old, new in replacements.items():
-              if old in text:
-                  if text.count(old) != 1:
-                      raise SystemExit(f'Expected exactly one broadcast occurrence for {old!r}, found {text.count(old)}')
+          def replace_once_or_verify(path_name, old, new):
+              path = Path(path_name)
+              text = path.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count > 1:
+                  raise SystemExit(f'{path_name}: expected at most one occurrence of {old!r}, found {count}')
+              if count == 1:
                   text = text.replace(old, new, 1)
-              if new not in text:
-                  raise SystemExit(f'Broadcast fix missing: {new!r}')
-          path.write_text(text, encoding='utf-8')
+                  path.write_text(text, encoding='utf-8')
+              elif new not in text:
+                  raise SystemExit(f'{path_name}: neither old nor corrected form was found for {old!r}')
+
+          # Server collision fixes discovered by the first Flatpak GCC build.
+          replace_once_or_verify(
+              'src/gameLayer/multyPlayer/serverChunkStorer.cpp',
+              'position += e.second.entityBuffered.getColliderOffset();',
+              'position += e.second.entity.getColliderOffset();')
+          replace_once_or_verify(
+              'src/gameLayer/multyPlayer/serverChunkStorer.cpp',
+              'if constexpr (hasGetColliderOffset<decltype(e.second->entity)>) { positionPlayer += e.second->entityBuffered.getColliderOffset(); }',
+              '// Player has no getColliderOffset(); keep the position returned by getPosition() unchanged.')
+
+          # broadCastNotLocked takes ENetPeer* as argument four; no peer is excluded here.
+          replace_once_or_verify(
+              'src/gameLayer/multyPlayer/tick.cpp',
+              'false, true, channelOtherVisualThings);',
+              'nullptr, true, channelOtherVisualThings);')
+          replace_once_or_verify(
+              'src/gameLayer/multyPlayer/tick.cpp',
+              'false, true, channelChunksAndBlocks);',
+              'nullptr, true, channelChunksAndBlocks);')
+
+          # Portability fixes that were previously only injected temporarily by CI.
+          replace_once_or_verify(
+              'src/gameLayer/gameplay/items.cpp',
+              '*this = {};',
+              '*this = PlayerInventory{};')
+          replace_once_or_verify(
+              'src/gameLayer/multyPlayer/server.cpp',
+              'unsigned int userData = (unsigned int)packet->userData;',
+              'unsigned int userData = static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(packet->userData));')
+          replace_once_or_verify(
+              'include/gameLayer/multyPlayer/doHittingThings.h',
+              'WeaponStats &weaponStats',
+              'WeaponStats weaponStats')
+          replace_once_or_verify(
+              'src/gameLayer/multyPlayer/splitUpdatesLogic.cpp',
+              'return entityData.entityGetter<X>();',
+              'return entityData.template entityGetter<X>();')
+
+          # renderOneItem never mutates Item; const-ref accepts both inventory items and temporaries.
+          replace_once_or_verify(
+              'src/gameLayer/rendering/UiEngine.cpp',
+              'auto renderOneItem = [&](glm::vec4 itemBox, Item &item, float in = 0, float color = 1, gl2d::Texture icon = {})',
+              'auto renderOneItem = [&](glm::vec4 itemBox, const Item &item, float in = 0, float color = 1, gl2d::Texture icon = {})')
           PY
 
           grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
           grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp
           grep -F 'nullptr, true, channelOtherVisualThings);' src/gameLayer/multyPlayer/tick.cpp
           grep -F 'nullptr, true, channelChunksAndBlocks);' src/gameLayer/multyPlayer/tick.cpp
+          grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
+          grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
+          grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
+          grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
+          grep -F 'const Item &item' src/gameLayer/rendering/UiEngine.cpp
 
       - name: Commit corrected source on isolated branch
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/gameLayer/multyPlayer/serverChunkStorer.cpp src/gameLayer/multyPlayer/tick.cpp
+          git add \
+            src/gameLayer/multyPlayer/serverChunkStorer.cpp \
+            src/gameLayer/multyPlayer/tick.cpp \
+            src/gameLayer/gameplay/items.cpp \
+            src/gameLayer/multyPlayer/server.cpp \
+            include/gameLayer/multyPlayer/doHittingThings.h \
+            src/gameLayer/multyPlayer/splitUpdatesLogic.cpp \
+            src/gameLayer/rendering/UiEngine.cpp
           if git diff --cached --quiet; then
             echo 'Permanent source fixes already committed.'
           else
-            git commit -m 'fix: correct Linux server broadcast arguments'
+            git commit -m 'fix: persist Linux GCC portability corrections'
             git push origin HEAD:agent/release-packaging-flatpak-fix
           fi
 
@@ -89,16 +123,13 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 
-      - name: Apply remaining GCC portability fixes for verification
+      - name: Verify permanent portability fixes
         run: |
-          sed -i '/bool PlayerInventory::readFromData/,/size_t currentAdvance/s/\*this = {};/\*this = PlayerInventory{};/' src/gameLayer/gameplay/items.cpp
-          sed -i 's/unsigned int userData = (unsigned int)packet->userData;/unsigned int userData = static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(packet->userData));/' src/gameLayer/multyPlayer/server.cpp
-          sed -i 's/WeaponStats \&weaponStats/WeaponStats weaponStats/' include/gameLayer/multyPlayer/doHittingThings.h
-          sed -i 's/return entityData.entityGetter<X>();/return entityData.template entityGetter<X>();/' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
           grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
           grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
           grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
           grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
+          grep -F 'const Item &item' src/gameLayer/rendering/UiEngine.cpp
 
       - name: Build Flatpak repository
         shell: bash
