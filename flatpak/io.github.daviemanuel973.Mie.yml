@@ -22,7 +22,7 @@ modules:
       - install -Dm755 flatpak/ourcraft-launcher.sh /app/bin/ourcraft-flatpak
       - install -Dm644 flatpak/io.github.daviemanuel973.Mie.desktop /app/share/applications/io.github.daviemanuel973.Mie.desktop
       - install -Dm644 flatpak/io.github.daviemanuel973.Mie.metainfo.xml /app/share/metainfo/io.github.daviemanuel973.Mie.metainfo.xml
-      - install -Dm644 resources/assets/logo.png /app/share/icons/hicolor/512x512/apps/io.github.daviemanuel973.Mie.png
+      - install -Dm644 flatpak/io.github.daviemanuel973.Mie.svg /app/share/icons/hicolor/scalable/apps/io.github.daviemanuel973.Mie.svg
     sources:
       - type: dir
         path: ..
