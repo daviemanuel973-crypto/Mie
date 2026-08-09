@@ -579,7 +579,7 @@ void PlayerInventory::formatIntoData(std::vector<unsigned char> &data)
 
 bool PlayerInventory::readFromData(void *data, size_t size)
 {
-	*this = {};
+	*this = PlayerInventory{};
 
 	size_t currentAdvance = 0;
 

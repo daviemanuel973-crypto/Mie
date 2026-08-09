@@ -9,7 +9,7 @@
 //chance crit bonus is [0, 1]
 template<class T>
 void doHittingThings(T &e, glm::vec3 dir, glm::dvec3 attackerPosition,
-	WeaponStats &weaponStats, std::uint64_t &wasKilled, std::minstd_rand &rng, std::uint64_t attackedId
+	WeaponStats weaponStats, std::uint64_t &wasKilled, std::minstd_rand &rng, std::uint64_t attackedId
 	, float hitCorectness, float critChanceBonus)
 {
 
