@@ -38,11 +38,8 @@ jobs:
                   if new in text:
                       return
                   raise SystemExit(f'{path_name}: neither old nor corrected form found: {old!r}')
-              text = text.replace(old, new)
-              path.write_text(text, encoding='utf-8')
+              path.write_text(text.replace(old, new), encoding='utf-8')
 
-          # CMake: preserve Windows/dev paths, but give packaged Linux a writable
-          # user-content root relative to the launcher working directory.
           replace_required(
               'CMakeLists.txt',
               'target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="resources/")\n\t\tset_target_properties',
@@ -74,52 +71,46 @@ jobs:
               'endif()',
               1)
 
-          # Settings/logs that must be writable.
           replace_required('src/gameLayer/gameLayer.cpp', 'RESOURCES_PATH "../playerSettings/"', 'USER_SETTINGS_PATH', 1)
           replace_required('src/gameLayer/audioEngineRaudioBackend.cpp', 'RESOURCES_PATH "../playerSettings/soundSettings"', 'USER_SETTINGS_PATH "soundSettings"', 2)
-          replace_required('src/gameLayer/errorReporting.cpp', 'RESOURCES_PATH "../errorLogs.txt"', 'USER_ERROR_LOG_PATH', 1)
+          replace_required('src/gameLayer/errorReporting.cpp', 'RESOURCES_PATH "../errorLogs.txt"', 'USER_ERROR_LOG_PATH', 2)
           replace_required('src/gameLayer/rendering/renderSettings.cpp', 'RESOURCES_PATH "../playerSettings/renderSettings"', 'USER_SETTINGS_PATH "renderSettings"', 2)
-
-          # User-editable content. Read-only engine assets continue to use RESOURCES_PATH.
           replace_required('src/gameLayer/rendering/renderSettings.cpp', 'RESOURCES_PATH "texturePacks"', 'USER_CONTENT_PATH "texturePacks"')
           replace_required('src/gameLayer/rendering/renderSettings.cpp', 'RESOURCES_PATH "skins"', 'USER_CONTENT_PATH "skins"')
           replace_required('src/gameLayer/rendering/renderSettings.cpp', 'RESOURCES_PATH "worlds/"', 'USER_CONTENT_PATH "worlds/"')
           replace_required('src/gameLayer/rendering/renderSettings.cpp', 'RESOURCES_PATH "worlds"', 'USER_CONTENT_PATH "worlds"')
           replace_required('src/gameLayer/multyPlayer/enetServerFunction.cpp', 'RESOURCES_PATH "worlds/"', 'USER_CONTENT_PATH "worlds/"')
 
-          # Flatpak launcher initializes the writable user tree and copies only
-          # user-editable shipped content without overwriting user modifications.
-          launcher = Path('flatpak/ourcraft-launcher.sh')
-          launcher.write_text('''#!/bin/sh
-set -eu
+          launcher_lines = [
+              '#!/bin/sh',
+              'set -eu',
+              '',
+              '# Flatpak maps XDG_DATA_HOME to ~/.var/app/<app-id>/data.',
+              '# Engine assets stay read-only under /app; only user-editable content lives here.',
+              'DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/ourcraft"',
+              'CONTENT_ROOT="$DATA_ROOT/resources"',
+              'mkdir -p "$CONTENT_ROOT/worlds" "$DATA_ROOT/playerSettings"',
+              '',
+              'for name in texturePacks skins; do',
+              '    src="/app/share/ourcraft/resources/$name"',
+              '    dst="$CONTENT_ROOT/$name"',
+              '    if [ -d "$src" ]; then',
+              '        mkdir -p "$dst"',
+              '        cp -a -n "$src/." "$dst/"',
+              '    fi',
+              'done',
+              '',
+              'cd "$DATA_ROOT"',
+              '',
+              '# CI can validate writable-data initialization without launching OpenGL.',
+              'if [ "${1:-}" = "--prepare-data-only" ]; then',
+              '    exit 0',
+              'fi',
+              '',
+              'exec /app/bin/ourcraft "$@"',
+          ]
+          Path('flatpak/ourcraft-launcher.sh').write_text('\n'.join(launcher_lines) + '\n', encoding='utf-8')
 
-# Flatpak maps XDG_DATA_HOME to ~/.var/app/<app-id>/data.
-# Engine assets stay read-only under /app; only user-editable content lives here.
-DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/ourcraft"
-CONTENT_ROOT="$DATA_ROOT/resources"
-mkdir -p "$CONTENT_ROOT/worlds" "$DATA_ROOT/playerSettings"
-
-for name in texturePacks skins; do
-    src="/app/share/ourcraft/resources/$name"
-    dst="$CONTENT_ROOT/$name"
-    if [ -d "$src" ]; then
-        mkdir -p "$dst"
-        cp -a -n "$src/." "$dst/"
-    fi
-done
-
-cd "$DATA_ROOT"
-
-# CI can validate writable-data initialization without launching OpenGL.
-if [ "${1:-}" = "--prepare-data-only" ]; then
-    exit 0
-fi
-
-exec /app/bin/ourcraft "$@"
-''', encoding='utf-8')
-
-          # Make the normal Linux workflow authoritative for this branch and test
-          # committed portability fixes instead of mutating source with sed.
           wf = Path('.github/workflows/linux-flatpak-ci.yml')
           text = wf.read_text(encoding='utf-8')
           if '      - agent/release-packaging-windows-fix\n' not in text:
@@ -127,46 +118,52 @@ exec /app/bin/ourcraft "$@"
                   '      - agent/release-packaging-stabilization\n',
                   '      - agent/release-packaging-stabilization\n      - agent/release-packaging-windows-fix\n',
                   1)
+
           start = text.find('      - name: Apply GCC portability fixes\n')
           end = text.find('      - name: Build Flatpak repository\n')
           if start != -1 and end != -1 and end > start:
-              verify = '''      - name: Verify permanent GCC portability fixes
-        run: |
-          grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
-          grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
-          grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
-          grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp
-          grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
-          grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
-          grep -F 'nullptr, true, channelOtherVisualThings);' src/gameLayer/multyPlayer/tick.cpp
-          grep -F 'const Item &item' src/gameLayer/rendering/UiEngine.cpp
-          grep -F '#include <csignal>' src/platform/platformTools.cpp
-
-'''
-              text = text[:start] + verify + text[end:]
+              verify_lines = [
+                  '      - name: Verify permanent GCC portability fixes',
+                  '        run: |',
+                  "          grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp",
+                  "          grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp",
+                  "          grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp",
+                  "          grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp",
+                  "          grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h",
+                  "          grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp",
+                  "          grep -F 'nullptr, true, channelOtherVisualThings);' src/gameLayer/multyPlayer/tick.cpp",
+                  "          grep -F 'const Item &item' src/gameLayer/rendering/UiEngine.cpp",
+                  "          grep -F '#include <csignal>' src/platform/platformTools.cpp",
+                  '',
+              ]
+              text = text[:start] + '\n'.join(verify_lines) + '\n' + text[end:]
           elif '      - name: Verify permanent GCC portability fixes\n' not in text:
               raise SystemExit('linux-flatpak-ci.yml: portability step not found')
 
-          old_smoke = '''      - name: Smoke-test installation metadata
-        run: |
-          flatpak remote-add --user --if-not-exists --no-gpg-verify mie-ci "$(pwd)/flatpak-repo"
-          flatpak install --user -y mie-ci io.github.daviemanuel973.Mie
-          flatpak info --user io.github.daviemanuel973.Mie
-'''
-          new_smoke = '''      - name: Smoke-test install and writable user data
-        run: |
-          flatpak remote-add --user --if-not-exists --no-gpg-verify mie-ci "$(pwd)/flatpak-repo"
-          flatpak install --user -y mie-ci io.github.daviemanuel973.Mie
-          flatpak info --user io.github.daviemanuel973.Mie
-          flatpak run io.github.daviemanuel973.Mie --prepare-data-only
-          data_root="$HOME/.var/app/io.github.daviemanuel973.Mie/data/ourcraft"
-          test -d "$data_root/resources/worlds"
-          test -d "$data_root/resources/texturePacks"
-          test -d "$data_root/resources/skins"
-          test -d "$data_root/playerSettings"
-          test -w "$data_root/resources/worlds"
-          test -w "$data_root/playerSettings"
-'''
+          old_smoke = '\n'.join([
+              '      - name: Smoke-test installation metadata',
+              '        run: |',
+              '          flatpak remote-add --user --if-not-exists --no-gpg-verify mie-ci "$(pwd)/flatpak-repo"',
+              '          flatpak install --user -y mie-ci io.github.daviemanuel973.Mie',
+              '          flatpak info --user io.github.daviemanuel973.Mie',
+              '',
+          ])
+          new_smoke = '\n'.join([
+              '      - name: Smoke-test install and writable user data',
+              '        run: |',
+              '          flatpak remote-add --user --if-not-exists --no-gpg-verify mie-ci "$(pwd)/flatpak-repo"',
+              '          flatpak install --user -y mie-ci io.github.daviemanuel973.Mie',
+              '          flatpak info --user io.github.daviemanuel973.Mie',
+              '          flatpak run io.github.daviemanuel973.Mie --prepare-data-only',
+              '          data_root="$HOME/.var/app/io.github.daviemanuel973.Mie/data/ourcraft"',
+              '          test -d "$data_root/resources/worlds"',
+              '          test -d "$data_root/resources/texturePacks"',
+              '          test -d "$data_root/resources/skins"',
+              '          test -d "$data_root/playerSettings"',
+              '          test -w "$data_root/resources/worlds"',
+              '          test -w "$data_root/playerSettings"',
+              '',
+          ])
           if old_smoke in text:
               text = text.replace(old_smoke, new_smoke, 1)
           elif new_smoke not in text:
