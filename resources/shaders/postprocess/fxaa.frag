@@ -17,7 +17,7 @@ float lumaSqr(in vec3 color)
 
 vec3 getTexture(in vec2 offset)
 {
-	return texture2D(u_texture, v_texCoords + offset).rgb;
+	return texture(u_texture, v_texCoords + offset).rgb;
 }
 
 float quality(int i)

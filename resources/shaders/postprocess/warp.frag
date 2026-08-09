@@ -44,7 +44,7 @@ void main()
 
 	texCoords = (texCoords + 1.f) /2.f;
 
-	float dist = -texture2D(u_currentViewSpace, texCoords).z;
+	float dist = -texture(u_currentViewSpace, texCoords).z;
 	
 
 	if(dist <= 0.001)
@@ -52,7 +52,7 @@ void main()
 		outColor = vec4(u_underwaterColor, 1.f);
 	}else
 	{
-		outColor = texture2D(u_color, texCoords);
+		outColor = texture(u_color, texCoords);
 
 		outColor.rgb = mix(outColor.rgb, u_underwaterColor, 0.1);
 
@@ -76,5 +76,5 @@ void main()
 	texCoords.y += sin(texCoords.x * 50.0 + u_time * 6) * 0.002; // Adjust frequency and amplitude as needed
 
 	// Sample the color texture with the distorted coordinates
-	outColor = texture2D(u_color, texCoords);
+	outColor = texture(u_color, texCoords);
 */

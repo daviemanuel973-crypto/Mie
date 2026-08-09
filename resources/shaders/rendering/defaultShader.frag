@@ -822,7 +822,7 @@ float getBlockAO()
 
 	vec2 newUV = rez[pos - 1]; 
 	
-	float ao = texture2D(u_ao, newUV).r;
+	float ao = texture(u_ao, newUV).r;
 	//return clamp(pow(ao, 1.2) * 1.4f, 0.62f,1);
 	return clamp(pow(ao, 1.0) * 1.2f, 0.70f,1) * 0.9;
 	//return clamp(pow(ao, 1.5) * 1.8f, 0.1f,1);
@@ -1939,7 +1939,7 @@ vec3 computeClipInfo(float zn, float zf) {
 }
 
 
-void swap(in out float a, in out float b)
+void swap(inout float a, inout float b)
 {
 	 float temp = a;
 	 a = b;

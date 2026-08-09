@@ -96,7 +96,7 @@ void loadOtherTextures(const char *basePath)
 
 	if (!programData.causticsTexture.id)
 	{
-		programData.causticsTexture.loadFromFile((p + "caustics.png").c_str(), false, true);
+		programData.causticsTexture.loadFromFile((p + "caustics3.png").c_str(), false, true);
 
 		if (!programData.causticsTexture.id)
 		{

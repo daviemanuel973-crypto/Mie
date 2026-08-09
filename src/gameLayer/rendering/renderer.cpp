@@ -2242,8 +2242,8 @@ void Renderer::reloadShaders()
 // region bloom
 
 	filterBloomDataShader.shader.clear();
-	filterBloomDataShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/filterBloomData.frag");
+	filterBloomDataShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/filterBloomData.frag");
 	filterBloomDataShader.shader.bind();
 	GET_UNIFORM2(filterBloomDataShader, u_exposure);
 	GET_UNIFORM2(filterBloomDataShader, u_tresshold);
@@ -2251,8 +2251,8 @@ void Renderer::reloadShaders()
 
 
 	applyBloomDataShader.shader.clear();
-	applyBloomDataShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/applyBloomData.frag");
+	applyBloomDataShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/applyBloomData.frag");
 	applyBloomDataShader.shader.bind();
 	GET_UNIFORM2(applyBloomDataShader, u_waterDropsPower);
 	GET_UNIFORM2(applyBloomDataShader, u_hitIntensity);
@@ -2261,22 +2261,22 @@ void Renderer::reloadShaders()
 
 
 	filterDownShader.shader.clear();
-	filterDownShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/filterDown.frag");
+	filterDownShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/filterDown.frag");
 	GET_UNIFORM2(filterDownShader, u_texture);
 	GET_UNIFORM2(filterDownShader, u_mip);
 
 
 	addMipsShader.shader.clear();
-	addMipsShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/addMipsShader.frag");
+	addMipsShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/addMipsShader.frag");
 	GET_UNIFORM2(addMipsShader, u_texture);
 	GET_UNIFORM2(addMipsShader, u_mip);
 
 
 	gausianBLurShader.shader.clear();
-	gausianBLurShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/gausianBlur.frag");
+	gausianBLurShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/gausianBlur.frag");
 	GET_UNIFORM2(gausianBLurShader, u_horizontal);
 	GET_UNIFORM2(gausianBLurShader, u_mip);
 	GET_UNIFORM2(gausianBLurShader, u_texel);
@@ -2298,8 +2298,8 @@ void Renderer::reloadShaders()
 // region fxaa
 	{
 		fxaaShader.shader.clear();
-		fxaaShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-			RESOURCES_PATH "shaders/postProcess/fxaa.frag");
+		fxaaShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+			RESOURCES_PATH "shaders/postprocess/fxaa.frag");
 
 		GET_UNIFORM2(fxaaShader, u_texture);
 
@@ -2335,8 +2335,8 @@ void Renderer::reloadShaders()
 	{
 		ssrShader.shader.clear();
 
-		ssrShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-			RESOURCES_PATH "shaders/postProcess/ssr.frag");
+		ssrShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+			RESOURCES_PATH "shaders/postprocess/ssr.frag");
 		ssrShader.shader.bind();
 
 		GET_UNIFORM2(ssrShader, u_color);
@@ -2449,8 +2449,8 @@ void Renderer::reloadShaders()
 
 	hbaoShader.shader.clear();
 	hbaoShader.shader.loadShaderProgramFromFile(
-		RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/hbao.frag");
+		RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/hbao.frag");
 
 	GET_UNIFORM2(hbaoShader, u_gPosition);
 	GET_UNIFORM2(hbaoShader, u_gNormal);
@@ -2460,23 +2460,23 @@ void Renderer::reloadShaders()
 
 	radialBlurShader.shader.clear();
 	radialBlurShader.shader.loadShaderProgramFromFile(
-		RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/radialBlur.frag");
+		RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/radialBlur.frag");
 	GET_UNIFORM2(radialBlurShader, u_texture);
 	GET_UNIFORM2(radialBlurShader, u_center);
 
 
 	maskDepthShader.shader.clear();
 	maskDepthShader.shader.loadShaderProgramFromFile(
-		RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/maskDepth.frag");
+		RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/maskDepth.frag");
 	GET_UNIFORM2(maskDepthShader, u_depthTexture);
 
 
 	applyHBAOShader.shader.clear();
 	applyHBAOShader.shader.loadShaderProgramFromFile(
-		RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/applyHBAO.frag");
+		RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/applyHBAO.frag");
 	GET_UNIFORM2(applyHBAOShader, u_hbao);
 	GET_UNIFORM2(applyHBAOShader, u_currentViewSpace);
 	GET_UNIFORM2(applyHBAOShader, u_viewDistance);
@@ -2485,8 +2485,8 @@ void Renderer::reloadShaders()
 
 	warpShader.shader.clear();
 	warpShader.shader.loadShaderProgramFromFile(
-		RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/warp.frag");
+		RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/warp.frag");
 	GET_UNIFORM2(warpShader, u_color);
 	GET_UNIFORM2(warpShader, u_time);
 	GET_UNIFORM2(warpShader, u_underwaterColor);
@@ -2495,8 +2495,8 @@ void Renderer::reloadShaders()
 
 	applyToneMapper.shader.clear();
 	applyToneMapper.shader.loadShaderProgramFromFile(
-		RESOURCES_PATH "shaders/postProcess/drawQuads.vert",
-		RESOURCES_PATH "shaders/postProcess/toneMap.frag");
+		RESOURCES_PATH "shaders/postprocess/drawQuads.vert",
+		RESOURCES_PATH "shaders/postprocess/toneMap.frag");
 	GET_UNIFORM2(applyToneMapper, u_color);
 	GET_UNIFORM2(applyToneMapper, u_tonemapper);
 	GET_UNIFORM2(applyToneMapper, u_exposure);
@@ -4428,6 +4428,11 @@ void Renderer::renderEntities(
 	{
 		auto &model = modelsManager.rightHand;
 
+		if (model.transforms.empty() || model.vertexCount == 0 || model.vao == 0)
+		{
+			return;
+		}
+
 		glBindVertexArray(model.vao);
 
 		glUniform1i(entityRenderer.basicEntityShader.u_bonesPerModel, model.transforms.size());
@@ -4539,7 +4544,7 @@ void Renderer::renderEntities(
 		{
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, skinningMatrixSSBO);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, skinningMatrix.size() * sizeof(glm::mat4),
-				&skinningMatrix[0][0][0], GL_STREAM_DRAW);
+				skinningMatrix.data(), GL_STREAM_DRAW);
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, perEntityDataSSBO);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, entityData.size() * sizeof(entityData[0]),
@@ -4557,6 +4562,11 @@ void Renderer::renderEntities(
 
 	auto renderAllEntitiesOfOneType = [&](Model &model, auto &container, bool isPlayers = 0)
 	{
+
+		if (container.empty() || model.transforms.empty() || model.vertexCount == 0 || model.vao == 0)
+		{
+			return;
+		}
 
 		glBindVertexArray(model.vao);
 
@@ -4702,15 +4712,20 @@ void Renderer::renderEntities(
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, skinningMatrixSSBO);
 		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, skinningMatrixSSBO);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, skinningMatrix.size() * sizeof(glm::mat4),
-			&skinningMatrix[0][0][0], GL_STREAM_DRAW);
+			skinningMatrix.data(), GL_STREAM_DRAW);
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, perEntityDataSSBO);
 		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, perEntityDataSSBO);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, entityData.size() * sizeof(entityData[0]),
 			entityData.data(), GL_STREAM_DRAW);
 
+		if (skinningMatrix.empty() || entityData.empty())
+		{
+			return;
+		}
+
 		glDrawElementsInstanced(GL_TRIANGLES, model.vertexCount, GL_UNSIGNED_INT, nullptr,
-			container.size());
+			static_cast<GLsizei>(entityData.size()));
 
 	};
 

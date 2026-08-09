@@ -45,8 +45,8 @@ flat in uvec2 v_textureSampler;
 void main()
 {
 
-	color.rgba = texture2D(sampler2D(v_textureSampler), v_uv).rgba;
-	//color.rgba = texture2D(sampler2D(textureSamplerers[1]), v_uv).rgba;
+	color.rgba = texture(sampler2D(v_textureSampler), v_uv).rgba;
+	//color.rgba = texture(sampler2D(textureSamplerers[1]), v_uv).rgba;
 	//color.rgba = vec4(v_uv,0,1);
 
 	if(color.a < 0.5)discard;

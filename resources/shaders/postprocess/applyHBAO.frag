@@ -26,7 +26,7 @@ const float AO_STRENGTH = 1.45;
 void main()
 {
 
-	float dist = -texture2D(u_currentViewSpace, v_texCoords).z;
+	float dist = -texture(u_currentViewSpace, v_texCoords).z;
 
 	vec2 texelSize = 1.0 / vec2(textureSize(u_hbao, 0));
 	float aoValue = 0.0;
