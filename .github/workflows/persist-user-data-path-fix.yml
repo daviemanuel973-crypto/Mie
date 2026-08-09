@@ -31,7 +31,7 @@ jobs:
               text = path.read_text(encoding='utf-8')
               count = text.count(old)
               if expected is not None and count != expected:
-                  if new in text and count == 0:
+                  if count == 0 and new in text:
                       return
                   raise SystemExit(f'{path_name}: expected {expected} occurrence(s) of {old!r}, found {count}')
               if count == 0:
@@ -110,65 +110,6 @@ jobs:
               'exec /app/bin/ourcraft "$@"',
           ]
           Path('flatpak/ourcraft-launcher.sh').write_text('\n'.join(launcher_lines) + '\n', encoding='utf-8')
-
-          wf = Path('.github/workflows/linux-flatpak-ci.yml')
-          text = wf.read_text(encoding='utf-8')
-          if '      - agent/release-packaging-windows-fix\n' not in text:
-              text = text.replace(
-                  '      - agent/release-packaging-stabilization\n',
-                  '      - agent/release-packaging-stabilization\n      - agent/release-packaging-windows-fix\n',
-                  1)
-
-          start = text.find('      - name: Apply GCC portability fixes\n')
-          end = text.find('      - name: Build Flatpak repository\n')
-          if start != -1 and end != -1 and end > start:
-              verify_lines = [
-                  '      - name: Verify permanent GCC portability fixes',
-                  '        run: |',
-                  "          grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp",
-                  "          grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp",
-                  "          grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp",
-                  "          grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp",
-                  "          grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h",
-                  "          grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp",
-                  "          grep -F 'nullptr, true, channelOtherVisualThings);' src/gameLayer/multyPlayer/tick.cpp",
-                  "          grep -F 'const Item &item' src/gameLayer/rendering/UiEngine.cpp",
-                  "          grep -F '#include <csignal>' src/platform/platformTools.cpp",
-                  '',
-              ]
-              text = text[:start] + '\n'.join(verify_lines) + '\n' + text[end:]
-          elif '      - name: Verify permanent GCC portability fixes\n' not in text:
-              raise SystemExit('linux-flatpak-ci.yml: portability step not found')
-
-          old_smoke = '\n'.join([
-              '      - name: Smoke-test installation metadata',
-              '        run: |',
-              '          flatpak remote-add --user --if-not-exists --no-gpg-verify mie-ci "$(pwd)/flatpak-repo"',
-              '          flatpak install --user -y mie-ci io.github.daviemanuel973.Mie',
-              '          flatpak info --user io.github.daviemanuel973.Mie',
-              '',
-          ])
-          new_smoke = '\n'.join([
-              '      - name: Smoke-test install and writable user data',
-              '        run: |',
-              '          flatpak remote-add --user --if-not-exists --no-gpg-verify mie-ci "$(pwd)/flatpak-repo"',
-              '          flatpak install --user -y mie-ci io.github.daviemanuel973.Mie',
-              '          flatpak info --user io.github.daviemanuel973.Mie',
-              '          flatpak run io.github.daviemanuel973.Mie --prepare-data-only',
-              '          data_root="$HOME/.var/app/io.github.daviemanuel973.Mie/data/ourcraft"',
-              '          test -d "$data_root/resources/worlds"',
-              '          test -d "$data_root/resources/texturePacks"',
-              '          test -d "$data_root/resources/skins"',
-              '          test -d "$data_root/playerSettings"',
-              '          test -w "$data_root/resources/worlds"',
-              '          test -w "$data_root/playerSettings"',
-              '',
-          ])
-          if old_smoke in text:
-              text = text.replace(old_smoke, new_smoke, 1)
-          elif new_smoke not in text:
-              raise SystemExit('linux-flatpak-ci.yml: smoke-test block not found')
-          wf.write_text(text, encoding='utf-8')
           PY
 
       - name: Verify path separation
@@ -193,7 +134,6 @@ jobs:
             src/gameLayer/errorReporting.cpp \
             src/gameLayer/rendering/renderSettings.cpp \
             src/gameLayer/multyPlayer/enetServerFunction.cpp \
-            flatpak/ourcraft-launcher.sh \
-            .github/workflows/linux-flatpak-ci.yml
+            flatpak/ourcraft-launcher.sh
           git commit -m 'fix: separate writable user data from packaged assets'
           git push origin HEAD:agent/release-packaging-windows-fix
