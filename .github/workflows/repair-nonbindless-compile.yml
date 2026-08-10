@@ -1,0 +1,41 @@
+name: Repair Non-Bindless Compile
+
+on:
+  push:
+    branches:
+      - agent/linux-nonbindless-renderer-fix
+    paths:
+      - '.github/workflows/repair-nonbindless-compile.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/linux-nonbindless-renderer-fix
+      - name: Fix header constant ordering
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('include/gameLayer/rendering/model.h')
+          s = p.read_text()
+          s = s.replace('int compatibilityTextureArraySize = PLAYER_SKIN_SIZE;', 'int compatibilityTextureArraySize = 128;')
+          s = s.replace('void rebuildCompatibilityTextureArray(int targetSize = PLAYER_SKIN_SIZE);', 'void rebuildCompatibilityTextureArray(int targetSize = 128);')
+          p.write_text(s)
+          PY
+          grep -F 'int compatibilityTextureArraySize = 128;' include/gameLayer/rendering/model.h
+          grep -F 'rebuildCompatibilityTextureArray(int targetSize = 128);' include/gameLayer/rendering/model.h
+          git diff --check
+      - name: Commit repair
+        shell: bash
+        run: |
+          git config user.name "Virgil_Hawkings"
+          git config user.email "daviemanuel973@gmail.com"
+          git add include/gameLayer/rendering/model.h
+          git commit -m "fix: repair compatibility texture array header defaults"
+          git push origin HEAD:agent/linux-nonbindless-renderer-fix
