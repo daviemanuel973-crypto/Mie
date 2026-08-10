@@ -25,12 +25,13 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import textwrap
           source = Path('tools/nonbindless_patch_source.txt').read_text().splitlines()
           start = next(i for i, line in enumerate(source) if "cat > /tmp/apply_patch.py <<'PY'" in line)
           end = next(i for i in range(start + 1, len(source)) if source[i].strip() == 'PY')
-          body = textwrap.dedent('\n'.join(source[start + 1:end])) + '\n'
-          Path('/tmp/apply_patch.py').write_text(body)
+          body_lines = []
+          for line in source[start + 1:end]:
+              body_lines.append(line[10:] if line.startswith('          ') else line)
+          Path('/tmp/apply_patch.py').write_text('\n'.join(body_lines) + '\n')
           PY
           python3 /tmp/apply_patch.py
           git diff --check
