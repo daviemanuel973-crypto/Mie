@@ -1,4 +1,3 @@
-# Validation trigger for the repaired non-bindless renderer head.
 name: Linux Flatpak CI
 
 on:
@@ -11,6 +10,7 @@ on:
       - agent/linux-world-create-crash-fix
       - agent/linux-texture-compat-fix
       - agent/linux-nonbindless-renderer-fix
+      - main
   pull_request:
     paths:
       - 'CMakeLists.txt'
@@ -36,17 +36,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Flatpak tooling
+      - name: Install Flatpak and shader tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
+          sudo apt-get install -y flatpak flatpak-builder glslang-tools
 
       - name: Configure Flathub
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 
-      - name: Verify permanent GCC and runtime portability fixes
+      - name: Verify permanent portability and renderer fixes
         run: |
           grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
           grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
@@ -64,13 +64,19 @@ jobs:
           grep -F -- '-DOURCRAFT_FLATPAK=ON' flatpak/io.github.daviemanuel973.Mie.yml
           grep -F 'if (container.empty() || model.transforms.empty() || model.vertexCount == 0 || model.vao == 0)' src/gameLayer/rendering/renderer.cpp
           grep -F 'skinningMatrix.data()' src/gameLayer/rendering/renderer.cpp
-          grep -F 'GL_TEXTURE_2D_ARRAY' src/gameLayer/blocksLoader.cpp
+          grep -F 'glTexImage2D(GL_TEXTURE_2D' src/gameLayer/blocksLoader.cpp
+          grep -F 'compatibilityTextureGridSize' src/gameLayer/blocksLoader.cpp
+          grep -F 'rebuildCompatibilityTextureArray(64);' src/gameLayer/blocksLoader.cpp
           grep -F 'compatibilityTextureArray' src/gameLayer/rendering/model.cpp
-          grep -F 'sampler2DArray u_compatTextureArray' resources/shaders/rendering/defaultShader.frag
-          grep -F 'sampler2DArray u_compatTextureArray' resources/shaders/rendering/zpass.frag
+          grep -F 'uniform sampler2D u_compatTextureArray;' resources/shaders/rendering/defaultShader.frag
+          grep -F 'uniform int u_compatTextureGrid;' resources/shaders/rendering/defaultShader.frag
+          grep -F 'uniform sampler2D u_compatTextureArray;' resources/shaders/rendering/zpass.frag
           grep -F 'sampler2DArray u_compatTextureArray' resources/shaders/basicEntity.frag
+          ! grep -F 'vec4 sampleBlockNormal(vec2 uv) { return sampleBlockNormal(uv); }' resources/shaders/rendering/defaultShader.frag
           grep -F 'Recommended for this GPU:' src/gameLayer/rendering/renderSettings.cpp
           grep -F 'Graphics: Low' src/gameLayer/rendering/renderSettings.cpp
+          grep -F 'Graphics: Medium' src/gameLayer/rendering/renderSettings.cpp
+          grep -F 'Graphics: High' src/gameLayer/rendering/renderSettings.cpp
           grep -F 'Graphics: Ultra' src/gameLayer/rendering/renderSettings.cpp
           grep -F 'Flatpak texture-array compatibility renderer enabled' flatpak/ourcraft-launcher.sh
           ! grep -F 'MESA_LOADER_DRIVER_OVERRIDE=zink' flatpak/ourcraft-launcher.sh
@@ -79,6 +85,19 @@ jobs:
           ! grep -R -F 'void swap(in out float a, in out float b)' resources/shaders
           test -f resources/shaders/postprocess/drawQuads.vert
           test -f resources/assets/otherTextures/caustics3.png
+
+      - name: Validate Flatpak compatibility GLSL
+        shell: bash
+        run: |
+          glslangValidator -DMIE_COMPAT_TEXTURES=1 -l \
+            resources/shaders/rendering/defaultShader.vert \
+            resources/shaders/rendering/defaultShader.frag
+          glslangValidator -DMIE_COMPAT_TEXTURES=1 -l \
+            resources/shaders/rendering/zpass.vert \
+            resources/shaders/rendering/zpass.frag
+          glslangValidator -DMIE_COMPAT_TEXTURES=1 -l \
+            resources/shaders/basicEntity.vert \
+            resources/shaders/basicEntity.frag
 
       - name: Build Flatpak repository
         shell: bash
