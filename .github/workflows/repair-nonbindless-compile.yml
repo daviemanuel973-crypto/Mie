@@ -22,17 +22,17 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          # Keep the compatibility atlas grid globally reachable by shader reloads.
+          # Keep this operation idempotent: no duplicate "static inline" on reruns.
           p = Path('include/gameLayer/blocksLoader.h')
           s = p.read_text()
-          old = 'int compatibilityTextureGridSize = 1;'
-          new = 'static inline int compatibilityTextureGridSize = 1;'
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif new not in s:
-              raise SystemExit('Could not locate compatibilityTextureGridSize declaration')
-          p.write_text(s)
+          pattern = r'^\s*(?:static\s+inline\s+)*int compatibilityTextureGridSize = 1;$'
+          replacement = '\tstatic inline int compatibilityTextureGridSize = 1;'
+          s2, count = re.subn(pattern, replacement, s, count=1, flags=re.MULTILINE)
+          if count != 1:
+              raise SystemExit('Could not normalize compatibilityTextureGridSize declaration')
+          p.write_text(s2)
 
           # reloadShaders() has no BlocksLoader instance; use the shared grid value.
           p = Path('src/gameLayer/rendering/renderer.cpp')
@@ -53,6 +53,7 @@ jobs:
           p.write_text(s)
           PY
           grep -F 'static inline int compatibilityTextureGridSize = 1;' include/gameLayer/blocksLoader.h
+          ! grep -F 'static inline static inline' include/gameLayer/blocksLoader.h
           grep -F 'glUniform1i(zpassShader.u_compatTextureGrid, BlocksLoader::compatibilityTextureGridSize);' src/gameLayer/rendering/renderer.cpp
           grep -F 'int compatibilityTextureArraySize = 128;' include/gameLayer/rendering/model.h
           grep -F 'rebuildCompatibilityTextureArray(int targetSize = 128);' include/gameLayer/rendering/model.h
@@ -69,5 +70,3 @@ jobs:
           fi
           git commit -m "fix: repair Linux compatibility renderer compile"
           git push origin HEAD:agent/linux-nonbindless-renderer-fix
-
-# Direct connector touch: re-run CI from a commit that already contains the source repair.
