@@ -1,6 +1,7 @@
 #pragma once
 #include <gameplay/entity.h>
 #include <gameplay/life.h>
+#include <gameplay/basicEnemyBehaviour.h>
 #include <random>
 #include <unordered_map>
 #include <unordered_set>
@@ -8,7 +9,8 @@
 
 struct Zombie: public PhysicalEntity, public CanPushOthers
 	, public HasOrientationAndHeadTurnDirection, public CollidesWithPlacedBlocks,
-	public CanBeKilled, public CanBeAttacked, public HasEyesAndPupils<EYE_ANIMATION_TYPE_PLAYER>
+	public CanBeKilled, public CanBeAttacked, public HasEyesAndPupils<EYE_ANIMATION_TYPE_PLAYER>,
+	public Animatable
 {
 
 	void update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter);
@@ -43,15 +45,11 @@ struct ZombieServer: public ServerEntity<Zombie>
 	};
 
 	Variant variant = Walker;
+	bool variantInitialized = false;
 	float moveSpeedMultiplier = 1.f;
+	BasicEnemyBehaviour basicEnemyBehaviour;
 
-	glm::vec2 direction = {};
-	float waitTime = 1;
-	float keepJumpingTimer = 0;
-	float randomSightBonusTimer = 1;
-
-
-	std::uint64_t playerLockedOn = 0;
+	void initializeVariant(std::minstd_rand &rng);
 
 	void appendDataToDisk(std::ofstream &f, std::uint64_t eId);
 
@@ -62,11 +60,11 @@ struct ZombieServer: public ServerEntity<Zombie>
 		std::unordered_map<std::uint64_t, glm::dvec3> &playersPosition,
 		std::unordered_map < std::uint64_t, Client *> &allClients);
 
-	//todo
-	bool isUnaware() { return  false; }
-	void signalHit(glm::vec3 direction) {};
+	bool isUnaware() { return basicEnemyBehaviour.isUnaware(); }
+	void signalHit(glm::vec3 direction) { basicEnemyBehaviour.signalHit(direction, this); }
 
-	LootTable &getLootTable() { return getEmptyLootTable(); }
+	WeaponStats getWeaponStats();
+	LootTable &getLootTable();
 
 };
 
