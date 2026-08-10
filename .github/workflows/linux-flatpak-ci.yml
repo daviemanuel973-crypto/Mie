@@ -9,6 +9,7 @@ on:
       - agent/release-packaging-windows-fix
       - agent/linux-world-create-crash-fix
       - agent/linux-texture-compat-fix
+      - agent/linux-nonbindless-renderer-fix
   pull_request:
     paths:
       - 'CMakeLists.txt'
@@ -58,15 +59,25 @@ jobs:
           grep -F 'USER_CONTENT_PATH="resources/"' CMakeLists.txt
           grep -F 'USER_SETTINGS_PATH="playerSettings/"' CMakeLists.txt
           grep -F 'USER_ERROR_LOG_PATH="errorLogs.txt"' CMakeLists.txt
+          grep -F 'OURCRAFT_FLATPAK=1' CMakeLists.txt
+          grep -F -- '-DOURCRAFT_FLATPAK=ON' flatpak/io.github.daviemanuel973.Mie.yml
           grep -F 'if (container.empty() || model.transforms.empty() || model.vertexCount == 0 || model.vao == 0)' src/gameLayer/rendering/renderer.cpp
           grep -F 'skinningMatrix.data()' src/gameLayer/rendering/renderer.cpp
+          grep -F 'GL_TEXTURE_2D_ARRAY' src/gameLayer/blocksLoader.cpp
+          grep -F 'compatibilityTextureArray' src/gameLayer/rendering/model.cpp
+          grep -F 'sampler2DArray u_compatTextureArray' resources/shaders/rendering/defaultShader.frag
+          grep -F 'sampler2DArray u_compatTextureArray' resources/shaders/rendering/zpass.frag
+          grep -F 'sampler2DArray u_compatTextureArray' resources/shaders/basicEntity.frag
+          grep -F 'Recommended for this GPU:' src/gameLayer/rendering/renderSettings.cpp
+          grep -F 'Graphics: Low' src/gameLayer/rendering/renderSettings.cpp
+          grep -F 'Graphics: Ultra' src/gameLayer/rendering/renderSettings.cpp
+          grep -F 'Flatpak texture-array compatibility renderer enabled' flatpak/ourcraft-launcher.sh
+          ! grep -F 'MESA_LOADER_DRIVER_OVERRIDE=zink' flatpak/ourcraft-launcher.sh
           ! grep -R -F 'shaders/postProcess/' src include
           ! grep -R -F 'texture2D(' resources/shaders
           ! grep -R -F 'void swap(in out float a, in out float b)' resources/shaders
           test -f resources/shaders/postprocess/drawQuads.vert
           test -f resources/assets/otherTextures/caustics3.png
-          grep -F 'MESA_LOADER_DRIVER_OVERRIDE=zink' flatpak/ourcraft-launcher.sh
-          grep -F 'ZINK_DESCRIPTORS' flatpak/ourcraft-launcher.sh
 
       - name: Build Flatpak repository
         shell: bash
@@ -108,6 +119,6 @@ jobs:
       - name: Upload Linux Flatpak
         uses: actions/upload-artifact@v4
         with:
-          name: Mie-Survival-Linux-x86_64-texture-compat-fix
+          name: Mie-Survival-Linux-x86_64-nonbindless-renderer-fix
           path: Mie-Survival-Linux-x86_64.flatpak
           if-no-files-found: error
