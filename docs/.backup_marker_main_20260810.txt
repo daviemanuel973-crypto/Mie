@@ -1,0 +1,3 @@
+Safety backup marker for main before promoting the Linux/Flatpak fixes.
+Original main commit: 23562ce8779ff9d2228d7adbe5bdfd1f8da34851
+Date: 2026-08-10
