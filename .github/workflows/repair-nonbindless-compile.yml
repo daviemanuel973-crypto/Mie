@@ -97,3 +97,5 @@ jobs:
           fi
           git commit -m "fix: avoid bindless texture calls in Linux compatibility mode"
           git push origin HEAD:agent/linux-nonbindless-renderer-fix
+
+# Revalidation marker: source hardening is already present in this commit.
