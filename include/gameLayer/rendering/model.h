@@ -247,6 +247,11 @@ struct ModelsManager
 	std::vector<GLuint64> gpuIds;
 	std::vector<GLuint> texturesIds;
 
+	GLuint compatibilityTextureArray = 0;
+	int compatibilityTextureArraySize = 128;
+	int compatibilityHandTextureLayer = 0;
+	void rebuildCompatibilityTextureArray(int targetSize = 128);
+
 	GLuint texturesSSBO = 0;
 
 	gl2d::Texture temporaryPlayerHandTexture = {};

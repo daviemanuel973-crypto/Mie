@@ -12,6 +12,7 @@ uniform vec3 u_positionFloat;
 
 out vec2 v_uv;
 out flat uvec2 v_textureSampler;
+out flat int v_compatTextureIndex;
 
 uniform int u_renderOnlyWater;
 
@@ -199,6 +200,7 @@ void main()
 	{
 		gl_Position = vec4(0,0,0,1);
 		v_textureSampler = uvec2(0,0);
+		v_compatTextureIndex = 0;
 		return;
 	}
 
@@ -228,5 +230,11 @@ void main()
 	gl_Position = posProjection;
 	
 	int textureIndex = in_textureIndex & 0x07FF;
+#ifdef MIE_COMPAT_TEXTURES
+	v_compatTextureIndex = textureIndex;
+	v_textureSampler = uvec2(0);
+#else
+	v_compatTextureIndex = 0;
 	v_textureSampler = textureSamplerers[textureIndex];
+#endif
 }

@@ -23,4 +23,6 @@ if [ "${1:-}" = "--prepare-data-only" ]; then
     exit 0
 fi
 
+echo "Mie: Flatpak texture-array compatibility renderer enabled" >&2
+
 exec /app/bin/ourcraft "$@"

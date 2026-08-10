@@ -1,5 +1,7 @@
 #version 430 core
+#ifndef MIE_COMPAT_TEXTURES
 #extension GL_ARB_bindless_texture: require
+#endif
 
 
 layout (location = 0) out vec4 out_color;
@@ -20,6 +22,29 @@ in flat uvec2 v_textureSampler;
 in flat uvec2 v_normalSampler;
 in flat uvec2 v_materialSampler;
 in flat uvec2 v_paralaxSampler;
+
+#ifdef MIE_COMPAT_TEXTURES
+in flat int v_compatTextureIndex;
+uniform sampler2D u_compatTextureArray;
+uniform int u_compatTextureGrid;
+vec2 compatibilityAtlasUV(vec2 uv, int textureIndex)
+{
+    float grid = float(max(u_compatTextureGrid, 1));
+    int safeIndex = max(textureIndex, 0);
+    vec2 tile = vec2(float(safeIndex % u_compatTextureGrid), float(safeIndex / u_compatTextureGrid));
+    vec2 localUV = clamp(fract(uv), vec2(0.001), vec2(0.999));
+    return (tile + localUV) / grid;
+}
+vec4 sampleBlockAlbedo(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex)); }
+vec4 sampleBlockNormal(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex + 1)); }
+vec4 sampleBlockMaterial(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex + 2)); }
+vec4 sampleBlockParallax(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex + 3)); }
+#else
+vec4 sampleBlockAlbedo(vec2 uv) { return texture(sampler2D(v_textureSampler), uv); }
+vec4 sampleBlockNormal(vec2 uv) { return texture(sampler2D(v_normalSampler), uv); }
+vec4 sampleBlockMaterial(vec2 uv) { return texture(sampler2D(v_materialSampler), uv); }
+vec4 sampleBlockParallax(vec2 uv) { return texture(sampler2D(v_paralaxSampler), uv); }
+#endif
 in flat int v_ambientInt;
 
 in flat int v_skyLight; //ambient sun value, todo remove?
@@ -380,7 +405,7 @@ vec3 applyNormalMap(vec3 inNormal, vec2 uv)
 		//return inNormal;
 	}else
 	{
-		normal = texture(sampler2D(v_normalSampler), uv).rgb;
+		normal = sampleBlockNormal(uv).rgb;
 	}
 
 	normal = normalize(2*normal - 1.f);
@@ -579,7 +604,7 @@ float shadowCalc(float dotLightNormal, int cascade)
 	vec3 pos = fragPositionLightSpace.xyz * 0.5 + 0.5;
 	pos.z = min(pos.z, 1.0);
 	
-	float depth = texture(sampler2D(u_cascadedShadowsMaps[cascade]), pos.xy).r;
+	float depth = texture(u_cascadedShadowsMaps[cascade], pos.xy).r;
 		
 	float bias = getShadowBias(dotLightNormal, cascade);
 
@@ -993,7 +1018,7 @@ void main()
 	if(u_shaders == 0)
 	{
 		//load albedo
-		vec4 textureColor = texture(sampler2D(v_textureSampler), v_uv);
+		vec4 textureColor = sampleBlockAlbedo(v_uv);
 		if(textureColor.a <= 0){discard;}
 		//gamma correction
 		textureColor.rgb = toLinear(textureColor.rgb);
@@ -1104,21 +1129,21 @@ void main()
 			vec2 deltaUVs = S / numLayers;
 
 			vec2 UVs = v_uv;
-			float currentDepthMapValue = 1.0f - pow(texture(sampler2D(v_paralaxSampler), UVs).r, power);
+			float currentDepthMapValue = 1.0f - pow(sampleBlockParallax(UVs).r, power);
 	
 
 			// Loop till the point on the heightmap is "hit"
 			while(currentLayerDepth < currentDepthMapValue)
 			{
 				UVs -= deltaUVs;
-				currentDepthMapValue = 1.0f - pow(texture(sampler2D(v_paralaxSampler), UVs).r, power);
+				currentDepthMapValue = 1.0f - pow(sampleBlockParallax(UVs).r, power);
 				currentLayerDepth += layerDepth;
 			}
 
 			// Apply Occlusion (interpolation with prev value)
 			vec2 prevTexCoords = UVs + deltaUVs;
 			float afterDepth  = currentDepthMapValue - currentLayerDepth;
-			float beforeDepth = 1.0f - pow(texture(sampler2D(v_paralaxSampler), prevTexCoords).r, power) - currentLayerDepth + layerDepth;
+			float beforeDepth = 1.0f - pow(sampleBlockParallax(prevTexCoords).r, power) - currentLayerDepth + layerDepth;
 			float weight = afterDepth / (afterDepth - beforeDepth);
 			UVs = prevTexCoords * weight + UVs * (1.0f - weight);
 
@@ -1137,7 +1162,7 @@ void main()
 		float roughness = 0;
 		float emissive = 0;
 		{
-			vec3 materialColor = texture(sampler2D(v_materialSampler), finalUV).rgb;
+			vec3 materialColor = sampleBlockMaterial(finalUV).rgb;
 			
 			roughness = pow((1 - materialColor.r),2);
 			metallic =pow((materialColor.g),0.5);
@@ -1154,8 +1179,8 @@ void main()
 		//load albedo
 		vec4 textureColor;
 		{
-			textureColor = texture(sampler2D(v_textureSampler), finalUV);
-			float textureAlphaOriginal = texture(sampler2D(v_textureSampler), v_uv).a;
+			textureColor = sampleBlockAlbedo(finalUV);
+			float textureAlphaOriginal = sampleBlockAlbedo(v_uv).a;
 			if(textureAlphaOriginal <= 0){discard;}
 			//gamma correction
 			textureColor.rgb = toLinear(textureColor.rgb);

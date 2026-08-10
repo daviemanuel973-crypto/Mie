@@ -19,6 +19,20 @@
 #include <unordered_map>
 #include <magic_enum.hpp>
 
+
+static GLuint64 getTextureRuntimeHandle(GLuint textureId)
+{
+#if defined(OURCRAFT_FLATPAK)
+	// Compatibility shaders use atlas/array indices, not bindless handles.
+	// Preserve a stable non-zero CPU-side identity without touching ARB_bindless_texture.
+	return static_cast<GLuint64>(textureId);
+#else
+	auto handle = glGetTextureHandleARB(textureId);
+	glMakeTextureHandleResidentARB(handle);
+	return handle;
+#endif
+}
+
 glm::mat4 aiToGlm(const aiMatrix4x4 &matrix)
 {
 	return glm::make_mat4(&matrix.a1); // a1 represents the first element of the matrix
@@ -62,14 +76,80 @@ bool areStringsSameToLower(const char *a, const char *b)
 }
 
 
+static std::vector<unsigned char> resizeModelTextureNearestCompat(GLuint textureId, int targetSize)
+{
+    gl2d::Texture sourceTexture;
+    sourceTexture.id = textureId;
+    glm::ivec2 sourceSize = {};
+    auto source = sourceTexture.readTextureData(0, &sourceSize);
+    std::vector<unsigned char> result((size_t)targetSize * targetSize * 4, 255);
+    if (sourceSize.x <= 0 || sourceSize.y <= 0 || source.size() < (size_t)sourceSize.x * sourceSize.y * 4)
+        return result;
+
+    for (int y = 0; y < targetSize; y++)
+    for (int x = 0; x < targetSize; x++)
+    {
+        int sx = std::min(sourceSize.x - 1, (x * sourceSize.x) / targetSize);
+        int sy = std::min(sourceSize.y - 1, (y * sourceSize.y) / targetSize);
+        size_t src = ((size_t)sx + (size_t)sy * sourceSize.x) * 4;
+        size_t dst = ((size_t)x + (size_t)y * targetSize) * 4;
+        result[dst + 0] = source[src + 0];
+        result[dst + 1] = source[src + 1];
+        result[dst + 2] = source[src + 2];
+        result[dst + 3] = source[src + 3];
+    }
+    return result;
+}
+
+void ModelsManager::rebuildCompatibilityTextureArray(int targetSize)
+{
+    if (compatibilityTextureArray)
+    {
+        glDeleteTextures(1, &compatibilityTextureArray);
+        compatibilityTextureArray = 0;
+    }
+    if (texturesIds.empty()) return;
+
+    compatibilityTextureArraySize = std::max(16, targetSize);
+    compatibilityHandTextureLayer = static_cast<int>(texturesIds.size());
+    int layers = compatibilityHandTextureLayer + 1;
+    int mipLevels = 1;
+    for (int size = compatibilityTextureArraySize; size > 1; size /= 2) mipLevels++;
+
+    glGenTextures(1, &compatibilityTextureArray);
+    glActiveTexture(GL_TEXTURE0 + 16);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, compatibilityTextureArray);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, mipLevels, GL_RGBA8,
+        compatibilityTextureArraySize, compatibilityTextureArraySize, layers);
+
+    for (int layer = 0; layer < compatibilityHandTextureLayer; layer++)
+    {
+        auto data = resizeModelTextureNearestCompat(texturesIds[layer], compatibilityTextureArraySize);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer,
+            compatibilityTextureArraySize, compatibilityTextureArraySize, 1,
+            GL_RGBA, GL_UNSIGNED_BYTE, data.data());
+    }
+
+    auto hand = resizeModelTextureNearestCompat(temporaryPlayerHandTexture.id, compatibilityTextureArraySize);
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, compatibilityHandTextureLayer,
+        compatibilityTextureArraySize, compatibilityTextureArraySize, 1,
+        GL_RGBA, GL_UNSIGNED_BYTE, hand.data());
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+    glActiveTexture(GL_TEXTURE0);
+}
+
 void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 {
 
 	if (!temporaryPlayerHandTexture.id)
 	{
 		temporaryPlayerHandTexture.loadFromFile(RESOURCES_PATH "skins/mage.png", true);
-		temporaryPlayerHandBindlessTexture = glGetTextureHandleARB(temporaryPlayerHandTexture.id);
-		glMakeTextureHandleResidentARB(temporaryPlayerHandBindlessTexture);
+		temporaryPlayerHandBindlessTexture = getTextureRuntimeHandle(temporaryPlayerHandTexture.id);
 	}
 
 
@@ -109,8 +189,7 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 		t.createFromBuffer((char *)data, 2, 2, true, false);
 
 		texturesIds.push_back(t.id);
-		auto handle = glGetTextureHandleARB(t.id);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(t.id);
 		gpuIds.push_back(handle);
 	}
 
@@ -143,8 +222,7 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 
 			glGenerateMipmap(GL_TEXTURE_2D);
 
-			handle = glGetTextureHandleARB(texture.id);
-			glMakeTextureHandleResidentARB(handle);
+			handle = getTextureRuntimeHandle(texture.id);
 		}
 		else
 		{
@@ -815,6 +893,9 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 	importer.FreeScene();
 
 
+#if defined(OURCRAFT_FLATPAK)
+	rebuildCompatibilityTextureArray(PLAYER_SKIN_SIZE);
+#endif
 	setupSSBO();
 }
 
@@ -917,6 +998,14 @@ void ModelsManager::clearAllModels()
 		}
 		glDeleteTextures(1, &texturesIds[0]);
 	}
+
+#if defined(OURCRAFT_FLATPAK)
+	if (compatibilityTextureArray)
+	{
+		glDeleteTextures(1, &compatibilityTextureArray);
+		compatibilityTextureArray = 0;
+	}
+#endif
 
 	texturesIds.clear();
 	gpuIds.clear();

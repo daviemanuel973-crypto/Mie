@@ -10,6 +10,20 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+
+static GLuint64 getTextureRuntimeHandle(GLuint textureId)
+{
+#if defined(OURCRAFT_FLATPAK)
+	// Compatibility shaders use atlas/array indices, not bindless handles.
+	// Preserve a stable non-zero CPU-side identity without touching ARB_bindless_texture.
+	return static_cast<GLuint64>(textureId);
+#else
+	auto handle = glGetTextureHandleARB(textureId);
+	glMakeTextureHandleResidentARB(handle);
+	return handle;
+#endif
+}
+
 //loadallblocks
 //load all textures
 //loadalltextures
@@ -998,6 +1012,95 @@ void noErrorFunc(const char *msg, void *userDefinedData)
 {
 }
 
+static std::vector<unsigned char> resizeBlockTextureNearestCompat(GLuint textureId, int targetSize)
+{
+    gl2d::Texture sourceTexture;
+    sourceTexture.id = textureId;
+    glm::ivec2 sourceSize = {};
+    auto source = sourceTexture.readTextureData(0, &sourceSize);
+
+    std::vector<unsigned char> result((size_t)targetSize * targetSize * 4, 255);
+    if (sourceSize.x <= 0 || sourceSize.y <= 0 || source.size() < (size_t)sourceSize.x * sourceSize.y * 4)
+    {
+        for (int y = 0; y < targetSize; y++)
+        for (int x = 0; x < targetSize; x++)
+        {
+            size_t d = ((size_t)x + (size_t)y * targetSize) * 4;
+            bool dark = ((x / 8) + (y / 8)) % 2 == 0;
+            result[d + 0] = dark ? 0 : 146;
+            result[d + 1] = dark ? 0 : 52;
+            result[d + 2] = dark ? 0 : 235;
+            result[d + 3] = 255;
+        }
+        return result;
+    }
+
+    for (int y = 0; y < targetSize; y++)
+    for (int x = 0; x < targetSize; x++)
+    {
+        int sx = std::min(sourceSize.x - 1, (x * sourceSize.x) / targetSize);
+        int sy = std::min(sourceSize.y - 1, (y * sourceSize.y) / targetSize);
+        size_t src = ((size_t)sx + (size_t)sy * sourceSize.x) * 4;
+        size_t dst = ((size_t)x + (size_t)y * targetSize) * 4;
+        result[dst + 0] = source[src + 0];
+        result[dst + 1] = source[src + 1];
+        result[dst + 2] = source[src + 2];
+        result[dst + 3] = source[src + 3];
+    }
+    return result;
+}
+
+void BlocksLoader::rebuildCompatibilityTextureArray(int targetSize)
+{
+    if (compatibilityTextureArray)
+    {
+        glDeleteTextures(1, &compatibilityTextureArray);
+        compatibilityTextureArray = 0;
+    }
+    if (texturesIds.empty()) return;
+
+    GLint maxTextureSize = 4096;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+
+    compatibilityTextureGridSize = static_cast<int>(std::ceil(std::sqrt(static_cast<double>(texturesIds.size()))));
+    compatibilityTextureGridSize = std::max(1, compatibilityTextureGridSize);
+
+    int maxTileSize = std::max(8, maxTextureSize / compatibilityTextureGridSize);
+    compatibilityTextureArraySize = std::max(8, std::min(targetSize, maxTileSize));
+    const int atlasSize = compatibilityTextureGridSize * compatibilityTextureArraySize;
+
+    glGenTextures(1, &compatibilityTextureArray);
+    glActiveTexture(GL_TEXTURE0 + 15);
+    glBindTexture(GL_TEXTURE_2D, compatibilityTextureArray);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, atlasSize, atlasSize, 0,
+        GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    for (size_t layer = 0; layer < texturesIds.size(); layer++)
+    {
+        auto data = resizeBlockTextureNearestCompat(texturesIds[layer], compatibilityTextureArraySize);
+        int tileX = static_cast<int>(layer % compatibilityTextureGridSize);
+        int tileY = static_cast<int>(layer / compatibilityTextureGridSize);
+        glTexSubImage2D(GL_TEXTURE_2D, 0,
+            tileX * compatibilityTextureArraySize,
+            tileY * compatibilityTextureArraySize,
+            compatibilityTextureArraySize, compatibilityTextureArraySize,
+            GL_RGBA, GL_UNSIGNED_BYTE, data.data());
+    }
+
+    // No mipmaps in compatibility mode: avoids cross-tile bleeding and saves VRAM.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glActiveTexture(GL_TEXTURE0);
+
+    std::cout << "Compatibility texture atlas: " << texturesIds.size()
+        << " layers, grid " << compatibilityTextureGridSize << "x"
+        << compatibilityTextureGridSize << ", tile " << compatibilityTextureArraySize
+        << "px, atlas " << atlasSize << "px" << std::endl;
+}
+
 //textureloader texture loader
 void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 {
@@ -1072,8 +1175,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			t.createFromBuffer((char *)data, 2, 2, true, false);
 
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 			gpuIds.push_back(handle);
 		}
 
@@ -1093,8 +1195,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			t.createFromBuffer((char *)data, 1, 1, true, false);
 
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 			gpuIds.push_back(handle);
 		}
 
@@ -1113,8 +1214,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			gl2d::Texture t;
 			t.createFromBuffer((char *)data, 1, 1, true, false);
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 
 			gpuIds.push_back(handle);
 		}
@@ -1134,8 +1234,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			gl2d::Texture t;
 			t.createFromBuffer((char *)data, 1, 1, true, false);
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 
 			gpuIds.push_back(handle);
 		}
@@ -1145,20 +1244,16 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 
 	auto setGpuIds = [&](int blockIndex) 
 	{
-		auto handle = glGetTextureHandleARB(texturesIds[blockIndex + 0]);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(texturesIds[blockIndex + 0]);
 		gpuIds[blockIndex + 0] = handle;
 
-		handle = glGetTextureHandleARB(texturesIds[blockIndex + 1]);
-		glMakeTextureHandleResidentARB(handle);
+		handle = getTextureRuntimeHandle(texturesIds[blockIndex + 1]);
 		gpuIds[blockIndex + 1] = handle;
 
-		handle = glGetTextureHandleARB(texturesIds[blockIndex + 2]);
-		glMakeTextureHandleResidentARB(handle);
+		handle = getTextureRuntimeHandle(texturesIds[blockIndex + 2]);
 		gpuIds[blockIndex + 2] = handle;
 
-		handle = glGetTextureHandleARB(texturesIds[blockIndex + 3]);
-		glMakeTextureHandleResidentARB(handle);
+		handle = getTextureRuntimeHandle(texturesIds[blockIndex + 3]);
 		gpuIds[blockIndex + 3] = handle;
 	};
 
@@ -1180,8 +1275,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 		glGenerateMipmap(GL_TEXTURE_2D);
 
 
-		auto handle = glGetTextureHandleARB(t.id);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(t.id);
 
 
 		if (appendMode)
@@ -1460,8 +1554,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 4.f);
 				glGenerateMipmap(GL_TEXTURE_2D);
 
-				auto handle = glGetTextureHandleARB(texturesIds[i*4 + 1]);
-				glMakeTextureHandleResidentARB(handle);
+				auto handle = getTextureRuntimeHandle(texturesIds[i*4 + 1]);
 				gpuIds[i * 4 + 1] = handle;
 
 			}
@@ -1548,8 +1641,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 4.f);
 				glGenerateMipmap(GL_TEXTURE_2D);
 
-				auto handle = glGetTextureHandleARB(texturesIds[i * 4 + 3]);
-				glMakeTextureHandleResidentARB(handle);
+				auto handle = getTextureRuntimeHandle(texturesIds[i * 4 + 3]);
 				gpuIds[i * 4 + 3] = handle;
 
 			}
@@ -1602,8 +1694,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 
-				auto handle = glGetTextureHandleARB(t.id);
-				glMakeTextureHandleResidentARB(handle);
+				auto handle = getTextureRuntimeHandle(t.id);
 
 				if (appendMode)
 				{
@@ -1680,8 +1771,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			spawnEggSize.x, spawnEggSize.y, true, false);
 
 		texturesIdsItems[index] = newTexture.id;
-		auto handle = glGetTextureHandleARB(newTexture.id);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(newTexture.id);
 		gpuIdsItems[index] = handle;
 
 
@@ -1708,6 +1798,9 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 		//std::cout << "err\n";
 	}
 
+#if defined(OURCRAFT_FLATPAK)
+	rebuildCompatibilityTextureArray(64);
+#endif
 }
 
 void BlocksLoader::setupAllColors()
@@ -1764,6 +1857,14 @@ void BlocksLoader::setupAllColors()
 void BlocksLoader::clearAllTextures()
 {
 	blocksColors.clear();
+
+#if defined(OURCRAFT_FLATPAK)
+	if (compatibilityTextureArray)
+	{
+		glDeleteTextures(1, &compatibilityTextureArray);
+		compatibilityTextureArray = 0;
+	}
+#endif
 
 	spawnEgg.cleanup();
 	

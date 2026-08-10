@@ -48,6 +48,7 @@ struct PerEntityData
 };
 
 flat out uvec2 v_textureSampler;
+flat out int v_compatTextureIndex;
 
 readonly restrict layout(std430) buffer u_perEntityData
 {
@@ -62,10 +63,17 @@ void main()
 
 	v_color *= max(entityData[gl_InstanceID].lightLevels/15.0, 0.1);
 
-	if(textureIndex == 1)	{v_textureSampler = entityData[gl_InstanceID].textureSampler1;} else
-	if(textureIndex == 2)	{v_textureSampler = entityData[gl_InstanceID].textureSampler2;} else
-	if(textureIndex == 3)	{v_textureSampler = entityData[gl_InstanceID].textureSampler3;} else
-							{v_textureSampler = entityData[gl_InstanceID].textureSampler0;} 
+	uvec2 selectedTextureSampler = entityData[gl_InstanceID].textureSampler0;
+	if(textureIndex == 1) selectedTextureSampler = entityData[gl_InstanceID].textureSampler1; else
+	if(textureIndex == 2) selectedTextureSampler = entityData[gl_InstanceID].textureSampler2; else
+	if(textureIndex == 3) selectedTextureSampler = entityData[gl_InstanceID].textureSampler3;
+#ifdef MIE_COMPAT_TEXTURES
+	v_compatTextureIndex = int(selectedTextureSampler.x);
+	v_textureSampler = uvec2(0);
+#else
+	v_compatTextureIndex = 0;
+	v_textureSampler = selectedTextureSampler;
+#endif
 	
 
 	vec3 diffI = entityPosInt - u_cameraPositionInt;

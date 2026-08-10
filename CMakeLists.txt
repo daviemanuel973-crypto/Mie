@@ -18,6 +18,7 @@ project(ourCraft)
 option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
+option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -105,6 +106,10 @@ if (OURCRAFT_LOW_END_BUILD)
 		target_compile_options("${CMAKE_PROJECT_NAME}" PRIVATE
 			$<$<CONFIG:Release>:-O3;-fno-math-errno;-fno-trapping-math;-fomit-frame-pointer>)
 	endif()
+endif()
+
+if (OURCRAFT_FLATPAK)
+	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC OURCRAFT_FLATPAK=1)
 endif()
 
 # The original Windows-oriented source relies on a few declarations being

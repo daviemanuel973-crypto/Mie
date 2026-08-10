@@ -88,6 +88,7 @@ out flat uvec2 v_textureSampler;
 out flat uvec2 v_normalSampler;
 out flat uvec2 v_materialSampler;
 out flat uvec2 v_paralaxSampler;
+out flat int v_compatTextureIndex;
 
 //in world space
 out flat ivec3 fragmentPositionI;
@@ -373,9 +374,18 @@ void main()
 	v_colors = (in_textureIndex & 0xF800) >> 11;
 	int textureIndex = in_textureIndex & 0x07FF;
 
+#ifdef MIE_COMPAT_TEXTURES
+	v_compatTextureIndex = textureIndex;
+	v_textureSampler = uvec2(0);
+	v_normalSampler = uvec2(0);
+	v_materialSampler = uvec2(0);
+	v_paralaxSampler = uvec2(0);
+#else
+	v_compatTextureIndex = 0;
 	v_textureSampler = textureSamplerers[textureIndex];
 	v_normalSampler = textureSamplerers[textureIndex+1];
 	v_materialSampler = textureSamplerers[textureIndex+2];
 	v_paralaxSampler = textureSamplerers[textureIndex+3];
+#endif
 
 }

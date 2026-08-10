@@ -6,6 +6,7 @@ on:
       - agent/content-exploration-v01
       - agent/release-packaging-stabilization
       - agent/release-packaging-windows-fix
+      - agent/linux-nonbindless-renderer-fix
   pull_request:
     paths:
       - 'CMakeLists.txt'
@@ -99,20 +100,17 @@ jobs:
           $installDir = Join-Path $env:RUNNER_TEMP "MieSmokeInstall"
           Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
 
-          # Fresh install.
           $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$installDir") -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "fresh install failed: $($p.ExitCode)" }
           if (-not (Test-Path "$installDir/Mie.exe")) { throw "Mie.exe missing after install" }
           if (-not (Test-Path "$installDir/resources/shaders")) { throw "shader resources missing after install" }
 
-          # Simulate a player save, then run the installer again to verify update safety.
           New-Item -ItemType Directory -Force "$installDir/resources/worlds/ci-preserve" | Out-Null
           Set-Content -Path "$installDir/resources/worlds/ci-preserve/save.txt" -Value "keep-me"
           $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$installDir") -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "update install failed: $($p.ExitCode)" }
           if (-not (Test-Path "$installDir/resources/worlds/ci-preserve/save.txt")) { throw "update removed player save" }
 
-          # Uninstaller itself must work. User-created save files may intentionally remain.
           $uninstaller = Get-ChildItem $installDir -Filter 'unins*.exe' | Select-Object -First 1
           if (-not $uninstaller) { throw "uninstaller missing" }
           $p = Start-Process -FilePath $uninstaller.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
