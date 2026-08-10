@@ -1,5 +1,7 @@
 #version 430 core
+#ifndef MIE_COMPAT_TEXTURES
 #extension GL_ARB_bindless_texture: require
+#endif
 
 layout(location = 0) out vec4 color;
 

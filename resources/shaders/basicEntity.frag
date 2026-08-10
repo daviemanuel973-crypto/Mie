@@ -1,5 +1,7 @@
 #version 430 core
+#ifndef MIE_COMPAT_TEXTURES
 #extension GL_ARB_bindless_texture: require
+#endif
 
 layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 out_screenSpacePositions;
@@ -39,13 +41,21 @@ readonly restrict layout(std430) buffer u_entityTextureSamplerers
 };
 
 flat in uvec2 v_textureSampler;
+flat in int v_compatTextureIndex;
+#ifdef MIE_COMPAT_TEXTURES
+uniform sampler2DArray u_compatTextureArray;
+#endif
 //flat in float v_ambient;
 
 
 void main()
 {
 
+#ifdef MIE_COMPAT_TEXTURES
+	color.rgba = texture(u_compatTextureArray, vec3(v_uv, float(v_compatTextureIndex))).rgba;
+#else
 	color.rgba = texture(sampler2D(v_textureSampler), v_uv).rgba;
+#endif
 	//color.rgba = texture(sampler2D(textureSamplerers[1]), v_uv).rgba;
 	//color.rgba = vec4(v_uv,0,1);
 

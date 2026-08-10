@@ -7,6 +7,8 @@
 #include <audioEngine.h>
 #include <safeSave.h>
 #include <sstream>
+#include <algorithm>
+#include <cctype>
 
 void displayRenderSettingsMenuButton(ProgramData &programData)
 {
@@ -22,28 +24,136 @@ void displayRenderSettingsMenuButton(ProgramData &programData)
 #define DEFAULT_COLOR_PICKER programData.ui.buttonTexture, programData.ui.buttonTexture, Colors_Gray, Colors_Gray
 #define DEFAULT_COLOR_PICKER_TRANSPARENT programData.ui.buttonTexture, programData.ui.buttonTexture, {(float)0x7F / 255.0f, (float)0x7F / 255.0f, (float)0x7F / 255.0f, 0.65}, {(float)0x7F / 255.0f, (float)0x7F / 255.0f, (float)0x7F / 255.0f, 0.65}
 
+const char *getGraphicsPresetName(int preset)
+{
+    switch (preset)
+    {
+        case 0: return "Low";
+        case 1: return "Medium";
+        case 2: return "High";
+        case 3: return "Ultra";
+        default: return "Custom";
+    }
+}
+
+int getRecommendedGraphicsPreset()
+{
+    const char *rendererNameRaw = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
+    std::string rendererName = rendererNameRaw ? rendererNameRaw : "";
+    std::transform(rendererName.begin(), rendererName.end(), rendererName.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    GLint maxTextureSize = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+
+    if (rendererName.find("llvmpipe") != std::string::npos ||
+        rendererName.find("softpipe") != std::string::npos ||
+        rendererName.find("software") != std::string::npos)
+        return 0;
+
+    if (rendererName.find("intel") != std::string::npos)
+    {
+        if (rendererName.find("hd graphics") != std::string::npos ||
+            rendererName.find("uhd graphics") != std::string::npos)
+            return 0;
+        return 1;
+    }
+
+    if (maxTextureSize > 0 && maxTextureSize < 8192) return 0;
+    if (rendererName.find("nvidia") != std::string::npos ||
+        rendererName.find("geforce") != std::string::npos ||
+        rendererName.find("radeon") != std::string::npos ||
+        rendererName.find("amd") != std::string::npos)
+        return 2;
+    return 1;
+}
+
+void applyGraphicsPreset(ProgramData &programData, int preset)
+{
+    preset = glm::clamp(preset, 0, 3);
+    auto &settings = getShadingSettings();
+
+    programData.renderer.frustumCulling = true;
+    programData.renderer.sortChunks = true;
+    settings.useLights = 1;
+    settings.FXAA = 1;
+
+    if (preset == 0)
+    {
+        settings.viewDistance = 5;
+        settings.lodStrength = 5;
+        settings.workerThreadsForBaking = 1;
+        settings.shadows = 0;
+        settings.waterType = 0;
+        settings.PBR = 0;
+        settings.SSR = 0;
+        settings.bloom = 0;
+        settings.bloomMultiplier = 0.f;
+        settings.maxLights = 8;
+        programData.renderer.ssao = false;
+        programData.renderer.fxaaData.ITERATIONS = 6;
+        programData.renderer.fxaaData.quaityMultiplier = 0.65f;
+        programData.renderer.fxaaData.SUBPIXEL_QUALITY = 0.60f;
+    }
+    else if (preset == 1)
+    {
+        settings.viewDistance = 8;
+        settings.lodStrength = 3;
+        settings.workerThreadsForBaking = 2;
+        settings.shadows = 1;
+        settings.waterType = 0;
+        settings.PBR = 0;
+        settings.SSR = 0;
+        settings.bloom = 0;
+        settings.bloomMultiplier = 0.f;
+        settings.maxLights = 16;
+        programData.renderer.ssao = false;
+        programData.renderer.fxaaData.ITERATIONS = 8;
+        programData.renderer.fxaaData.quaityMultiplier = 0.72f;
+        programData.renderer.fxaaData.SUBPIXEL_QUALITY = 0.70f;
+    }
+    else if (preset == 2)
+    {
+        settings.viewDistance = 12;
+        settings.lodStrength = 2;
+        settings.workerThreadsForBaking = 3;
+        settings.shadows = 1;
+        settings.waterType = 1;
+        settings.PBR = 1;
+        settings.SSR = 0;
+        settings.bloom = 1;
+        settings.bloomMultiplier = 0.45f;
+        settings.maxLights = 32;
+        programData.renderer.ssao = true;
+        programData.renderer.fxaaData.ITERATIONS = 10;
+        programData.renderer.fxaaData.quaityMultiplier = 0.78f;
+        programData.renderer.fxaaData.SUBPIXEL_QUALITY = 0.85f;
+    }
+    else
+    {
+        settings.viewDistance = 18;
+        settings.lodStrength = 1;
+        settings.workerThreadsForBaking = 4;
+        settings.shadows = 2;
+        settings.waterType = 1;
+        settings.PBR = 1;
+        settings.SSR = 1;
+        settings.bloom = 1;
+        settings.bloomMultiplier = 0.60f;
+        settings.maxLights = 48;
+        programData.renderer.ssao = true;
+        programData.renderer.fxaaData.ITERATIONS = 12;
+        programData.renderer.fxaaData.quaityMultiplier = 0.8f;
+        programData.renderer.fxaaData.SUBPIXEL_QUALITY = 0.95f;
+    }
+
+    settings.normalize();
+    saveShadingSettings();
+}
+
 void applyLowEndPerformancePreset(ProgramData &programData)
 {
-	auto &settings = getShadingSettings();
-	settings.viewDistance = 5;
-	settings.lodStrength = 5;
-	settings.workerThreadsForBaking = 1;
-	settings.shadows = 0;
-	settings.waterType = 0;
-	settings.PBR = 0;
-	settings.SSR = 0;
-	settings.bloom = 0;
-	settings.bloomMultiplier = 0.f;
-	settings.maxLights = 8;
-	settings.useLights = 1;
-	settings.FXAA = 1;
-
-	programData.renderer.frustumCulling = true;
-	programData.renderer.sortChunks = true;
-	programData.renderer.ssao = false;
-	programData.renderer.fxaaData.ITERATIONS = 6;
-	programData.renderer.fxaaData.quaityMultiplier = 0.65f;
-	programData.renderer.fxaaData.SUBPIXEL_QUALITY = 0.60f;
+	applyGraphicsPreset(programData, 0);
 }
 
 void displayRenderSettingsMenu(ProgramData &programData)
@@ -64,11 +174,20 @@ void displayRenderSettingsMenu(ProgramData &programData)
 
 	programData.ui.menuRenderer.Text("Rendering Settings...", Colors_White);
 
-	if (programData.ui.menuRenderer.Button("Performance preset (Intel HD / low-end)", Colors_Gray,
-		programData.ui.buttonTexture))
-	{
-		applyLowEndPerformancePreset(programData);
-	}
+	const int recommendedPreset = getRecommendedGraphicsPreset();
+	std::string recommendation = std::string("Recommended for this GPU: ") + getGraphicsPresetName(recommendedPreset);
+	programData.ui.menuRenderer.Text(recommendation.c_str(), Colors_White);
+	if (programData.ui.menuRenderer.Button("Apply recommended graphics", Colors_Gray, programData.ui.buttonTexture))
+		applyGraphicsPreset(programData, recommendedPreset);
+	if (programData.ui.menuRenderer.Button("Graphics: Low", Colors_Gray, programData.ui.buttonTexture))
+		applyGraphicsPreset(programData, 0);
+	if (programData.ui.menuRenderer.Button("Graphics: Medium", Colors_Gray, programData.ui.buttonTexture))
+		applyGraphicsPreset(programData, 1);
+	if (programData.ui.menuRenderer.Button("Graphics: High", Colors_Gray, programData.ui.buttonTexture))
+		applyGraphicsPreset(programData, 2);
+	if (programData.ui.menuRenderer.Button("Graphics: Ultra", Colors_Gray, programData.ui.buttonTexture))
+		applyGraphicsPreset(programData, 3);
+	programData.ui.menuRenderer.Text("You can still tune every option below manually.", Colors_Gray);
 
 	programData.ui.menuRenderer.sliderInt("View Distance", &getShadingSettings().viewDistance,
 		1, 50, Colors_White, programData.ui.buttonTexture, Colors_Gray,

@@ -117,6 +117,9 @@ ShadingSettings &getShadingSettings();
 bool checkIfShadingSettingsChangedForShaderReloads();
 
 void applyLowEndPerformancePreset(ProgramData &programData);
+void applyGraphicsPreset(ProgramData &programData, int preset);
+int getRecommendedGraphicsPreset();
+const char *getGraphicsPresetName(int preset);
 
 void saveShadingSettings();
 

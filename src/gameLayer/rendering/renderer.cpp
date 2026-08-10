@@ -1439,7 +1439,7 @@ void Renderer::recreateBlocksTexturesBuffer(BlocksLoader &blocksLoader)
 
 
 	defaultShader.u_textureSamplerers = getStorageBlockIndex(defaultShader.shader.id, "u_textureSamplerers");
-	glShaderStorageBlockBinding(defaultShader.shader.id, defaultShader.u_textureSamplerers, 3);
+	if (defaultShader.u_textureSamplerers != GL_INVALID_INDEX) glShaderStorageBlockBinding(defaultShader.shader.id, defaultShader.u_textureSamplerers, 3);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
@@ -1532,6 +1532,23 @@ void Renderer::renderAllBlocksUiTextures(BlocksLoader &blocksLoader, ModelsManag
 	glUniformMatrix4fv(renderUIBlocksShader.u_viewProjection, 1, GL_FALSE, &(projection * view)[0][0]);
 
 	glUniform1i(renderUIBlocksShader.u_useOneTexture, false);
+	auto bindUiBlockTextures = [&](BlockType blockType)
+	{
+#if defined(OURCRAFT_FLATPAK)
+		GLint units[6] = {0,1,2,3,4,5};
+		for (int j = 0; j < 6; j++)
+		{
+			glActiveTexture(GL_TEXTURE0 + j);
+			glBindTexture(GL_TEXTURE_2D, blocksLoader.texturesIds[getGpuIdIndexForBlock(blockType, j)]);
+		}
+		glUniform1iv(renderUIBlocksShader.u_texture, 6, units);
+		glActiveTexture(GL_TEXTURE0);
+#else
+		std::uint64_t textures[6] = {};
+		for (int j = 0; j < 6; j++) textures[j] = blocksLoader.gpuIds[getGpuIdIndexForBlock(blockType, j)];
+		glUniformHandleui64vARB(renderUIBlocksShader.u_texture, 6, textures);
+#endif
+	};
 	for (BlockType i = 1; i < BlocksCount; i++)
 	{
 		if (isBlockMesh(i))
@@ -1547,12 +1564,7 @@ void Renderer::renderAllBlocksUiTextures(BlocksLoader &blocksLoader, ModelsManag
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
 
-			std::uint64_t textures[6] = {};
-			for (int j = 0; j < 6; j++)
-			{
-				textures[j] = blocksLoader.gpuIds[getGpuIdIndexForBlock(i, j)];
-			}
-			glUniformHandleui64vARB(renderUIBlocksShader.u_texture, 6, textures);
+			bindUiBlockTextures(i);
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -1678,12 +1690,7 @@ void Renderer::renderAllBlocksUiTextures(BlocksLoader &blocksLoader, ModelsManag
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
 
-			std::uint64_t textures[6] = {};
-			for (int j = 0; j < 6; j++)
-			{
-				textures[j] = blocksLoader.gpuIds[getGpuIdIndexForBlock(i, j)];
-			}
-			glUniformHandleui64vARB(renderUIBlocksShader.u_texture, 6, textures);
+			bindUiBlockTextures(i);
 			setDistance(modelsManager.blockModels[index].getDimensions());
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -2164,6 +2171,9 @@ void Renderer::reloadShaders()
 {
 
 	std::string defines = getShadingSettings().formatIntoGLSLcode();
+#if defined(OURCRAFT_FLATPAK)
+	defines += "\n#define MIE_COMPAT_TEXTURES 1\n";
+#endif
 
 	defaultShader.shader.clear();
 
@@ -2176,6 +2186,7 @@ void Renderer::reloadShaders()
 	GET_UNIFORM2(defaultShader, u_positionInt);
 	GET_UNIFORM2(defaultShader, u_positionFloat);
 	GET_UNIFORM2(defaultShader, u_texture);
+	GET_UNIFORM2(defaultShader, u_compatTextureArray);
 	GET_UNIFORM2(defaultShader, u_time);
 	GET_UNIFORM2(defaultShader, u_showLightLevels);
 	GET_UNIFORM2(defaultShader, u_skyLightIntensity);
@@ -2234,7 +2245,7 @@ void Renderer::reloadShaders()
 	glShaderStorageBlockBinding(defaultShader.shader.id, defaultShader.u_vertexUV, 2);
 
 	defaultShader.u_textureSamplerers = getStorageBlockIndex(defaultShader.shader.id, "u_textureSamplerers");
-	glShaderStorageBlockBinding(defaultShader.shader.id, defaultShader.u_textureSamplerers, 3);
+	if (defaultShader.u_textureSamplerers != GL_INVALID_INDEX) glShaderStorageBlockBinding(defaultShader.shader.id, defaultShader.u_textureSamplerers, 3);
 
 	defaultShader.u_lights = getStorageBlockIndex(defaultShader.shader.id, "u_lights");
 	glShaderStorageBlockBinding(defaultShader.shader.id, defaultShader.u_lights, 4);
@@ -2286,8 +2297,8 @@ void Renderer::reloadShaders()
 // region ui blocks
 	{
 		renderUIBlocksShader.shader.clear();
-		renderUIBlocksShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/renderBlockUi.vert",
-			RESOURCES_PATH "shaders/renderBlockUi.frag");
+		renderUIBlocksShader.shader.loadShaderProgramFromFileAndAddCode(RESOURCES_PATH "shaders/renderBlockUi.vert",
+			RESOURCES_PATH "shaders/renderBlockUi.frag", defines.c_str());
 		renderUIBlocksShader.shader.bind();
 		GET_UNIFORM2(renderUIBlocksShader, u_texture);
 		GET_UNIFORM2(renderUIBlocksShader, u_viewProjection);
@@ -2311,8 +2322,8 @@ void Renderer::reloadShaders()
 
 		zpassShader.shader.clear();
 
-		zpassShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/rendering/zpass.vert",
-			RESOURCES_PATH "shaders/rendering/zpass.frag");
+		zpassShader.shader.loadShaderProgramFromFileAndAddCode(RESOURCES_PATH "shaders/rendering/zpass.vert",
+			RESOURCES_PATH "shaders/rendering/zpass.frag", defines.c_str());
 		zpassShader.shader.bind();
 
 		GET_UNIFORM2(zpassShader, u_viewProjection);
@@ -2320,6 +2331,10 @@ void Renderer::reloadShaders()
 		GET_UNIFORM2(zpassShader, u_positionFloat);
 		GET_UNIFORM2(zpassShader, u_renderOnlyWater);
 		GET_UNIFORM2(zpassShader, u_timeGrass);
+		GET_UNIFORM2(zpassShader, u_compatTextureArray);
+#if defined(OURCRAFT_FLATPAK)
+		glUniform1i(zpassShader.u_compatTextureArray, 15);
+#endif
 
 		zpassShader.u_vertexData = getStorageBlockIndex(zpassShader.shader.id, "u_vertexData");
 		glShaderStorageBlockBinding(zpassShader.shader.id, zpassShader.u_vertexData, 1);
@@ -2328,7 +2343,7 @@ void Renderer::reloadShaders()
 		glShaderStorageBlockBinding(zpassShader.shader.id, zpassShader.u_vertexUV, 2);
 
 		zpassShader.u_textureSamplerers = getStorageBlockIndex(zpassShader.shader.id, "u_textureSamplerers");
-		glShaderStorageBlockBinding(zpassShader.shader.id, zpassShader.u_textureSamplerers, 3);
+		if (zpassShader.u_textureSamplerers != GL_INVALID_INDEX) glShaderStorageBlockBinding(zpassShader.shader.id, zpassShader.u_textureSamplerers, 3);
 	}
 // endregion
 // region ssr
@@ -2356,8 +2371,8 @@ void Renderer::reloadShaders()
 
 		decalShader.shader.clear();
 
-		decalShader.shader.loadShaderProgramFromFile(RESOURCES_PATH "shaders/rendering/zpass.vert",
-			RESOURCES_PATH "shaders/rendering/decal.frag");
+		decalShader.shader.loadShaderProgramFromFileAndAddCode(RESOURCES_PATH "shaders/rendering/zpass.vert",
+			RESOURCES_PATH "shaders/rendering/decal.frag", defines.c_str());
 		decalShader.shader.bind();
 
 		GET_UNIFORM2(decalShader, u_viewProjection);
@@ -2376,7 +2391,7 @@ void Renderer::reloadShaders()
 		glShaderStorageBlockBinding(decalShader.shader.id, decalShader.u_vertexUV, 2);
 
 		decalShader.u_textureSamplerers = getStorageBlockIndex(decalShader.shader.id, "u_textureSamplerers");
-		glShaderStorageBlockBinding(decalShader.shader.id, decalShader.u_textureSamplerers, 3);
+		if (decalShader.u_textureSamplerers != GL_INVALID_INDEX) glShaderStorageBlockBinding(decalShader.shader.id, decalShader.u_textureSamplerers, 3);
 
 
 	}
@@ -2385,8 +2400,8 @@ void Renderer::reloadShaders()
 
 	entityRenderer.blockEntityshader.shader.clear();
 
-	entityRenderer.blockEntityshader.shader.loadShaderProgramFromFile
-	(RESOURCES_PATH "shaders/blockEntity.vert", RESOURCES_PATH "shaders/blockEntity.frag");
+	entityRenderer.blockEntityshader.shader.loadShaderProgramFromFileAndAddCode
+	(RESOURCES_PATH "shaders/blockEntity.vert", RESOURCES_PATH "shaders/blockEntity.frag", defines.c_str());
 	entityRenderer.blockEntityshader.shader.bind();
 
 	GET_UNIFORM2(entityRenderer.blockEntityshader, u_entityPositionInt);
@@ -2404,8 +2419,8 @@ void Renderer::reloadShaders()
 	//
 	entityRenderer.itemEntityShader.shader.clear();
 
-	entityRenderer.itemEntityShader.shader.loadShaderProgramFromFile
-		(RESOURCES_PATH "shaders/blockEntity.vert", RESOURCES_PATH "shaders/itemEntity.frag");
+	entityRenderer.itemEntityShader.shader.loadShaderProgramFromFileAndAddCode
+		(RESOURCES_PATH "shaders/blockEntity.vert", RESOURCES_PATH "shaders/itemEntity.frag", defines.c_str());
 	entityRenderer.itemEntityShader.shader.bind();
 
 	GET_UNIFORM2(entityRenderer.itemEntityShader, u_entityPositionInt);
@@ -2421,8 +2436,8 @@ void Renderer::reloadShaders()
 
 
 	entityRenderer.basicEntityShader.shader.clear();
-	entityRenderer.basicEntityShader.shader.loadShaderProgramFromFile
-	(RESOURCES_PATH "shaders/basicEntity.vert", RESOURCES_PATH "shaders/basicEntity.frag");
+	entityRenderer.basicEntityShader.shader.loadShaderProgramFromFileAndAddCode
+	(RESOURCES_PATH "shaders/basicEntity.vert", RESOURCES_PATH "shaders/basicEntity.frag", defines.c_str());
 	entityRenderer.basicEntityShader.shader.bind();
 
 	GET_UNIFORM2(entityRenderer.basicEntityShader, u_cameraPositionInt);
@@ -2432,10 +2447,11 @@ void Renderer::reloadShaders()
 	GET_UNIFORM2(entityRenderer.basicEntityShader, u_view);
 	GET_UNIFORM2(entityRenderer.basicEntityShader, u_bonesPerModel);
 	GET_UNIFORM2(entityRenderer.basicEntityShader, u_exposure);
+	GET_UNIFORM2(entityRenderer.basicEntityShader, u_compatTextureArray);
 	
 	//
 	entityRenderer.basicEntityShader.u_entityTextureSamplerers = getStorageBlockIndex(entityRenderer.basicEntityShader.shader.id, "u_entityTextureSamplerers");
-	glShaderStorageBlockBinding(entityRenderer.basicEntityShader.shader.id, entityRenderer.basicEntityShader.u_entityTextureSamplerers, 5);
+	if (entityRenderer.basicEntityShader.u_entityTextureSamplerers != GL_INVALID_INDEX) glShaderStorageBlockBinding(entityRenderer.basicEntityShader.shader.id, entityRenderer.basicEntityShader.u_entityTextureSamplerers, 5);
 
 	entityRenderer.basicEntityShader.u_skinningMatrix = getStorageBlockIndex(entityRenderer.basicEntityShader.shader.id, "u_skinningMatrix");
 	glShaderStorageBlockBinding(entityRenderer.basicEntityShader.shader.id, entityRenderer.basicEntityShader.u_skinningMatrix, 6);
@@ -2539,6 +2555,13 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 {
 
 	auto &shadingSettings = getShadingSettings();
+
+#if defined(OURCRAFT_FLATPAK)
+	// Flatpak conventional texture-array binding: avoids GL_ARB_bindless_texture on Mesa/Intel.
+	glActiveTexture(GL_TEXTURE0 + 15);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, blocksLoader.compatibilityTextureArray);
+	glActiveTexture(GL_TEXTURE0);
+#endif
 
 	defaultShader.shadingSettings.exposure = adaptiveExposure.currentExposure
 		+ shadingSettings.exposure;
@@ -2888,6 +2911,9 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 		glUniform1i(defaultShader.u_typesCount, BlocksCount);	//remove
 		glUniform1f(defaultShader.u_time, std::clock() / 400.f);
 		glUniform1i(defaultShader.u_showLightLevels, showLightLevels);
+#if defined(OURCRAFT_FLATPAK)
+		glUniform1i(defaultShader.u_compatTextureArray, 15);
+#endif
 		glUniform1i(defaultShader.u_skyLightIntensity, skyLightIntensity);
 		glUniform3fv(defaultShader.u_sunDirection, 1, &mainLightPosition[0]);
 		glUniform1f(defaultShader.u_metallic, metallic);
@@ -2950,7 +2976,18 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 		glBindTexture(GL_TEXTURE_2D, programData.aoTexture.id);
 		glUniform1i(defaultShader.u_ao, 11);
 	// endregion
+#if defined(OURCRAFT_FLATPAK)
+		GLint compatibilityShadowUnits[3] = {12, 13, 14};
+		for (int shadowIndex = 0; shadowIndex < 3; shadowIndex++)
+		{
+			glActiveTexture(GL_TEXTURE0 + compatibilityShadowUnits[shadowIndex]);
+			glBindTexture(GL_TEXTURE_2D, sunShadow.shadowMapCascades[shadowIndex].depth);
+		}
+		glUniform1iv(defaultShader.u_cascadedShadowsMaps, 3, compatibilityShadowUnits);
+		glActiveTexture(GL_TEXTURE0);
+#else
 		glUniformHandleui64vARB(defaultShader.u_cascadedShadowsMaps, 3, &sunShadow.bindlessShadowTextures[0]);
+#endif
 		glUniform3iv(defaultShader.u_cascadedShadowPosition, 3, &sunShadow.lightSpacePositionCascades[0][0]);
 		glUniformMatrix4fv(defaultShader.u_cascadedShadowMatrix, 3, GL_FALSE, &sunShadow.lightSpaceMatrixCascades[0][0][0]);
 
@@ -4394,6 +4431,12 @@ void Renderer::renderEntities(
 // region other entities setup shader
 	
 	entityRenderer.basicEntityShader.shader.bind();
+#if defined(OURCRAFT_FLATPAK)
+	glActiveTexture(GL_TEXTURE0 + 16);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, modelsManager.compatibilityTextureArray);
+	glUniform1i(entityRenderer.basicEntityShader.u_compatTextureArray, 16);
+	glActiveTexture(GL_TEXTURE0);
+#endif
 	
 	glUniformMatrix4fv(entityRenderer.basicEntityShader.u_viewProjection, 1, GL_FALSE, &vp[0][0]);
 	glUniformMatrix4fv(entityRenderer.basicEntityShader.u_view, 1, GL_FALSE, &viewMatrix[0][0]);
@@ -4527,10 +4570,17 @@ void Renderer::renderEntities(
 			//data.textureId2 = currentSkinBindlessTexture;
 			//data.textureId3 = currentSkinBindlessTexture;
 
+#if defined(OURCRAFT_FLATPAK)
+			data.textureId0 = static_cast<GLuint64>(modelsManager.compatibilityHandTextureLayer);
+			data.textureId1 = data.textureId0;
+			data.textureId2 = data.textureId0;
+			data.textureId3 = data.textureId0;
+#else
 			data.textureId0 = modelsManager.temporaryPlayerHandBindlessTexture;
 			data.textureId1 = modelsManager.temporaryPlayerHandBindlessTexture;
 			data.textureId2 = modelsManager.temporaryPlayerHandBindlessTexture;
 			data.textureId3 = modelsManager.temporaryPlayerHandBindlessTexture;
+#endif
 
 
 			glm::dvec3 position = glm::dvec3(posInt) + glm::dvec3(posFloat);
@@ -4637,14 +4687,26 @@ void Renderer::renderEntities(
 				if (found != playersConnectionData.end())
 				{
 					//todo armour here!
+#if defined(OURCRAFT_FLATPAK)
+					// Dynamic network skins are temporarily mapped to the standard player layer in compatibility mode.
+					data.textureId0 = static_cast<GLuint64>(ModelsManager::SteveTexture);
+					data.textureId1 = static_cast<GLuint64>(ModelsManager::HelmetTestTexture);
+					data.textureId2 = static_cast<GLuint64>(ModelsManager::SteveTexture);
+					data.textureId3 = static_cast<GLuint64>(ModelsManager::SteveTexture);
+#else
 					data.textureId0 = found->second.skinBindlessTexture;
 					data.textureId1 = modelsManager.gpuIds[ModelsManager::HelmetTestTexture];
 					data.textureId2 = found->second.skinBindlessTexture;
 					data.textureId3 = found->second.skinBindlessTexture;
+#endif
 				}
 				else
 				{
+#if defined(OURCRAFT_FLATPAK)
+					data.textureId0 = static_cast<GLuint64>(e.second.getTextureIndex());
+#else
 					data.textureId0 = modelsManager.gpuIds[e.second.getTextureIndex()];
+#endif
 					data.textureId1 = data.textureId0;
 					data.textureId2 = data.textureId0;
 					data.textureId3 = data.textureId0;
@@ -4653,7 +4715,11 @@ void Renderer::renderEntities(
 			}
 			else
 			{
+#if defined(OURCRAFT_FLATPAK)
+				data.textureId0 = static_cast<GLuint64>(e.second.getTextureIndex());
+#else
 				data.textureId0 = modelsManager.gpuIds[e.second.getTextureIndex()];
+#endif
 				data.textureId1 = data.textureId0;
 				data.textureId2 = data.textureId0;
 				data.textureId3 = data.textureId0;
@@ -4820,7 +4886,21 @@ void Renderer::renderEntities(
 					}
 				}
 
+#if defined(OURCRAFT_FLATPAK)
+				GLint blockEntityUnits[6] = {0,1,2,3,4,5};
+				for (int textureUnit = 0; textureUnit < 6; textureUnit++)
+				{
+					glActiveTexture(GL_TEXTURE0 + textureUnit);
+					GLuint textureId = isBlock(e.second.entityBuffered.type)
+						? blocksLoader.texturesIds[getGpuIdIndexForBlock(e.second.entityBuffered.type, textureUnit)]
+						: blocksLoader.texturesIdsItems[e.second.entityBuffered.type - ItemsStartPoint];
+					glBindTexture(GL_TEXTURE_2D, textureId);
+				}
+				glUniform1iv(entityRenderer.blockEntityshader.u_texture, 6, blockEntityUnits);
+				glActiveTexture(GL_TEXTURE0);
+#else
 				glUniformHandleui64vARB(entityRenderer.blockEntityshader.u_texture, 6, textures);
+#endif
 
 				glm::vec3 entityFloat = {};
 				glm::ivec3 entityInt = {};
@@ -4885,7 +4965,10 @@ void Renderer::renderEntities(
 
 		auto renderOneItem = [&](auto type, glm::dvec3 pos, int light, glm::mat4 *mat = 0)
 		{
-			std::uint64_t texture;
+			std::uint64_t texture = 0;
+#if defined(OURCRAFT_FLATPAK)
+			GLuint textureIdCompat = 0;
+#endif
 
 			BlocksLoader::ItemGeometry geometry = {};
 
@@ -4893,15 +4976,23 @@ void Renderer::renderEntities(
 
 			if (type >= ItemsStartPoint)
 			{
+#if defined(OURCRAFT_FLATPAK)
+				textureIdCompat = blocksLoader.texturesIdsItems[type - ItemsStartPoint];
+#else
 				texture = blocksLoader.gpuIdsItems
 					[type - ItemsStartPoint];
+#endif
 
 				geometry = blocksLoader.itemsGeometry[type - ItemsStartPoint + 1];
 
 				//this means this is a model
 				if (geometry.indexBuffer)
 				{
+#if defined(OURCRAFT_FLATPAK)
+					textureIdCompat = tempWhite.id;
+#else
 					texture = tempWhiteBindlessHandle;
+#endif
 					isALoadedModel = true;
 				}
 
@@ -4909,11 +5000,21 @@ void Renderer::renderEntities(
 			}
 			else
 			{
+#if defined(OURCRAFT_FLATPAK)
+				textureIdCompat = blocksLoader.texturesIds[getGpuIdIndexForBlock(type, 0)];
+#else
 				texture = blocksLoader.gpuIds
 					[getGpuIdIndexForBlock(type, 0)];
+#endif
 			}
 
+#if defined(OURCRAFT_FLATPAK)
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, textureIdCompat);
+			glUniform1i(entityRenderer.itemEntityShader.u_texture, 0);
+#else
 			glUniformHandleui64ARB(entityRenderer.itemEntityShader.u_texture, texture);
+#endif
 			glUniform1i(entityRenderer.itemEntityShader.u_lightValue, light);
 
 			if (mat)

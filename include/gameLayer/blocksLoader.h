@@ -7,6 +7,10 @@ struct BlocksLoader
 	std::vector<GLuint64> gpuIds;
 	std::vector<GLuint> texturesIds;
 
+	GLuint compatibilityTextureArray = 0;
+	int compatibilityTextureArraySize = 128;
+	void rebuildCompatibilityTextureArray(int targetSize = 128);
+
 	//load all blocks loadallblocks
 	void loadAllTextures(std::string path, bool reportErrors);
 	void setupAllColors();
