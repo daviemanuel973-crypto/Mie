@@ -69,3 +69,5 @@ jobs:
           fi
           git commit -m "fix: repair Linux compatibility renderer compile"
           git push origin HEAD:agent/linux-nonbindless-renderer-fix
+
+# Direct connector touch: re-run CI from a commit that already contains the source repair.
