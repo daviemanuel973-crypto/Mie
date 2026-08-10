@@ -9,7 +9,7 @@ struct BlocksLoader
 
 	GLuint compatibilityTextureArray = 0;
 	int compatibilityTextureArraySize = 64;
-	static inline static inline int compatibilityTextureGridSize = 1;
+	static inline int compatibilityTextureGridSize = 1;
 	void rebuildCompatibilityTextureArray(int targetSize = 64);
 
 	//load all blocks loadallblocks
