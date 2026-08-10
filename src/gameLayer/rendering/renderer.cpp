@@ -2336,7 +2336,7 @@ void Renderer::reloadShaders()
 		GET_UNIFORM2(zpassShader, u_compatTextureGrid);
 #if defined(OURCRAFT_FLATPAK)
 		glUniform1i(zpassShader.u_compatTextureArray, 15);
-		glUniform1i(zpassShader.u_compatTextureGrid, blocksLoader.compatibilityTextureGridSize);
+		glUniform1i(zpassShader.u_compatTextureGrid, BlocksLoader::compatibilityTextureGridSize);
 #endif
 
 		zpassShader.u_vertexData = getStorageBlockIndex(zpassShader.shader.id, "u_vertexData");
