@@ -33,8 +33,19 @@ struct GoblinClient: public ClientEntity<Goblin, GoblinClient>
 
 struct GoblinServer: public ServerEntity<Goblin> 
 {
+	enum Variant : unsigned char
+	{
+		Common = 0,
+		Warrior,
+		Chief,
+	};
 
 	BasicEnemyBehaviour basicEnemyBehaviour;
+	Variant variant = Common;
+	bool variantConfigured = false;
+	float moveSpeedMultiplier = 1.f;
+
+	void configureVariant(std::uint64_t eId);
 
 	bool isUnaware() { return  basicEnemyBehaviour.isUnaware(); };
 
@@ -53,5 +64,3 @@ struct GoblinServer: public ServerEntity<Goblin>
 
 	LootTable &getLootTable();
 };
-
-
