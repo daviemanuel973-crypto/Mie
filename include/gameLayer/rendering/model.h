@@ -248,9 +248,9 @@ struct ModelsManager
 	std::vector<GLuint> texturesIds;
 
 	GLuint compatibilityTextureArray = 0;
-	int compatibilityTextureArraySize = PLAYER_SKIN_SIZE;
+	int compatibilityTextureArraySize = 128;
 	int compatibilityHandTextureLayer = 0;
-	void rebuildCompatibilityTextureArray(int targetSize = PLAYER_SKIN_SIZE);
+	void rebuildCompatibilityTextureArray(int targetSize = 128);
 
 	GLuint texturesSSBO = 0;
 
