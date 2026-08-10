@@ -1,3 +1,4 @@
+# Validation trigger for the repaired non-bindless renderer head.
 name: Linux Flatpak CI
 
 on:
