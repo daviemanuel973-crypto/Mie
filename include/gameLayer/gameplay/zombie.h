@@ -1,11 +1,12 @@
 #pragma once
 #include <gameplay/entity.h>
 #include <gameplay/life.h>
-#include <gameplay/basicEnemyBehaviour.h>
+#include <memory>
 #include <random>
 #include <unordered_map>
 #include <unordered_set>
 
+struct BasicEnemyBehaviour;
 
 struct Zombie: public PhysicalEntity, public CanPushOthers
 	, public HasOrientationAndHeadTurnDirection, public CollidesWithPlacedBlocks,
@@ -44,11 +45,14 @@ struct ZombieServer: public ServerEntity<Zombie>
 		Brute,
 	};
 
-	BasicEnemyBehaviour basicEnemyBehaviour;
+	// Kept behind a pointer so zombie.h does not pull BasicEnemyBehaviour -> Client
+	// -> Packet -> zombie.h into a circular include chain.
+	std::shared_ptr<BasicEnemyBehaviour> basicEnemyBehaviour;
 	Variant variant = Walker;
 	bool variantConfigured = false;
 	float moveSpeedMultiplier = 1.f;
 
+	void ensureBehaviour();
 	void configureVariant(std::uint64_t eId);
 
 	void appendDataToDisk(std::ofstream &f, std::uint64_t eId);
@@ -60,8 +64,8 @@ struct ZombieServer: public ServerEntity<Zombie>
 		std::unordered_map<std::uint64_t, glm::dvec3> &playersPosition,
 		std::unordered_map < std::uint64_t, Client *> &allClients);
 
-	bool isUnaware() { return basicEnemyBehaviour.isUnaware(); }
-	void signalHit(glm::vec3 direction) { basicEnemyBehaviour.signalHit(direction, this); }
+	bool isUnaware();
+	void signalHit(glm::vec3 direction);
 
 	WeaponStats getWeaponStats();
 	LootTable &getLootTable();
