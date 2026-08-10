@@ -17,14 +17,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: agent/linux-nonbindless-renderer-fix
-      - name: Repair Linux compatibility renderer compile
+      - name: Repair and harden Linux compatibility renderer
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
 
-          # Keep this operation idempotent: no duplicate "static inline" on reruns.
+          # Keep the compatibility atlas grid declaration normalized and idempotent.
           p = Path('include/gameLayer/blocksLoader.h')
           s = p.read_text()
           pattern = r'^\s*(?:static\s+inline\s+)*int compatibilityTextureGridSize = 1;$'
@@ -51,22 +51,49 @@ jobs:
           s = s.replace('int compatibilityTextureArraySize = PLAYER_SKIN_SIZE;', 'int compatibilityTextureArraySize = 128;')
           s = s.replace('void rebuildCompatibilityTextureArray(int targetSize = PLAYER_SKIN_SIZE);', 'void rebuildCompatibilityTextureArray(int targetSize = 128);')
           p.write_text(s)
+
+          # The Flatpak compatibility shaders do not consume ARB bindless handles.
+          # Avoid calling ARB_bindless_texture at runtime on Mesa/Intel GPUs that do not expose it.
+          def harden_texture_handles(path, insertion_marker):
+              p = Path(path)
+              s = p.read_text()
+              helper_name = 'getTextureRuntimeHandle'
+              if helper_name not in s:
+                  pair = re.compile(
+                      r'(?m)^([ \t]*)([^=\n]+?)\s*=\s*glGetTextureHandleARB\(([^;\n]+)\);\s*\n[ \t]*glMakeTextureHandleResidentARB\([^;\n]+\);'
+                  )
+                  s, replaced = pair.subn(r'\1\2 = getTextureRuntimeHandle(\3);', s)
+                  if replaced == 0:
+                      raise SystemExit(f'No bindless handle pairs replaced in {path}')
+                  if 'glGetTextureHandleARB(' in s:
+                      raise SystemExit(f'Unpaired bindless handle call remains in {path}')
+
+                  helper = '''\nstatic GLuint64 getTextureRuntimeHandle(GLuint textureId)\n{\n#if defined(OURCRAFT_FLATPAK)\n\t// Compatibility shaders use atlas/array indices, not bindless handles.\n\t// Preserve a stable non-zero CPU-side identity without touching ARB_bindless_texture.\n\treturn static_cast<GLuint64>(textureId);\n#else\n\tauto handle = glGetTextureHandleARB(textureId);\n\tglMakeTextureHandleResidentARB(handle);\n\treturn handle;\n#endif\n}\n\n'''
+                  if insertion_marker not in s:
+                      raise SystemExit(f'Insertion marker missing in {path}')
+                  s = s.replace(insertion_marker, helper + insertion_marker, 1)
+              p.write_text(s)
+
+          harden_texture_handles('src/gameLayer/blocksLoader.cpp', '//loadallblocks')
+          harden_texture_handles('src/gameLayer/rendering/model.cpp', 'glm::mat4 aiToGlm')
           PY
           grep -F 'static inline int compatibilityTextureGridSize = 1;' include/gameLayer/blocksLoader.h
           ! grep -F 'static inline static inline' include/gameLayer/blocksLoader.h
           grep -F 'glUniform1i(zpassShader.u_compatTextureGrid, BlocksLoader::compatibilityTextureGridSize);' src/gameLayer/rendering/renderer.cpp
-          grep -F 'int compatibilityTextureArraySize = 128;' include/gameLayer/rendering/model.h
-          grep -F 'rebuildCompatibilityTextureArray(int targetSize = 128);' include/gameLayer/rendering/model.h
+          grep -F 'return static_cast<GLuint64>(textureId);' src/gameLayer/blocksLoader.cpp
+          grep -F 'return static_cast<GLuint64>(textureId);' src/gameLayer/rendering/model.cpp
+          test "$(grep -c 'glGetTextureHandleARB(' src/gameLayer/blocksLoader.cpp)" -eq 1
+          test "$(grep -c 'glGetTextureHandleARB(' src/gameLayer/rendering/model.cpp)" -eq 1
           git diff --check
       - name: Commit repair
         shell: bash
         run: |
           git config user.name "Virgil_Hawkings"
           git config user.email "daviemanuel973@gmail.com"
-          git add include/gameLayer/blocksLoader.h src/gameLayer/rendering/renderer.cpp include/gameLayer/rendering/model.h
+          git add include/gameLayer/blocksLoader.h src/gameLayer/rendering/renderer.cpp include/gameLayer/rendering/model.h src/gameLayer/blocksLoader.cpp src/gameLayer/rendering/model.cpp
           if git diff --cached --quiet; then
-            echo "Renderer compile repair already applied."
+            echo "Renderer repair already applied."
             exit 0
           fi
-          git commit -m "fix: repair Linux compatibility renderer compile"
+          git commit -m "fix: avoid bindless texture calls in Linux compatibility mode"
           git push origin HEAD:agent/linux-nonbindless-renderer-fix
