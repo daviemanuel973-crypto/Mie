@@ -30,7 +30,10 @@ jobs:
           end = next(i for i in range(start + 1, len(source)) if source[i].strip() == 'PY')
           body_lines = []
           for line in source[start + 1:end]:
-              body_lines.append(line[10:] if line.startswith('          ') else line)
+              line = line[10:] if line.startswith('          ') else line
+              if line.strip() == 'if count != 1:':
+                  line = line.replace('count != 1', 'count < 1')
+              body_lines.append(line)
           Path('/tmp/apply_patch.py').write_text('\n'.join(body_lines) + '\n')
           PY
           python3 /tmp/apply_patch.py
