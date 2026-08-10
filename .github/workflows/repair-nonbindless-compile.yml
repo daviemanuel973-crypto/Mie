@@ -17,17 +17,43 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: agent/linux-nonbindless-renderer-fix
-      - name: Fix header constant ordering
+      - name: Repair Linux compatibility renderer compile
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
+          # Keep the compatibility atlas grid globally reachable by shader reloads.
+          p = Path('include/gameLayer/blocksLoader.h')
+          s = p.read_text()
+          old = 'int compatibilityTextureGridSize = 1;'
+          new = 'static inline int compatibilityTextureGridSize = 1;'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('Could not locate compatibilityTextureGridSize declaration')
+          p.write_text(s)
+
+          # reloadShaders() has no BlocksLoader instance; use the shared grid value.
+          p = Path('src/gameLayer/rendering/renderer.cpp')
+          s = p.read_text()
+          old = 'glUniform1i(zpassShader.u_compatTextureGrid, blocksLoader.compatibilityTextureGridSize);'
+          new = 'glUniform1i(zpassShader.u_compatTextureGrid, BlocksLoader::compatibilityTextureGridSize);'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('Could not locate z-pass compatibility grid uniform')
+          p.write_text(s)
+
+          # Preserve the previous non-bindless header repair if an older checkout still needs it.
           p = Path('include/gameLayer/rendering/model.h')
           s = p.read_text()
           s = s.replace('int compatibilityTextureArraySize = PLAYER_SKIN_SIZE;', 'int compatibilityTextureArraySize = 128;')
           s = s.replace('void rebuildCompatibilityTextureArray(int targetSize = PLAYER_SKIN_SIZE);', 'void rebuildCompatibilityTextureArray(int targetSize = 128);')
           p.write_text(s)
           PY
+          grep -F 'static inline int compatibilityTextureGridSize = 1;' include/gameLayer/blocksLoader.h
+          grep -F 'glUniform1i(zpassShader.u_compatTextureGrid, BlocksLoader::compatibilityTextureGridSize);' src/gameLayer/rendering/renderer.cpp
           grep -F 'int compatibilityTextureArraySize = 128;' include/gameLayer/rendering/model.h
           grep -F 'rebuildCompatibilityTextureArray(int targetSize = 128);' include/gameLayer/rendering/model.h
           git diff --check
@@ -36,6 +62,10 @@ jobs:
         run: |
           git config user.name "Virgil_Hawkings"
           git config user.email "daviemanuel973@gmail.com"
-          git add include/gameLayer/rendering/model.h
-          git commit -m "fix: repair compatibility texture array header defaults"
+          git add include/gameLayer/blocksLoader.h src/gameLayer/rendering/renderer.cpp include/gameLayer/rendering/model.h
+          if git diff --cached --quiet; then
+            echo "Renderer compile repair already applied."
+            exit 0
+          fi
+          git commit -m "fix: repair Linux compatibility renderer compile"
           git push origin HEAD:agent/linux-nonbindless-renderer-fix
