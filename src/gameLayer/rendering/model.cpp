@@ -19,6 +19,20 @@
 #include <unordered_map>
 #include <magic_enum.hpp>
 
+
+static GLuint64 getTextureRuntimeHandle(GLuint textureId)
+{
+#if defined(OURCRAFT_FLATPAK)
+	// Compatibility shaders use atlas/array indices, not bindless handles.
+	// Preserve a stable non-zero CPU-side identity without touching ARB_bindless_texture.
+	return static_cast<GLuint64>(textureId);
+#else
+	auto handle = glGetTextureHandleARB(textureId);
+	glMakeTextureHandleResidentARB(handle);
+	return handle;
+#endif
+}
+
 glm::mat4 aiToGlm(const aiMatrix4x4 &matrix)
 {
 	return glm::make_mat4(&matrix.a1); // a1 represents the first element of the matrix
@@ -135,8 +149,7 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 	if (!temporaryPlayerHandTexture.id)
 	{
 		temporaryPlayerHandTexture.loadFromFile(RESOURCES_PATH "skins/mage.png", true);
-		temporaryPlayerHandBindlessTexture = glGetTextureHandleARB(temporaryPlayerHandTexture.id);
-		glMakeTextureHandleResidentARB(temporaryPlayerHandBindlessTexture);
+		temporaryPlayerHandBindlessTexture = getTextureRuntimeHandle(temporaryPlayerHandTexture.id);
 	}
 
 
@@ -176,8 +189,7 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 		t.createFromBuffer((char *)data, 2, 2, true, false);
 
 		texturesIds.push_back(t.id);
-		auto handle = glGetTextureHandleARB(t.id);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(t.id);
 		gpuIds.push_back(handle);
 	}
 
@@ -210,8 +222,7 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 
 			glGenerateMipmap(GL_TEXTURE_2D);
 
-			handle = glGetTextureHandleARB(texture.id);
-			glMakeTextureHandleResidentARB(handle);
+			handle = getTextureRuntimeHandle(texture.id);
 		}
 		else
 		{

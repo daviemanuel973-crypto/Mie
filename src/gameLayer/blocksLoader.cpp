@@ -10,6 +10,20 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+
+static GLuint64 getTextureRuntimeHandle(GLuint textureId)
+{
+#if defined(OURCRAFT_FLATPAK)
+	// Compatibility shaders use atlas/array indices, not bindless handles.
+	// Preserve a stable non-zero CPU-side identity without touching ARB_bindless_texture.
+	return static_cast<GLuint64>(textureId);
+#else
+	auto handle = glGetTextureHandleARB(textureId);
+	glMakeTextureHandleResidentARB(handle);
+	return handle;
+#endif
+}
+
 //loadallblocks
 //load all textures
 //loadalltextures
@@ -1161,8 +1175,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			t.createFromBuffer((char *)data, 2, 2, true, false);
 
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 			gpuIds.push_back(handle);
 		}
 
@@ -1182,8 +1195,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			t.createFromBuffer((char *)data, 1, 1, true, false);
 
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 			gpuIds.push_back(handle);
 		}
 
@@ -1202,8 +1214,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			gl2d::Texture t;
 			t.createFromBuffer((char *)data, 1, 1, true, false);
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 
 			gpuIds.push_back(handle);
 		}
@@ -1223,8 +1234,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			gl2d::Texture t;
 			t.createFromBuffer((char *)data, 1, 1, true, false);
 			texturesIds.push_back(t.id);
-			auto handle = glGetTextureHandleARB(t.id);
-			glMakeTextureHandleResidentARB(handle);
+			auto handle = getTextureRuntimeHandle(t.id);
 
 			gpuIds.push_back(handle);
 		}
@@ -1234,20 +1244,16 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 
 	auto setGpuIds = [&](int blockIndex) 
 	{
-		auto handle = glGetTextureHandleARB(texturesIds[blockIndex + 0]);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(texturesIds[blockIndex + 0]);
 		gpuIds[blockIndex + 0] = handle;
 
-		handle = glGetTextureHandleARB(texturesIds[blockIndex + 1]);
-		glMakeTextureHandleResidentARB(handle);
+		handle = getTextureRuntimeHandle(texturesIds[blockIndex + 1]);
 		gpuIds[blockIndex + 1] = handle;
 
-		handle = glGetTextureHandleARB(texturesIds[blockIndex + 2]);
-		glMakeTextureHandleResidentARB(handle);
+		handle = getTextureRuntimeHandle(texturesIds[blockIndex + 2]);
 		gpuIds[blockIndex + 2] = handle;
 
-		handle = glGetTextureHandleARB(texturesIds[blockIndex + 3]);
-		glMakeTextureHandleResidentARB(handle);
+		handle = getTextureRuntimeHandle(texturesIds[blockIndex + 3]);
 		gpuIds[blockIndex + 3] = handle;
 	};
 
@@ -1269,8 +1275,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 		glGenerateMipmap(GL_TEXTURE_2D);
 
 
-		auto handle = glGetTextureHandleARB(t.id);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(t.id);
 
 
 		if (appendMode)
@@ -1549,8 +1554,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 4.f);
 				glGenerateMipmap(GL_TEXTURE_2D);
 
-				auto handle = glGetTextureHandleARB(texturesIds[i*4 + 1]);
-				glMakeTextureHandleResidentARB(handle);
+				auto handle = getTextureRuntimeHandle(texturesIds[i*4 + 1]);
 				gpuIds[i * 4 + 1] = handle;
 
 			}
@@ -1637,8 +1641,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 4.f);
 				glGenerateMipmap(GL_TEXTURE_2D);
 
-				auto handle = glGetTextureHandleARB(texturesIds[i * 4 + 3]);
-				glMakeTextureHandleResidentARB(handle);
+				auto handle = getTextureRuntimeHandle(texturesIds[i * 4 + 3]);
 				gpuIds[i * 4 + 3] = handle;
 
 			}
@@ -1691,8 +1694,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 
-				auto handle = glGetTextureHandleARB(t.id);
-				glMakeTextureHandleResidentARB(handle);
+				auto handle = getTextureRuntimeHandle(t.id);
 
 				if (appendMode)
 				{
@@ -1769,8 +1771,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			spawnEggSize.x, spawnEggSize.y, true, false);
 
 		texturesIdsItems[index] = newTexture.id;
-		auto handle = glGetTextureHandleARB(newTexture.id);
-		glMakeTextureHandleResidentARB(handle);
+		auto handle = getTextureRuntimeHandle(newTexture.id);
 		gpuIdsItems[index] = handle;
 
 
