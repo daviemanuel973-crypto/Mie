@@ -1,0 +1,368 @@
+name: Apply v0.2 threats content patch
+
+on:
+  push:
+    branches:
+      - agent/v0.2-threats-exploration
+
+permissions:
+  contents: write
+
+jobs:
+  apply-content:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0.2-threats-exploration
+          fetch-depth: 0
+
+      - name: Apply enemy variants and loot
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f"missing patch anchor: {label}")
+              return text.replace(old, new, 1)
+
+          # Make BasicEnemyBehaviour usable by entities that do not carry the generic
+          # animation state (zombies have their own legacy hand animation path).
+          path = Path('include/gameLayer/gameplay/basicEnemyBehaviour.h')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              '''\t\tbaseEntity->entity.animationStateServer.runningTime = 0;\n\t\tbaseEntity->entity.animationStateServer.attacked = 0;''',
+              '''\t\tif constexpr (::hasAnimations<decltype(baseEntity->entity)>)\n\t\t{\n\t\t\tbaseEntity->entity.animationStateServer.runningTime = 0;\n\t\t\tbaseEntity->entity.animationStateServer.attacked = 0;\n\t\t}''',
+              'basic enemy animation reset')
+          text = replace_once(
+              text,
+              '''\t\t\t\tbaseEntity->entity.move(move);\n\t\t\t\tbaseEntity->entity.bodyOrientation = direction;\n\t\t\t\tbaseEntity->entity.animationStateServer.runningTime = 0.6;\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\tbaseEntity->entity.animationStateServer.runningTime = 0;\n\t\t\t}''',
+              '''\t\t\t\tbaseEntity->entity.move(move);\n\t\t\t\tbaseEntity->entity.bodyOrientation = direction;\n\t\t\t\tif constexpr (::hasAnimations<decltype(baseEntity->entity)>)\n\t\t\t\t{\n\t\t\t\t\tbaseEntity->entity.animationStateServer.runningTime = 0.6;\n\t\t\t\t}\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\tif constexpr (::hasAnimations<decltype(baseEntity->entity)>)\n\t\t\t\t{\n\t\t\t\t\tbaseEntity->entity.animationStateServer.runningTime = 0;\n\t\t\t\t}\n\t\t\t}''',
+              'basic enemy movement animation')
+          path.write_text(text)
+
+          # Replace the disabled legacy zombie server AI with the shared, maintained
+          # enemy behaviour and add deterministic Walker/Runner/Brute gameplay stats.
+          path = Path('src/gameLayer/gameplay/zombie.cpp')
+          text = path.read_text()
+          marker = 'void ZombieServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)'
+          pos = text.find(marker)
+          if pos < 0:
+              raise SystemExit('missing zombie server tail anchor')
+          zombie_tail = r'''void ZombieServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
+{
+}
+
+static unsigned int getEnemyVariantRoll(std::uint64_t eId)
+{
+	// SplitMix64 finalizer gives a stable, well-distributed roll from an entity id.
+	std::uint64_t value = eId + 0x9E3779B97F4A7C15ULL;
+	value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9ULL;
+	value = (value ^ (value >> 27)) * 0x94D049BB133111EBULL;
+	value ^= value >> 31;
+	return static_cast<unsigned int>(value % 100ULL);
+}
+
+void ZombieServer::configureVariant(std::uint64_t eId)
+{
+	if (variantConfigured) { return; }
+
+	const unsigned int roll = getEnemyVariantRoll(eId);
+	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 200.f;
+	const float lifePercent = glm::clamp(entity.life.life / oldMaxLife, 0.f, 1.f);
+	float newMaxLife = 180.f;
+
+	if (roll < 70)
+	{
+		variant = Walker;
+		moveSpeedMultiplier = 1.f;
+		newMaxLife = 180.f;
+	}
+	else if (roll < 90)
+	{
+		variant = Runner;
+		moveSpeedMultiplier = 1.55f;
+		newMaxLife = 120.f;
+	}
+	else
+	{
+		variant = Brute;
+		moveSpeedMultiplier = 0.72f;
+		newMaxLife = 360.f;
+	}
+
+	entity.life.maxLife = newMaxLife;
+	entity.life.life = glm::clamp(newMaxLife * lifePercent, 0.f, newMaxLife);
+	variantConfigured = true;
+}
+
+bool ZombieServer::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter,
+	ServerChunkStorer &serverChunkStorer, std::minstd_rand &rng, std::uint64_t yourEID,
+	std::unordered_set<std::uint64_t> &othersDeleted,
+	std::unordered_map<std::uint64_t, std::unordered_map<glm::ivec3, PathFindingNode>> &pathFinding,
+	std::unordered_map<std::uint64_t, glm::dvec3> &playersPosition,
+	std::unordered_map < std::uint64_t, Client *> &allClients)
+{
+	configureVariant(yourEID);
+
+	BasicEnemyBehaviourOtherSettings settings;
+	settings.runSpeed = 2.f * moveSpeedMultiplier;
+	settings.searchDistance = 40.f;
+	settings.hearBonus = 0.08f;
+	settings.sightBonus = 0.08f;
+
+	if (variant == Runner)
+	{
+		settings.searchDistance = 46.f;
+		settings.hearBonus = 0.16f;
+	}
+	else if (variant == Brute)
+	{
+		settings.searchDistance = 34.f;
+		settings.hearBonus = 0.12f;
+		settings.sightBonus = 0.02f;
+	}
+
+	basicEnemyBehaviour.update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID,
+		othersDeleted, pathFinding, playersPosition, getPosition(), allClients, settings);
+
+	doCollisionWithOthers(getPosition(), entity.getMaxColliderSize(), entity.forces,
+		serverChunkStorer, yourEID);
+	entity.update(deltaTime, chunkGetter);
+	return true;
+}
+
+WeaponStats ZombieServer::getWeaponStats()
+{
+	WeaponStats weaponStats;
+	weaponStats.armourPenetration = 1.f;
+	weaponStats.accuracy = 7.f;
+	weaponStats.range = 1.55f;
+	weaponStats.critChance = 0.06f;
+
+	switch (variant)
+	{
+	case Runner:
+		weaponStats.damage = 12.f;
+		weaponStats.critDamage = 20.f;
+		weaponStats.surprizeDamage = 18.f;
+		weaponStats.speed = 4.f;
+		weaponStats.range = 1.45f;
+		weaponStats.knockBack = 2.f;
+		weaponStats.accuracy = 8.f;
+		break;
+	case Brute:
+		weaponStats.damage = 32.f;
+		weaponStats.critDamage = 48.f;
+		weaponStats.surprizeDamage = 42.f;
+		weaponStats.speed = 0.f;
+		weaponStats.range = 1.8f;
+		weaponStats.knockBack = 8.f;
+		weaponStats.accuracy = 6.f;
+		break;
+	case Walker:
+	default:
+		weaponStats.damage = 16.f;
+		weaponStats.critDamage = 25.f;
+		weaponStats.surprizeDamage = 24.f;
+		weaponStats.speed = 1.5f;
+		weaponStats.knockBack = 3.f;
+		break;
+	}
+
+	return weaponStats;
+}
+
+LootTable zombieWalkerLootTable
+{
+	{LootEntry{1, 1, 2, ItemTypes::cloth}, LootEntry{3, 1, 2, ItemTypes::bone}},
+	glm::ivec2{ 5, 22 },
+	0.20f,
+	{LootEntry{1, 1, 1, ItemTypes::bone}, LootEntry{6, 1, 1, ItemTypes::bandage}},
+};
+
+LootTable zombieRunnerLootTable
+{
+	{LootEntry{1, 1, 2, ItemTypes::cloth}, LootEntry{4, 1, 1, ItemTypes::bandage}},
+	glm::ivec2{ 10, 35 },
+	0.30f,
+	{LootEntry{1, 1, 2, ItemTypes::bone}, LootEntry{5, 1, 1, ItemTypes::apple}},
+};
+
+LootTable zombieBruteLootTable
+{
+	{LootEntry{1, 2, 5, ItemTypes::bone}, LootEntry{2, 2, 4, ItemTypes::cloth}},
+	glm::ivec2{ 35, 95 },
+	0.65f,
+	{LootEntry{1, 1, 2, ItemTypes::copperIngot}, LootEntry{5, 1, 1, ItemTypes::ironIngot}, LootEntry{7, 1, 1, ItemTypes::healingPotion}},
+};
+
+LootTable &ZombieServer::getLootTable()
+{
+	switch (variant)
+	{
+	case Runner: return zombieRunnerLootTable;
+	case Brute: return zombieBruteLootTable;
+	case Walker:
+	default: return zombieWalkerLootTable;
+	}
+}
+'''
+          path.write_text(text[:pos] + zombie_tail)
+
+          # Add deterministic goblin Common/Warrior/Chief variants. The Chief is a
+          # rare roaming miniboss until the procedural camp generation lands.
+          path = Path('src/gameLayer/gameplay/goblin.cpp')
+          text = path.read_text()
+          append_anchor = '''void GoblinServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)\n{\n}\n'''
+          configure_code = append_anchor + r'''
+static unsigned int getGoblinVariantRoll(std::uint64_t eId)
+{
+	std::uint64_t value = eId + 0xD1B54A32D192ED03ULL;
+	value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9ULL;
+	value = (value ^ (value >> 27)) * 0x94D049BB133111EBULL;
+	value ^= value >> 31;
+	return static_cast<unsigned int>(value % 100ULL);
+}
+
+void GoblinServer::configureVariant(std::uint64_t eId)
+{
+	if (variantConfigured) { return; }
+
+	const unsigned int roll = getGoblinVariantRoll(eId);
+	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 55.f;
+	const float lifePercent = glm::clamp(entity.life.life / oldMaxLife, 0.f, 1.f);
+	float newMaxLife = 55.f;
+
+	if (roll < 75)
+	{
+		variant = Common;
+		moveSpeedMultiplier = 1.f;
+		newMaxLife = 55.f;
+	}
+	else if (roll < 97)
+	{
+		variant = Warrior;
+		moveSpeedMultiplier = 1.08f;
+		newMaxLife = 105.f;
+	}
+	else
+	{
+		variant = Chief;
+		moveSpeedMultiplier = 0.92f;
+		newMaxLife = 260.f;
+	}
+
+	entity.life.maxLife = newMaxLife;
+	entity.life.life = glm::clamp(newMaxLife * lifePercent, 0.f, newMaxLife);
+	variantConfigured = true;
+}
+'''
+          text = replace_once(text, append_anchor, configure_code, 'goblin variant configuration')
+
+          update_anchor = '''{\n\tBasicEnemyBehaviourOtherSettings settings;\n\tsettings.hearBonus = -0.1;\n\n\n\tbasicEnemyBehaviour.update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID, othersDeleted,'''
+          update_replacement = '''{\n\tconfigureVariant(yourEID);\n\n\tBasicEnemyBehaviourOtherSettings settings;\n\tsettings.hearBonus = -0.1f;\n\tsettings.runSpeed = 2.f * moveSpeedMultiplier;\n\tsettings.searchDistance = 38.f;\n\n\tif (variant == Warrior)\n\t{\n\t\tsettings.hearBonus = 0.f;\n\t\tsettings.searchDistance = 44.f;\n\t}\n\telse if (variant == Chief)\n\t{\n\t\tsettings.hearBonus = 0.12f;\n\t\tsettings.sightBonus = 0.18f;\n\t\tsettings.searchDistance = 52.f;\n\t}\n\n\tbasicEnemyBehaviour.update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID, othersDeleted,'''
+          text = replace_once(text, update_anchor, update_replacement, 'goblin update settings')
+
+          stats_marker = 'WeaponStats GoblinServer::getWeaponStats()'
+          stats_pos = text.find(stats_marker)
+          if stats_pos < 0:
+              raise SystemExit('missing goblin stats anchor')
+          goblin_tail = r'''WeaponStats GoblinServer::getWeaponStats()
+{
+	WeaponStats weaponStats;
+	weaponStats.armourPenetration = 1.f;
+	weaponStats.range = 1.5f;
+	weaponStats.critChance = 0.1f;
+	weaponStats.accuracy = 8.f;
+
+	switch (variant)
+	{
+	case Warrior:
+		weaponStats.damage = 30.f;
+		weaponStats.critDamage = 42.f;
+		weaponStats.surprizeDamage = 38.f;
+		weaponStats.speed = 1.8f;
+		weaponStats.knockBack = 5.f;
+		weaponStats.armourPenetration = 2.f;
+		break;
+	case Chief:
+		weaponStats.damage = 44.f;
+		weaponStats.critDamage = 62.f;
+		weaponStats.surprizeDamage = 55.f;
+		weaponStats.speed = 1.2f;
+		weaponStats.range = 1.8f;
+		weaponStats.knockBack = 9.f;
+		weaponStats.armourPenetration = 3.f;
+		weaponStats.accuracy = 9.f;
+		break;
+	case Common:
+	default:
+		weaponStats.damage = 20.f;
+		weaponStats.critDamage = 30.f;
+		weaponStats.surprizeDamage = 30.f;
+		weaponStats.speed = 1.f;
+		weaponStats.knockBack = 3.f;
+		break;
+	}
+
+	return weaponStats;
+}
+
+LootTable goblinLootTable
+{
+	{LootEntry{1, 1, 4, ItemTypes::cloth}, LootEntry{30, 7, 14, ItemTypes::cloth}},
+	glm::ivec2{ 30, 75 },
+	0.30f,
+	{LootEntry{1, 1, 2, ItemTypes::fang}, LootEntry{30, 5, 6, ItemTypes::fang}, LootEntry{3, 1, 1, ItemTypes::apple}},
+};
+
+LootTable goblinWarriorLootTable
+{
+	{LootEntry{1, 2, 5, ItemTypes::cloth}, LootEntry{2, 1, 3, ItemTypes::fang}},
+	glm::ivec2{ 55, 145 },
+	0.50f,
+	{LootEntry{1, 1, 2, ItemTypes::copperIngot}, LootEntry{6, 1, 1, ItemTypes::ironIngot}, LootEntry{8, 1, 1, ItemTypes::healingPotion}},
+};
+
+LootTable goblinChiefLootTable
+{
+	{LootEntry{1, 3, 7, ItemTypes::cloth}, LootEntry{1.5f, 2, 5, ItemTypes::fang}},
+	glm::ivec2{ 180, 420 },
+	0.85f,
+	{LootEntry{1, 2, 4, ItemTypes::ironIngot}, LootEntry{3, 1, 2, ItemTypes::silverIngot}, LootEntry{5, 1, 1, ItemTypes::goldIngot}, LootEntry{5, 1, 2, ItemTypes::healingPotion}},
+};
+
+LootTable &GoblinServer::getLootTable()
+{
+	switch (variant)
+	{
+	case Warrior: return goblinWarriorLootTable;
+	case Chief: return goblinChiefLootTable;
+	case Common:
+	default: return goblinLootTable;
+	}
+}
+'''
+          path.write_text(text[:stats_pos] + goblin_tail)
+          PY
+
+      - name: Verify patch
+        run: |
+          git diff --check
+          grep -q 'configureVariant(yourEID)' src/gameLayer/gameplay/zombie.cpp
+          grep -q 'case Chief' src/gameLayer/gameplay/goblin.cpp
+          grep -q 'hasAnimations<decltype(baseEntity->entity)>' include/gameLayer/gameplay/basicEnemyBehaviour.h
+
+      - name: Commit content implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add include/gameLayer/gameplay/basicEnemyBehaviour.h src/gameLayer/gameplay/zombie.cpp src/gameLayer/gameplay/goblin.cpp
+          git commit -m "feat: implement enemy variants and loot"
+          git push origin HEAD:agent/v0.2-threats-exploration
