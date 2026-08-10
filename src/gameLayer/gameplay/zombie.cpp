@@ -1,36 +1,29 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/mat3x3.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <gameplay/zombie.h>
 #include <multyPlayer/serverChunkStorer.h>
-#include <iostream>
-#include <glm/gtx/quaternion.hpp>
 #include <rendering/model.h>
 
-static const auto frontHands = glm::rotate(glm::radians(90.f), glm::vec3{1.f,0.f,0.f});
+static const auto frontHands = glm::rotate(glm::radians(90.f), glm::vec3{1.f, 0.f, 0.f});
 
-void animatePlayerHandsZombie(glm::mat4 *poseVector, float &currentAngle)
+void animatePlayerHandsZombie(glm::mat4 *poseVector, float &currentAngle, float deltaTime)
 {
-
-
-	auto a = glm::quatLookAt(glm::normalize(glm::vec3(-sin(currentAngle), cosf(currentAngle), 4)), glm::vec3(0, 1, 0));
-	auto b = glm::quatLookAt(glm::normalize(glm::vec3(-sin(currentAngle + 10), cosf(currentAngle + 10), 4)), glm::vec3(0, 1, 0));
-
-	poseVector[2] = poseVector[2] * frontHands * glm::rotate(cosf(currentAngle) * 0.02f, glm::vec3{1.f,0.f,0.f}) * glm::rotate(cosf(currentAngle + 5) * 0.05f, glm::vec3{0.f,0.f,1.f});
-	poseVector[3] = poseVector[3] * frontHands * glm::rotate(cosf(currentAngle + 10) * 0.02f, glm::vec3{1.f,0.f,0.f}) * glm::rotate(cosf(currentAngle + 15) * 0.05f, glm::vec3{0.f,0.f,1.f});
-
+	(void)deltaTime;
+	poseVector[2] = poseVector[2] * frontHands
+		* glm::rotate(cosf(currentAngle) * 0.02f, glm::vec3{1.f, 0.f, 0.f})
+		* glm::rotate(cosf(currentAngle + 5.f) * 0.05f, glm::vec3{0.f, 0.f, 1.f});
+	poseVector[3] = poseVector[3] * frontHands
+		* glm::rotate(cosf(currentAngle + 10.f) * 0.02f, glm::vec3{1.f, 0.f, 0.f})
+		* glm::rotate(cosf(currentAngle + 15.f) * 0.05f, glm::vec3{0.f, 0.f, 1.f});
 }
 
 void Zombie::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter)
 {
-
 	updateForces(deltaTime, true);
-
 	resolveConstrainsAndUpdatePositions(chunkGetter, deltaTime, getColliderSize());
-
 }
 
 glm::vec3 Zombie::getColliderSize()
@@ -40,12 +33,12 @@ glm::vec3 Zombie::getColliderSize()
 
 glm::vec3 Zombie::getMaxColliderSize()
 {
-	return glm::vec3(0.8, 1.8, 0.8);
+	return glm::vec3(0.8f, 1.8f, 0.8f);
 }
 
 void ZombieClient::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter)
 {
-	currentHandsAngle += deltaTime;
+	currentHandsAngle += deltaTime * 2.f;
 	if (currentHandsAngle > glm::radians(360.f))
 	{
 		currentHandsAngle -= glm::radians(360.f);
@@ -56,442 +49,184 @@ void ZombieClient::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 
 void ZombieClient::setEntityMatrix(glm::mat4 *skinningMatrix)
 {
-
-
-	//animatePlayerHandsZombie(skinningMatrix, currentHandsAngle);
+	animatePlayerHandsZombie(skinningMatrix, currentHandsAngle, 0.f);
 }
-
 
 int ZombieClient::getTextureIndex()
 {
 	return ModelsManager::TexturesLoaded::ZombieTexture;
 }
 
-
 void ZombieServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
+	(void)f;
+	(void)eId;
 }
 
-//todo temporary allocator
+void ZombieServer::initializeVariant(std::minstd_rand &rng)
+{
+	if (variantInitialized)
+	{
+		return;
+	}
+
+	variantInitialized = true;
+	const unsigned int roll = rng() % 100u;
+
+	if (roll < 72u)
+	{
+		variant = Walker;
+		moveSpeedMultiplier = 1.f;
+		entity.life = Life{200};
+	}
+	else if (roll < 93u)
+	{
+		variant = Runner;
+		moveSpeedMultiplier = 1.65f;
+		entity.life = Life{125};
+	}
+	else
+	{
+		variant = Brute;
+		moveSpeedMultiplier = 0.72f;
+		entity.life = Life{420};
+	}
+}
+
 bool ZombieServer::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter,
 	ServerChunkStorer &serverChunkStorer, std::minstd_rand &rng, std::uint64_t yourEID,
 	std::unordered_set<std::uint64_t> &othersDeleted,
 	std::unordered_map<std::uint64_t, std::unordered_map<glm::ivec3, PathFindingNode>> &pathFinding,
 	std::unordered_map<std::uint64_t, glm::dvec3> &playersPosition,
-	std::unordered_map < std::uint64_t, Client *> &allClients
-)
+	std::unordered_map < std::uint64_t, Client *> &allClients)
 {
+	initializeVariant(rng);
 
+	BasicEnemyBehaviourOtherSettings settings;
+	settings.searchDistance = 42.f;
+	settings.hearBonus = 0.16f;
+	settings.sightBonus = 0.08f;
+	settings.runSpeed = 2.f * moveSpeedMultiplier;
 
-	//look at player
-	if(0)
+	if (variant == Runner)
 	{
-		auto found = playersPosition.begin();
-
-		if (found == playersPosition.end())
-		{
-
-		}
-		else
-		{
-			lookAtPosition(found->second, entity.lookDirectionAnimation,
-				getPosition(), entity.bodyOrientation,
-				glm::radians(65.f));
-			
-		}
+		settings.searchDistance = 48.f;
+		settings.hearBonus = 0.24f;
+	}
+	else if (variant == Brute)
+	{
+		settings.searchDistance = 36.f;
+		settings.hearBonus = 0.22f;
 	}
 
-
-
-	if (0)
-	{
-	float followDistance = 22;
-	float keepFollowDistance = 33;
-	float randomSightBonus = 10;
-	glm::dvec3 playerLockedOnPosition = getPosition();
-
-	randomSightBonusTimer -= deltaTime;
-	if (randomSightBonusTimer <= 0)
-	{
-		randomSightBonusTimer = getRandomNumberFloat(rng, 3, 12);
-		randomSightBonusTimer += getRandomNumberFloat(rng, 3, 12);
-		randomSightBonusTimer += getRandomNumberFloat(rng, 3, 12);
-
-		followDistance += randomSightBonus;
-	}
-
-	if (!playerLockedOn)
-	{
-
-		//todo temporary allocator
-
-		std::vector<std::uint64_t> close;
-
-		for (auto &p : playersPosition)
-		{
-			if (glm::distance(p.second, getPosition()) <= followDistance)
-			{
-				close.push_back(p.first);
-			}
-		}
-
-		if (!close.empty())
-		{
-			playerLockedOn = close[rng() % close.size()];
-		}
-			
-	}
-	
-	{
-		auto found = playersPosition.find(playerLockedOn);
-
-		if (found == playersPosition.end())
-		{
-			playerLockedOn = 0;
-		}
-		else
-		{
-			if (glm::distance(found->second, getPosition()) <= keepFollowDistance)
-			{
-				playerLockedOnPosition = found->second;
-			}
-			else
-			{
-				playerLockedOn = 0;
-			}
-		}
-	}
-
-	//auto playeerPos2D = playerLockedOnPosition;
-	//playeerPos2D.y = 0;
-	//auto pos2D = getPosition();
-	//pos2D.y = 0;
-
-	auto vectorToPlayer = playerLockedOnPosition - getPosition();
-	vectorToPlayer.y = 0;
-	bool closeToPlayer = playerLockedOn && (glm::length(vectorToPlayer) > 1.2f);
-
-	bool pathFindingSucceeded = 0;
-	if (keepJumpingTimer >= 0)
-	{
-		keepJumpingTimer -= deltaTime;
-		if (direction != glm::vec2(0, 0))
-		{
-			pathFindingSucceeded = true;
-		}
-		//else
-		//{
-		//	direction = {0,0};
-		//}
-	}
-	//else
-	//{
-	//	direction = {0,0};
-	//}
-
-	if (!pathFindingSucceeded && playerLockedOn && closeToPlayer)
-	{
-
-		auto path = pathFinding.find(playerLockedOn);
-
-		if (path != pathFinding.end())
-		{
-
-			auto pos = from3DPointToBlock(getPosition());
-
-			auto foundNode = path->second.find(pos);
-
-			if (foundNode != path->second.end())
-			{
-
-				std::pair<glm::ivec3, PathFindingNode> interPolateNode = *foundNode;
-				std::pair<glm::ivec3, PathFindingNode> interPolateNodeNotGood = *foundNode;
-
-				int originalHeight = pos.y;
-
-				//interpolate
-				int maxCounterLoop = 100;
-				int interpolateSteps = 0;
-				if(1) 
-				while (maxCounterLoop-- > 0)
-				{
-
-					if (originalHeight != interPolateNodeNotGood.second.returnPos.y)
-					{
-						break;
-					}
-
-					auto newFoundNode = path->second.find(interPolateNodeNotGood.second.returnPos);
-
-					if (newFoundNode != path->second.end())
-					{
-						if (newFoundNode->second.level > 0)
-						{
-							
-							glm::dvec3 direction = glm::dvec3(newFoundNode->second.returnPos) + glm::dvec3(0,0.5,0)
-								- getPosition();
-
-							direction.y = 0;
-
-							float checklength = glm::length(direction);
-
-							if (checklength)
-							{
-								//normalize
-								direction /= checklength;
-
-								bool problems = 0;
-
-								//try interpolation
-								int maxCounter = 300;//so we don't get infinite loops
-
-								glm::dvec3 start = getPosition();
-								start.y += 0.1;
-
-								glm::dvec3 leftVector = -glm::cross(direction, glm::dvec3(0, 1, 0));
-
-								glm::dvec3 start2 = start;
-								start += leftVector * 0.20;
-								start2 -= leftVector * 0.20;
-
-								for (int i = 0; i< (checklength*10)-2; i++)
-								{
-									start += direction * 0.1;
-									start2 += direction * 0.1;
-
-									//glm::dvec3 direction2 = glm::dvec3(newFoundNode->second.returnPos) - start;
-									//direction2.y = 0;
-									//if (glm::dot(direction, direction2) < 0.f) { break; }
-
-									auto checkOneDirection = [&](glm::ivec3 blockPos)
-									{
-										auto b = serverChunkStorer.getBlockSafe(blockPos + glm::ivec3(0,1,0));
-										if (b && b->isColidable())
-										{
-											problems = true;
-											return true;
-										}
-
-										b = serverChunkStorer.getBlockSafe(blockPos + glm::ivec3(0,-1,0));
-										if (!b || !b->isColidable())
-										{
-											problems = true;
-											return true;
-										}
-
-										return false;
-									};
-
-									auto pos1 = from3DPointToBlock(start);
-									auto pos2 = from3DPointToBlock(start2);
-
-									if (pos1 != pos2)
-									{
-										if (checkOneDirection(pos1))
-										{
-											break;
-										}
-										if (checkOneDirection(pos2))
-										{
-											break;
-										}
-									}
-									else
-									{
-										if (checkOneDirection(pos1))
-										{
-											break;
-										}
-									}
-
-									//blockPos.y -= 2;
-									//auto b2 = serverChunkStorer.getBlockSafe(blockPos);
-									//if (!b2 || !b2->isColidable())
-									//{
-									//	problems = true;
-									//	break;
-									//}
-
-								}
-
-								if (maxCounter <= 0) { break; }
-
-								if (problems)
-								{
-									//std::cout << "Problems! ";
-									interPolateNodeNotGood = *newFoundNode;
-									//break; //worse interpolation but less lickely to have problems
-								}
-								else
-								{
-									interpolateSteps++;
-									interPolateNodeNotGood = *newFoundNode;
-									interPolateNode = *newFoundNode;
-								}
-
-
-							};
-
-						}
-						else
-						{
-							break;
-						}
-					}
-					else
-					{
-						break;
-					}
-
-				}
-
-				//if (interpolateSteps <= 1 && 
-				//	glm::length(glm::dvec2(pos.x + 0.5,pos.z + 0.5) - glm::dvec2(getPosition().x, getPosition().z))
-				//	< 0.5
-				//	)
-				//{
-				//	glm::vec3 d = glm::dvec3(pos.x + 0.5, 0, pos.z + 0.5)
-				//		- getPosition();
-				//	d.y = 0;
-				//	std::cout << "yes";
-				//	direction.x = d.x;
-				//	direction.y = d.z;
-				//}
-				//else
-				{
-					glm::vec3 d = glm::dvec3(interPolateNode.second.returnPos)
-						- getPosition();
-					d.y = 0;
-
-					direction.x = d.x;
-					direction.y = d.z;
-				}
-
-				if (glm::length(direction) != 0)
-				{
-					direction = glm::normalize(direction);
-
-					pathFindingSucceeded = true;
-				}
-			}
-
-		};
-
-
-		if(1)
-		if (!pathFindingSucceeded)
-		{
-			//std::cout << "yess ";
-
-			glm::vec3 d = playerLockedOnPosition
-				- getPosition();
-			d.y = 0;
-
-			direction.x = d.x;
-			direction.y = d.z;
-
-			if (glm::length(direction) != 0)
-			{
-				direction = glm::normalize(direction);
-			}
-
-		}
-
-	};
-
-	if (!playerLockedOn)
-	{
-		waitTime -= deltaTime;
-
-		if (waitTime < 0)
-		{
-			int moving = getRandomChance(rng, 0.5);
-			waitTime += getRandomNumberFloat(rng, 1, 8);
-
-			if (moving)
-			{
-				direction = getRandomUnitVector(rng);
-				waitTime += getRandomNumberFloat(rng, 0, 2);
-			}
-		}
-	};
-
-	//jump
-	{
-		auto blockPos = getPosition();
-		blockPos.x += direction.x;
-		blockPos.z += direction.y;
-
-		auto b = serverChunkStorer.getBlockSafe(from3DPointToBlock(blockPos));
-
-		if (b && b->isColidable())
-		{
-
-			//don't jump too tall walls lol
-			auto b = serverChunkStorer.getBlockSafe(from3DPointToBlock(blockPos) + glm::ivec3(0,1,0));
-			if (!b || !b->isColidable())
-			{
-				auto b = serverChunkStorer.getBlockSafe(from3DPointToBlock(blockPos) + glm::ivec3(0, 2, 0));
-				if (!b || !b->isColidable())
-				{
-					entity.forces.jump();
-					keepJumpingTimer = 0.4;
-				}
-			}
-
-		}
-	}
-
-	//don't fall into gaps when not following player
-	if(1)
-	if(!pathFindingSucceeded)
-	{
-		auto blockPos = getPosition();
-		blockPos.x += direction.x;
-		blockPos.z += direction.y;
-
-		//block under
-		blockPos.y--;
-		auto b = serverChunkStorer.getBlockSafe(from3DPointToBlock(blockPos));
-
-		//void
-		if (!b)
-		{
-			direction = {};
-			waitTime = 0;
-		}
-		else if (!b->isColidable())
-		{
-
-			//bigger fall under?
-			blockPos.y--;
-			auto b = serverChunkStorer.getBlockSafe(from3DPointToBlock(blockPos));
-
-			if (!b || !b->isColidable())
-			{
-				direction = {};
-				waitTime = 0;
-			}
-		}
-
-
-	}
-
-
-	// Variant speed is server authoritative; clients receive the resulting position.
-	auto move = (2.f * moveSpeedMultiplier) * deltaTime * direction;
-	getPosition().x += move.x;
-	getPosition().z += move.y;
-	};
-
+	basicEnemyBehaviour.update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID,
+		othersDeleted, pathFinding, playersPosition, getPosition(), allClients, settings);
 
 	doCollisionWithOthers(getPosition(), entity.getMaxColliderSize(), entity.forces,
 		serverChunkStorer, yourEID);
 
 	entity.update(deltaTime, chunkGetter);
-
-	entity.bodyOrientation = direction;
-
 	return true;
 }
 
+WeaponStats ZombieServer::getWeaponStats()
+{
+	WeaponStats stats;
+	stats.armourPenetration = 1;
+	stats.accuracy = 7;
+	stats.range = 1.45f;
+
+	switch (variant)
+	{
+		case Runner:
+			stats.damage = 13;
+			stats.critDamage = 20;
+			stats.surprizeDamage = 18;
+			stats.critChance = 0.06f;
+			stats.speed = 0.72f;
+			stats.knockBack = 2.f;
+			break;
+
+		case Brute:
+			stats.damage = 34;
+			stats.critDamage = 48;
+			stats.surprizeDamage = 44;
+			stats.critChance = 0.12f;
+			stats.speed = 1.55f;
+			stats.range = 1.7f;
+			stats.knockBack = 6.f;
+			stats.accuracy = 8;
+			break;
+
+		case Walker:
+		default:
+			stats.damage = 18;
+			stats.critDamage = 26;
+			stats.surprizeDamage = 24;
+			stats.critChance = 0.08f;
+			stats.speed = 1.1f;
+			stats.knockBack = 3.f;
+			break;
+	}
+
+	return stats;
+}
+
+static LootTable walkerLootTable
+{
+	{
+		LootEntry{1.f, 1, 3, ItemTypes::cloth},
+		LootEntry{3.f, 1, 2, ItemTypes::bone},
+		LootEntry{9.f, 1, 1, ItemTypes::bandage}
+	},
+	glm::ivec2{1, 7},
+	0.14f,
+	{
+		LootEntry{1.f, 1, 2, ItemTypes::bone},
+		LootEntry{5.f, 1, 1, ItemTypes::apple}
+	}
+};
+
+static LootTable runnerLootTable
+{
+	{
+		LootEntry{1.f, 1, 2, ItemTypes::cloth},
+		LootEntry{2.4f, 1, 2, ItemTypes::bone},
+		LootEntry{6.f, 1, 2, ItemTypes::bandage},
+		LootEntry{14.f, 1, 1, ItemTypes::speedPotion}
+	},
+	glm::ivec2{3, 12},
+	0.24f,
+	{
+		LootEntry{1.f, 1, 2, ItemTypes::bandage},
+		LootEntry{7.f, 1, 1, ItemTypes::healingPotion}
+	}
+};
+
+static LootTable bruteLootTable
+{
+	{
+		LootEntry{1.f, 2, 5, ItemTypes::bone},
+		LootEntry{2.f, 2, 4, ItemTypes::cloth},
+		LootEntry{7.f, 1, 2, ItemTypes::copperIngot},
+		LootEntry{16.f, 1, 1, ItemTypes::ironIngot}
+	},
+	glm::ivec2{12, 36},
+	0.55f,
+	{
+		LootEntry{1.f, 1, 2, ItemTypes::bandage},
+		LootEntry{4.f, 1, 1, ItemTypes::healingPotion},
+		LootEntry{12.f, 1, 1, ItemTypes::strengthPotion}
+	}
+};
+
+LootTable &ZombieServer::getLootTable()
+{
+	switch (variant)
+	{
+		case Runner: return runnerLootTable;
+		case Brute: return bruteLootTable;
+		case Walker:
+		default: return walkerLootTable;
+	}
+}
