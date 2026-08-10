@@ -5,6 +5,7 @@
 #include <glm/mat3x3.hpp>
 #include <glm/gtx/transform.hpp>
 #include <gameplay/zombie.h>
+#include <gameplay/basicEnemyBehaviour.h>
 #include <multyPlayer/serverChunkStorer.h>
 #include <iostream>
 #include <glm/gtx/quaternion.hpp>
@@ -67,6 +68,25 @@ void ZombieServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 	(void)eId;
 }
 
+void ZombieServer::ensureBehaviour()
+{
+	if (!basicEnemyBehaviour)
+	{
+		basicEnemyBehaviour = std::make_shared<BasicEnemyBehaviour>();
+	}
+}
+
+bool ZombieServer::isUnaware()
+{
+	return basicEnemyBehaviour ? basicEnemyBehaviour->isUnaware() : true;
+}
+
+void ZombieServer::signalHit(glm::vec3 direction)
+{
+	ensureBehaviour();
+	basicEnemyBehaviour->signalHit(direction, this);
+}
+
 static unsigned int getZombieVariantRoll(std::uint64_t eId)
 {
 	std::uint64_t value = eId + 0x9E3779B97F4A7C15ULL;
@@ -78,6 +98,7 @@ static unsigned int getZombieVariantRoll(std::uint64_t eId)
 
 void ZombieServer::configureVariant(std::uint64_t eId)
 {
+	ensureBehaviour();
 	if (variantConfigured) { return; }
 
 	const unsigned int roll = getZombieVariantRoll(eId);
@@ -136,7 +157,7 @@ bool ZombieServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 		settings.sightBonus = 0.02f;
 	}
 
-	basicEnemyBehaviour.update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID,
+	basicEnemyBehaviour->update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID,
 		othersDeleted, pathFinding, playersPosition, getPosition(), allClients, settings);
 
 	doCollisionWithOthers(getPosition(), entity.getMaxColliderSize(), entity.forces,
