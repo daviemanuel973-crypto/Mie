@@ -604,7 +604,7 @@ float shadowCalc(float dotLightNormal, int cascade)
 	vec3 pos = fragPositionLightSpace.xyz * 0.5 + 0.5;
 	pos.z = min(pos.z, 1.0);
 	
-	float depth = texture(sampler2D(u_cascadedShadowsMaps[cascade]), pos.xy).r;
+	float depth = texture(u_cascadedShadowsMaps[cascade], pos.xy).r;
 		
 	float bias = getShadowBias(dotLightNormal, cascade);
 
