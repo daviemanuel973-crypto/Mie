@@ -1,1 +1,0 @@
-Temporary validation trigger for the bounded Linux compatibility atlas. Remove before promoting the validated commit to main.
