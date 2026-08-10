@@ -89,13 +89,23 @@ jobs:
       - name: Validate Flatpak compatibility GLSL
         shell: bash
         run: |
-          glslangValidator -DMIE_COMPAT_TEXTURES=1 -l \
+          # The runtime prepends these four defines through
+          # ShadingSettings::formatIntoGLSLcode(). Mirror a conservative Low preset
+          # here so offline validation matches the real shader source seen by OpenGL.
+          GLSL_DEFINES=(
+            -DMIE_COMPAT_TEXTURES=1
+            -Dc_shadows=0
+            -Dc_PBR=0
+            -Dc_SSR=0
+            -Dc_useLights=1
+          )
+          glslangValidator "${GLSL_DEFINES[@]}" -l \
             resources/shaders/rendering/defaultShader.vert \
             resources/shaders/rendering/defaultShader.frag
-          glslangValidator -DMIE_COMPAT_TEXTURES=1 -l \
+          glslangValidator "${GLSL_DEFINES[@]}" -l \
             resources/shaders/rendering/zpass.vert \
             resources/shaders/rendering/zpass.frag
-          glslangValidator -DMIE_COMPAT_TEXTURES=1 -l \
+          glslangValidator "${GLSL_DEFINES[@]}" -l \
             resources/shaders/basicEntity.vert \
             resources/shaders/basicEntity.frag
 
