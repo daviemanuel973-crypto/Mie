@@ -1045,32 +1045,46 @@ void BlocksLoader::rebuildCompatibilityTextureArray(int targetSize)
     }
     if (texturesIds.empty()) return;
 
-    compatibilityTextureArraySize = std::max(16, targetSize);
-    int mipLevels = 1;
-    for (int size = compatibilityTextureArraySize; size > 1; size /= 2) mipLevels++;
+    GLint maxTextureSize = 4096;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+
+    compatibilityTextureGridSize = static_cast<int>(std::ceil(std::sqrt(static_cast<double>(texturesIds.size()))));
+    compatibilityTextureGridSize = std::max(1, compatibilityTextureGridSize);
+
+    int maxTileSize = std::max(8, maxTextureSize / compatibilityTextureGridSize);
+    compatibilityTextureArraySize = std::max(8, std::min(targetSize, maxTileSize));
+    const int atlasSize = compatibilityTextureGridSize * compatibilityTextureArraySize;
 
     glGenTextures(1, &compatibilityTextureArray);
     glActiveTexture(GL_TEXTURE0 + 15);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, compatibilityTextureArray);
-    glTexStorage3D(GL_TEXTURE_2D_ARRAY, mipLevels, GL_RGBA8,
-        compatibilityTextureArraySize, compatibilityTextureArraySize,
-        static_cast<GLsizei>(texturesIds.size()));
+    glBindTexture(GL_TEXTURE_2D, compatibilityTextureArray);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, atlasSize, atlasSize, 0,
+        GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     for (size_t layer = 0; layer < texturesIds.size(); layer++)
     {
         auto data = resizeBlockTextureNearestCompat(texturesIds[layer], compatibilityTextureArraySize);
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, static_cast<GLint>(layer),
-            compatibilityTextureArraySize, compatibilityTextureArraySize, 1,
+        int tileX = static_cast<int>(layer % compatibilityTextureGridSize);
+        int tileY = static_cast<int>(layer / compatibilityTextureGridSize);
+        glTexSubImage2D(GL_TEXTURE_2D, 0,
+            tileX * compatibilityTextureArraySize,
+            tileY * compatibilityTextureArraySize,
+            compatibilityTextureArraySize, compatibilityTextureArraySize,
             GL_RGBA, GL_UNSIGNED_BYTE, data.data());
     }
 
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+    // No mipmaps in compatibility mode: avoids cross-tile bleeding and saves VRAM.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glActiveTexture(GL_TEXTURE0);
+
+    std::cout << "Compatibility texture atlas: " << texturesIds.size()
+        << " layers, grid " << compatibilityTextureGridSize << "x"
+        << compatibilityTextureGridSize << ", tile " << compatibilityTextureArraySize
+        << "px, atlas " << atlasSize << "px" << std::endl;
 }
 
 //textureloader texture loader
@@ -1784,7 +1798,7 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 	}
 
 #if defined(OURCRAFT_FLATPAK)
-	rebuildCompatibilityTextureArray(128);
+	rebuildCompatibilityTextureArray(64);
 #endif
 }
 

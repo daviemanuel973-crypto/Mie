@@ -2187,6 +2187,7 @@ void Renderer::reloadShaders()
 	GET_UNIFORM2(defaultShader, u_positionFloat);
 	GET_UNIFORM2(defaultShader, u_texture);
 	GET_UNIFORM2(defaultShader, u_compatTextureArray);
+	GET_UNIFORM2(defaultShader, u_compatTextureGrid);
 	GET_UNIFORM2(defaultShader, u_time);
 	GET_UNIFORM2(defaultShader, u_showLightLevels);
 	GET_UNIFORM2(defaultShader, u_skyLightIntensity);
@@ -2332,8 +2333,10 @@ void Renderer::reloadShaders()
 		GET_UNIFORM2(zpassShader, u_renderOnlyWater);
 		GET_UNIFORM2(zpassShader, u_timeGrass);
 		GET_UNIFORM2(zpassShader, u_compatTextureArray);
+		GET_UNIFORM2(zpassShader, u_compatTextureGrid);
 #if defined(OURCRAFT_FLATPAK)
 		glUniform1i(zpassShader.u_compatTextureArray, 15);
+		glUniform1i(zpassShader.u_compatTextureGrid, blocksLoader.compatibilityTextureGridSize);
 #endif
 
 		zpassShader.u_vertexData = getStorageBlockIndex(zpassShader.shader.id, "u_vertexData");
@@ -2559,7 +2562,7 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 #if defined(OURCRAFT_FLATPAK)
 	// Flatpak conventional texture-array binding: avoids GL_ARB_bindless_texture on Mesa/Intel.
 	glActiveTexture(GL_TEXTURE0 + 15);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, blocksLoader.compatibilityTextureArray);
+	glBindTexture(GL_TEXTURE_2D, blocksLoader.compatibilityTextureArray);
 	glActiveTexture(GL_TEXTURE0);
 #endif
 
@@ -2913,6 +2916,7 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 		glUniform1i(defaultShader.u_showLightLevels, showLightLevels);
 #if defined(OURCRAFT_FLATPAK)
 		glUniform1i(defaultShader.u_compatTextureArray, 15);
+		glUniform1i(defaultShader.u_compatTextureGrid, blocksLoader.compatibilityTextureGridSize);
 #endif
 		glUniform1i(defaultShader.u_skyLightIntensity, skyLightIntensity);
 		glUniform3fv(defaultShader.u_sunDirection, 1, &mainLightPosition[0]);
@@ -4432,9 +4436,9 @@ void Renderer::renderEntities(
 	
 	entityRenderer.basicEntityShader.shader.bind();
 #if defined(OURCRAFT_FLATPAK)
-	glActiveTexture(GL_TEXTURE0 + 16);
+	glActiveTexture(GL_TEXTURE0 + 15);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, modelsManager.compatibilityTextureArray);
-	glUniform1i(entityRenderer.basicEntityShader.u_compatTextureArray, 16);
+	glUniform1i(entityRenderer.basicEntityShader.u_compatTextureArray, 15);
 	glActiveTexture(GL_TEXTURE0);
 #endif
 	

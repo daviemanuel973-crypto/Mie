@@ -125,6 +125,7 @@ struct Renderer
 		uniform u_positionFloat = -1;
 		uniform u_texture = -1;
 		uniform u_compatTextureArray = -1;
+		uniform u_compatTextureGrid = -1;
 		uniform u_time = -1;
 		uniform u_showLightLevels = -1;
 		uniform u_skyLightIntensity = -1;
@@ -344,6 +345,7 @@ struct Renderer
 		GLuint u_vertexData = GL_INVALID_INDEX;
 		GLuint u_textureSamplerers;
 		uniform u_compatTextureArray = -1;
+		uniform u_compatTextureGrid = -1;
 		GLuint u_renderOnlyWater;
 		GLuint u_timeGrass;
 	}zpassShader;

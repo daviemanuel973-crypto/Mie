@@ -25,14 +25,23 @@ in flat uvec2 v_paralaxSampler;
 
 #ifdef MIE_COMPAT_TEXTURES
 in flat int v_compatTextureIndex;
-uniform sampler2DArray u_compatTextureArray;
-vec4 sampleBlockAlbedo(vec2 uv) { return texture(u_compatTextureArray, vec3(uv, float(v_compatTextureIndex))); }
-vec4 sampleBlockNormal(vec2 uv) { return texture(u_compatTextureArray, vec3(uv, float(v_compatTextureIndex + 1))); }
-vec4 sampleBlockMaterial(vec2 uv) { return texture(u_compatTextureArray, vec3(uv, float(v_compatTextureIndex + 2))); }
-vec4 sampleBlockParallax(vec2 uv) { return texture(u_compatTextureArray, vec3(uv, float(v_compatTextureIndex + 3))); }
+uniform sampler2D u_compatTextureArray;
+uniform int u_compatTextureGrid;
+vec2 compatibilityAtlasUV(vec2 uv, int textureIndex)
+{
+    float grid = float(max(u_compatTextureGrid, 1));
+    int safeIndex = max(textureIndex, 0);
+    vec2 tile = vec2(float(safeIndex % u_compatTextureGrid), float(safeIndex / u_compatTextureGrid));
+    vec2 localUV = clamp(fract(uv), vec2(0.001), vec2(0.999));
+    return (tile + localUV) / grid;
+}
+vec4 sampleBlockAlbedo(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex)); }
+vec4 sampleBlockNormal(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex + 1)); }
+vec4 sampleBlockMaterial(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex + 2)); }
+vec4 sampleBlockParallax(vec2 uv) { return texture(u_compatTextureArray, compatibilityAtlasUV(uv, v_compatTextureIndex + 3)); }
 #else
 vec4 sampleBlockAlbedo(vec2 uv) { return texture(sampler2D(v_textureSampler), uv); }
-vec4 sampleBlockNormal(vec2 uv) { return sampleBlockNormal(uv); }
+vec4 sampleBlockNormal(vec2 uv) { return texture(sampler2D(v_normalSampler), uv); }
 vec4 sampleBlockMaterial(vec2 uv) { return texture(sampler2D(v_materialSampler), uv); }
 vec4 sampleBlockParallax(vec2 uv) { return texture(sampler2D(v_paralaxSampler), uv); }
 #endif
