@@ -111,12 +111,12 @@ jobs:
 
       - name: Test player persistence format
         run: |
-          cmake -S . -B build-tests \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DOURCRAFT_ENABLE_AVX2=OFF \
-            -DBUILD_TESTING=ON
-          cmake --build build-tests --target playerPersistenceTests --parallel 2
-          ctest --test-dir build-tests --output-on-failure -R player-persistence-format
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            tests/playerPersistenceTests.cpp \
+            src/gameLayer/multyPlayer/playerSaveFormat.cpp \
+            -o playerPersistenceTests
+          ./playerPersistenceTests
 
       - name: Build Flatpak repository
         shell: bash
