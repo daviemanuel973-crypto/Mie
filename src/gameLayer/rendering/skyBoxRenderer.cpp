@@ -723,25 +723,25 @@ void SkyBoxLoaderAndDrawer::drawBefore(const glm::mat4 &viewProjMat,
 	{
 		firstTexture = twilightSky.texture;
 		secondTexture = daySky.texture;
-		mix = std::powf(timeOfDay / 0.25f, 1.f/bias);
+		mix = std::pow(timeOfDay / 0.25f, 1.f/bias);
 	}
 	else if (timeOfDay <= 0.50)
 	{
 		firstTexture = daySky.texture;
 		secondTexture = twilightSky.texture;
-		mix = std::powf((timeOfDay -0.25f) / 0.25f, bias);
+		mix = std::pow((timeOfDay -0.25f) / 0.25f, bias);
 	}
 	else if (timeOfDay <= 0.75)
 	{
 		firstTexture = twilightSky.texture;
 		secondTexture = nightSky.texture;
-		mix = std::powf((timeOfDay - 0.50f) / 0.25f, 1.f/bias);
+		mix = std::pow((timeOfDay - 0.50f) / 0.25f, 1.f/bias);
 	}
 	else if (timeOfDay <= 1.f)
 	{
 		firstTexture = nightSky.texture;
 		secondTexture = twilightSky.texture;
-		mix = std::powf((timeOfDay - 0.75f) / 0.25f, bias);
+		mix = std::pow((timeOfDay - 0.75f) / 0.25f, bias);
 	}
 
 

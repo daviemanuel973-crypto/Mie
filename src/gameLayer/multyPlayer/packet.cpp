@@ -3,16 +3,27 @@
 #include <zstd-1.5.5/lib/zstd.h> 
 #include <iostream>
 #include <platformTools.h>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <new>
+
+namespace
+{
+	constexpr unsigned long long maxDecompressedPacketSize = 256ULL * 1024ULL * 1024ULL;
+}
 
 void *compressData(const char *data, size_t size, size_t &compressedSize)
 {
+	compressedSize = 0;
+	if (!data || size == 0) { return nullptr; }
 
 	//PL::Profiler profiler;
 	//profiler.start();
 
-	size_t newExpectedMaxSize = size * 0.8;
-
-	char *rezult = new char[newExpectedMaxSize];
+	const size_t newExpectedMaxSize = ZSTD_compressBound(size);
+	char *rezult = new (std::nothrow) char[newExpectedMaxSize];
+	if (!rezult) { return nullptr; }
 
 	//TODO try out other compresssion levels
 	compressedSize = ZSTD_compress(rezult, newExpectedMaxSize, data, size, 1);
@@ -35,13 +46,15 @@ void *compressData(const char *data, size_t size, size_t &compressedSize)
 
 void *compressDataForce(const char *data, size_t size, size_t &compressedSize)
 {
+	compressedSize = 0;
+	if (!data || size == 0) { return nullptr; }
 
 	//PL::Profiler profiler;
 	//profiler.start();
 
-	size_t newExpectedMaxSize = size * 1.2;
-
-	char *rezult = new char[newExpectedMaxSize];
+	const size_t newExpectedMaxSize = ZSTD_compressBound(size);
+	char *rezult = new (std::nothrow) char[newExpectedMaxSize];
+	if (!rezult) { return nullptr; }
 
 	//TODO try out other compresssion levels
 	compressedSize = ZSTD_compress(rezult, newExpectedMaxSize, data, size, 3);
@@ -64,16 +77,21 @@ void *compressDataForce(const char *data, size_t size, size_t &compressedSize)
 
 void *unCompressData(const char *data, size_t compressedSize, size_t &originalSize)
 {
+	originalSize = 0;
+	if (!data || compressedSize == 0) { return nullptr; }
+
 	// Decompress data
-   // First, we need to get the decompressed size
-	originalSize = ZSTD_getDecompressedSize(data, compressedSize);
-	if (originalSize == ZSTD_CONTENTSIZE_ERROR || originalSize == 0)
+	// First, we need to get the decompressed size.
+	const unsigned long long frameSize = ZSTD_getFrameContentSize(data, compressedSize);
+	if (frameSize == ZSTD_CONTENTSIZE_ERROR || frameSize == ZSTD_CONTENTSIZE_UNKNOWN ||
+		frameSize == 0 || frameSize > maxDecompressedPacketSize ||
+		frameSize > static_cast<unsigned long long>(std::numeric_limits<size_t>::max()))
 	{
-		// Failed to get decompressed size
 		return nullptr;
 	}
+	originalSize = static_cast<size_t>(frameSize);
 
-	char *decompressedData = new char[originalSize];
+	char *decompressedData = new (std::nothrow) char[originalSize];
 	if (!decompressedData)
 	{
 		// Memory allocation failed
@@ -82,7 +100,7 @@ void *unCompressData(const char *data, size_t compressedSize, size_t &originalSi
 
 	// Decompress data
 	size_t result = ZSTD_decompress(decompressedData, originalSize, data, compressedSize);
-	if (ZSTD_isError(result))
+	if (ZSTD_isError(result) || result != originalSize)
 	{
 		// Decompression failed
 		delete[] decompressedData;
@@ -152,15 +170,19 @@ void sendPacket(ENetPeer *to, Packet p,
 	}
 
 	ENetPacket *packet = enet_packet_create(nullptr, size + sizeof(Packet), flag);
+	if (!packet) { return; }
 
 	if (freeCallback)
 	{
 		packet->freeCallback = freeCallback;
-		packet->userData = (void*)packetId;
+		packet->userData = reinterpret_cast<void *>(static_cast<std::uintptr_t>(packetId));
 	}
 
 	memcpy(packet->data, &p, sizeof(Packet));
-	memcpy(packet->data + sizeof(Packet), data, size);
+	if (size > 0)
+	{
+		memcpy(packet->data + sizeof(Packet), data, size);
+	}
 
 	enet_peer_send(to, channel, packet);
 }
@@ -192,18 +214,22 @@ char *parsePacket(ENetPacket &packet, Packet &p, size_t &dataSize)
 {
 	size_t size = packet.dataLength;
 	void *data = packet.data;
-	dataSize = std::max(size_t(0), size - sizeof(Packet));
+	dataSize = 0;
+	p = {};
 
-	memcpy(&p, data, sizeof(Packet));
-
-	if (size <= sizeof(Packet))
+	if (!data || size < sizeof(Packet))
 	{
 		return nullptr;
 	}
-	else
+
+	memcpy(&p, data, sizeof(Packet));
+	dataSize = size - sizeof(Packet);
+	if (dataSize == 0)
 	{
-		return (char *)data + sizeof(Packet);
+		return nullptr;
 	}
+
+	return static_cast<char *>(data) + sizeof(Packet);
 }
 
 float computeRestantTimer(std::uint64_t older, std::uint64_t newer)
@@ -219,7 +245,7 @@ void sendPlayerSkinPacket(ENetPeer *to, std::uint64_t cid, gl2d::Texture &t)
 	glm::ivec2 size = {};
 	auto data = t.readTextureData(0, &size);
 
-	if (size.x != PLAYER_SKIN_SIZE && size.y != PLAYER_SKIN_SIZE) { return; }
+	if (size.x != PLAYER_SKIN_SIZE || size.y != PLAYER_SKIN_SIZE) { return; }
 
 	sendPlayerSkinPacket(to, cid, data);
 }

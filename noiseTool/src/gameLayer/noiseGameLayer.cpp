@@ -12,6 +12,7 @@
 #include <bezie.h>
 #include <fstream>
 #include <voronoi.h>
+#include <cstdint>
 
 gl2d::Renderer2D renderer;
 WorldGenerator wg;
@@ -24,7 +25,7 @@ void renderSettingsForOneNoise(const char *name, NoiseSetting &n)
 {
 	ImGui::PushID((void*)name);
 
-	ImGui::Text(name);
+	ImGui::Text("%s", name);
 
 	ImGui::DragFloat("Scale: ", &n.scale, 0.01);
 	ImGui::Combo("Noise Type", &n.type, 
@@ -727,10 +728,10 @@ void drawNoise(const char *name, gl2d::Texture t)
 {
 
 
-	ImGui::Text(name);
+	ImGui::Text("%s", name);
 
 	auto cursor = ImGui::GetCursorPos();
-	ImGui::Image((ImTextureID)t.id, {(float)t.GetSize().x, (float)t.GetSize().y},
+	ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<std::uintptr_t>(t.id)), {(float)t.GetSize().x, (float)t.GetSize().y},
 		{}, {1,1}, {1,1,1,1}, {1,1,1,1});
 
 
@@ -1002,7 +1003,7 @@ bool gameLogic(float deltaTime)
 	{
 		ImGui::Text("3D noise");
 
-		ImGui::Image((ImTextureID)stone3DNoiseT.id, {(float)stone3DNoiseT.GetSize().x, 256},
+		ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<std::uintptr_t>(stone3DNoiseT.id)), {(float)stone3DNoiseT.GetSize().x, 256},
 			{0,1}, {1,0}, {1,1,1,1}, {1,1,1,1});
 	}
 
@@ -1010,7 +1011,7 @@ bool gameLogic(float deltaTime)
 	{
 		ImGui::Text("Spagetti noise");
 
-		ImGui::Image((ImTextureID)spagettiT.id, {(float)spagettiT.GetSize().x, 256},
+		ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<std::uintptr_t>(spagettiT.id)), {(float)spagettiT.GetSize().x, 256},
 			{0,1}, {1,0}, {1,1,1,1}, {1,1,1,1});
 	}
 
@@ -1018,7 +1019,7 @@ bool gameLogic(float deltaTime)
 	{
 		ImGui::Text("Slice");
 
-		ImGui::Image((ImTextureID)sliceT.id, {(float)sliceT.GetSize().x, 256},
+		ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<std::uintptr_t>(sliceT.id)), {(float)sliceT.GetSize().x, 256},
 			{0,1}, {1,0}, {1,1,1,1}, {1,1,1,1});
 	}
 

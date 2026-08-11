@@ -336,22 +336,32 @@ RECENT REVISION HISTORY:
 //    default this is set to (1 << 24), which is 16777216, but that's still
 //    very big.
 
-#include <memory>
+#include <algorithm>
 #include <cstring>
+#include <new>
 
 inline void *STBIMAGE_CUSTOM_REALOC(void *p, size_t oldSize, size_t newsz)
 {
-	void* newPtr = new char[newsz];
+	char *newPtr = new (std::nothrow) char[newsz];
+	if (!newPtr) { return nullptr; }
 
-	std::memcpy(newPtr, p, oldSize);
+	if (p)
+	{
+		std::memcpy(newPtr, p, std::min(oldSize, newsz));
+	}
 
-	delete[] p;
+	delete[] static_cast<char *>(p);
 	return newPtr;
 };
 
-#define STBI_MALLOC(sz)           new char[(sz)]
+inline void STBIMAGE_CUSTOM_FREE(const void *p)
+{
+	delete[] static_cast<const char *>(p);
+}
+
+#define STBI_MALLOC(sz)           new (std::nothrow) char[(sz)]
 #define STBI_REALLOC_SIZED(p, oldsz, newsz) STBIMAGE_CUSTOM_REALOC((p), (oldsz), (newsz))
-#define STBI_FREE(p)              delete[] (p)
+#define STBI_FREE(p)              STBIMAGE_CUSTOM_FREE(p)
 
 
 

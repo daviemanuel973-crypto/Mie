@@ -301,7 +301,7 @@ void Profiler::displayPlot(const char *mainPlotName, float scale)
 		{0.5f, 0.5f, 1.0f, 1.0f},
 	}; //todo
 
-	ImGui::Text(mainPlotName);
+	ImGui::Text("%s", mainPlotName);
 
 
 	ImGui::PlotMultiHistograms(mainPlotName,  // label

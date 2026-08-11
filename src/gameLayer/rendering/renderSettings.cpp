@@ -489,15 +489,18 @@ void openFolder(const char *path)
 #if defined(_WIN32) || defined(_WIN64)
 	std::string command = "explorer ";
 	command += path;
-	system(command.c_str());
+	const int openResult = system(command.c_str());
+	(void)openResult;
 #elif defined(__APPLE__) || defined(__MACH__)
 	std::string command = "open ";
 	command += path;
-	system(command.c_str());
+	const int openResult = system(command.c_str());
+	(void)openResult;
 #elif defined(__linux__)
 	std::string command = "xdg-open ";
 	command += path;
-	system(command.c_str());
+	const int openResult = system(command.c_str());
+	(void)openResult;
 #else
 	
 #endif

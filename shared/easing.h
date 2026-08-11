@@ -91,11 +91,11 @@ struct EasingEngine
 		if (runDeltaTime > length)
 		{
 			runDeltaTime -= length;
-			result_ += linearRemap((std::sinf(length * speed) + 1.f)/2.f, 0, 1, start, end);
+			result_ += linearRemap((std::sin(length * speed) + 1.f)/2.f, 0, 1, start, end);
 		}
 		else
 		{
-			result_ += linearRemap((std::sinf(runDeltaTime * speed) + 1.f)/2.f, 0, 1, start, end);
+			result_ += linearRemap((std::sin(runDeltaTime * speed) + 1.f)/2.f, 0, 1, start, end);
 			runDeltaTime = 0;
 		}
 
@@ -122,7 +122,7 @@ struct EasingEngine
 		else
 		{
 			float ratio = runDeltaTime / length;
-			result_ += linearRemap(std::powf(std::sinf(ratio*3.1415926), power)
+			result_ += linearRemap(std::pow(std::sin(ratio*3.1415926), power)
 				, 0, 1, start, end);
 			runDeltaTime = 0;
 		}

@@ -7,6 +7,7 @@
 #include "blocks.h"
 #include <unordered_map>
 #include <rendering/model.h>
+#include <cstdint>
 
 struct BlocksLoader;
 struct ChunkSystem;
@@ -616,18 +617,15 @@ struct PointDebugRenderer
 
 constexpr int mergeShortsUnsigned(unsigned short a, unsigned short b)
 {
-	int rez = 0;
-	((unsigned short *)&rez)[0] = a;
-	((unsigned short *)&rez)[1] = b;
-	return rez;
+	static_assert(sizeof(unsigned short) == 2, "16-bit unsigned short required");
+	return static_cast<int>(static_cast<std::uint32_t>(a) |
+		(static_cast<std::uint32_t>(b) << 16U));
 }
 
 constexpr int mergeShorts(short a, short b)
 {
-	int rez = 0;
-	((short*)&rez)[0] = a;
-	((short*)&rez)[1] = b;
-	return rez;
+	return mergeShortsUnsigned(static_cast<std::uint16_t>(a),
+		static_cast<std::uint16_t>(b));
 }
 
 constexpr unsigned char merge4bits(unsigned char a, unsigned char b)

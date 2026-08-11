@@ -1287,7 +1287,7 @@ float computeMineDurationTime(BlockType type, Item &item)
 }
 
 
-char *blockNames[] = {
+const char *blockNames[] = {
 	"Air",
 	"Grass Block",
 	"Dirt",
