@@ -12,7 +12,7 @@ struct WorldSaver
 
 	//returns false if chunk hasn't been saved
 	bool loadChunk(ChunkData &c);
-	void saveChunk(ChunkData &c);
+	bool saveChunk(ChunkData &c);
 	void saveChunkBlockData(SavedChunk &c);
 
 	void loadEntityData(EntityData &entityData, glm::ivec2 chunkPosition);

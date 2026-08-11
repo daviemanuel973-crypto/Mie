@@ -1,4 +1,4 @@
-# Survival Mode v0.1
+# Survival Mode v0.3
 
 This branch turns the existing survival scaffolding into the default playable progression while preserving Creative mode for administration/testing.
 
@@ -20,9 +20,19 @@ This branch turns the existing survival scaffolding into the default playable pr
 - Old inventory payloads remain readable because armour fields are appended and treated as optional on decode.
 - Existing effects, food healing, mobs, mining, block drops, chests, coins and stations are preserved.
 
+## Persistent players
+
+- Every installation creates a stable 128-bit player identity on first launch.
+- Each world stores that identity's inventory, equipped armour, position, life, hunger and game mode.
+- The server restores the snapshot on reconnect instead of creating a fresh Survival player.
+- Player snapshots are saved every 30 seconds, on disconnect and during clean server shutdown.
+- Every snapshot is versioned, size-limited and written with a checksum plus a recovery copy.
+- Chunk terrain now uses checksummed primary/recovery files; failed writes stay dirty and are retried instead of being discarded.
+- A server rejects simultaneous sessions using the same identity to prevent save rollback.
+- Existing worlds remain compatible; their first reconnect simply creates the first player snapshot.
+
 ## Next survival milestones
 
-- persistent player identity/inventory between reconnects;
 - difficulty selection and hardcore rules;
 - day/night spawn pressure;
 - tool durability;

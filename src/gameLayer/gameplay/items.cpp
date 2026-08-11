@@ -157,7 +157,7 @@ int Item::readFromData(void *data, size_t size)
 		}
 
 		metaData.resize(metaDataSize);
-		readDataIntoVectorUnsafeUnresized((unsigned char *)data + 7, 0, metaDataSize, metaData);
+		readDataIntoVectorUnsafeUnresized((unsigned char *)data + 6, 0, metaDataSize, metaData);
 
 		//if (hasDurability())
 		//{
@@ -186,6 +186,12 @@ int Item::readFromData(void *data, size_t size)
 
 void Item::sanitize()
 {
+	if (type != 0 && !::isBlock(type) && !isItem(type))
+	{
+		*this = {};
+		return;
+	}
+
 	if (counter == 0)
 	{
 		*this = {};
@@ -577,9 +583,10 @@ void PlayerInventory::formatIntoData(std::vector<unsigned char> &data)
 
 }
 
-bool PlayerInventory::readFromData(void *data, size_t size)
+bool PlayerInventory::readFromData(void *data, size_t size, size_t *bytesRead)
 {
 	*this = PlayerInventory{};
+	if (bytesRead) { *bytesRead = 0; }
 
 	size_t currentAdvance = 0;
 
@@ -618,6 +625,7 @@ bool PlayerInventory::readFromData(void *data, size_t size)
 	if (currentAdvance < size && !readOne(chestArmour)) { return 0; }
 	if (currentAdvance < size && !readOne(bootsArmour)) { return 0; }
 
+	if (bytesRead) { *bytesRead = currentAdvance; }
 	return true;
 }
 

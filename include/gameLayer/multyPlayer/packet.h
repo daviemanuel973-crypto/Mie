@@ -15,6 +15,7 @@
 #include <gl2d/gl2d.h>
 #include <gameplay/life.h>
 #include <gameplay/battleUI.h>
+#include <multyPlayer/playerPersistence.h>
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
@@ -95,6 +96,7 @@ enum : std::uint32_t
 	headerClientChangeBlockData,
 	headerChangeBlockData,
 	headerTrainingDummyGotAttacked, //from server to players!
+	headerClientIdentity,
 
 };
 
@@ -132,6 +134,12 @@ struct Packet_DisconectOtherPlayer
 struct Packet_ClientUpdateTimer
 {
 	std::uint64_t timer = 0;
+};
+
+struct Packet_ClientIdentity
+{
+	std::uint32_t protocolVersion = PLAYER_IDENTITY_PROTOCOL_VERSION;
+	PlayerIdentity identity = {};
 };
 
 //also used for Packet_ClientDamageLocallyAndDied

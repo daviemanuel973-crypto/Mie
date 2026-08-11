@@ -1502,9 +1502,10 @@ bool ServerChunkStorer::saveNextChunk(WorldSaver &worldSaver, int count, int ent
 
 void ServerChunkStorer::saveChunk(WorldSaver &worldSaver, SavedChunk *savedChunks)
 {
-	worldSaver.saveChunk(savedChunks->chunk);
+	const bool savedChunkData = worldSaver.saveChunk(savedChunks->chunk);
 	worldSaver.saveEntitiesForChunk(*savedChunks);
-	savedChunks->otherData.dirty = false;
+	// Keep failed writes dirty so the normal per-tick saver retries them.
+	if (savedChunkData) { savedChunks->otherData.dirty = false; }
 	savedChunks->otherData.dirtyEntity = false;
 }
 
@@ -1549,6 +1550,12 @@ int ServerChunkStorer::unloadChunksThatNeedUnloading(WorldSaver &worldSaver, int
 			if (c.second->otherData.dirty)
 			{
 				saveChunk(worldSaver, c.second);
+				if (c.second->otherData.dirty)
+				{
+					// Do not discard an unsaved chunk. Leave it loaded and retry later.
+					++it;
+					continue;
+				}
 			}
 
 			delete c.second;

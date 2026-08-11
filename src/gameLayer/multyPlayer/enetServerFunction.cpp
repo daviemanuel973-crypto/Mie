@@ -23,10 +23,15 @@
 #include <filesystem>
 #include <platformTools.h>
 #include <profiler.h>
+#include <multyPlayer/playerPersistence.h>
+#include <unordered_set>
+#include <cmath>
+#include <algorithm>
 
 //todo add to a struct
 ENetHost *server = 0;
 std::unordered_map<std::uint64_t, Client> connections;
+std::unordered_set<ENetPeer *> pendingConnections;
 //static std::uint64_t entityId = RESERVED_CLIENTS_ID + 1;
 static std::thread enetServerThread;
 
@@ -216,36 +221,55 @@ void updatePlayerSurvivalStats(Client &client)
 	sendPacket(client.peer, headerUpdateSurvivalStats, &packetData, sizeof(packetData), true, channelEffects);
 }
 
-//create connection
-//todo anounce it to all players, both as a connection and as an entity
 void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
 {
-
-	//std::cout << "min" << event.peer->timeoutMinimum << "\n";
-	//std::cout << "max" << event.peer->timeoutMaximum << "\n";
-	//std::cout << "limit" << event.peer->timeoutLimit << "\n";
-
-	//make sure we wait a little longer before timeout
 	event.peer->timeoutMinimum = 10'000;
 	event.peer->timeoutMaximum = 30'000;
 	event.peer->timeoutLimit = 64;
+	pendingConnections.insert(event.peer);
+}
+
+bool isIdentityAlreadyConnected(const PlayerIdentity &identity)
+{
+	for (const auto &connection : connections)
+	{
+		if (connection.second.identity == identity) { return true; }
+	}
+	return false;
+}
+
+void finishAddingConnection(ENetEvent &event, WorldSaver &worldSaver,
+	const PlayerIdentity &identity)
+{
+	if (!identity.isValid() || isIdentityAlreadyConnected(identity))
+	{
+		std::cout << "Rejected duplicate or invalid player identity.\n";
+		pendingConnections.erase(event.peer);
+		enet_peer_disconnect(event.peer, 0);
+		return;
+	}
 
 	std::uint64_t id = getEntityIdAndIncrement(worldSaver, EntityType::player);
 
 	{
-		Client c{event.peer}; 
+		Client c{event.peer};
+		c.identity = identity;
 		c.playerData.entity.position = worldSaver.spawnPosition;
 		c.playerData.entity.lastPosition = worldSaver.spawnPosition;
-		c.playerData.lastChunkPositionWhenAnUpdateWasSent.x = divideChunk(c.playerData.entity.position.x);
-		c.playerData.lastChunkPositionWhenAnUpdateWasSent.y = divideChunk(c.playerData.entity.position.z);
 
 		// Survival is now the default. Creative remains available through the server command.
 		c.playerData.otherPlayerSettings.gameMode = OtherPlayerSettings::SURVIVAL;
 		c.playerData.inventory = PlayerInventory{};
 		c.playerData.survivalStats = {};
+		const bool restored = loadPlayerFromDisk(worldSaver.savePath, identity, c.playerData);
+		c.playerData.lastChunkPositionWhenAnUpdateWasSent.x = divideChunk(c.playerData.entity.position.x);
+		c.playerData.lastChunkPositionWhenAnUpdateWasSent.y = divideChunk(c.playerData.entity.position.z);
+		std::cout << (restored ? "Restored" : "Created") << " player "
+			<< identity.toString() << ".\n";
 
 		insertConnection(id, c);
 	}
+	pendingConnections.erase(event.peer);
 
 	{
 		Packet p;
@@ -321,23 +345,40 @@ void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
 
 }
 
-void removeConnection(ENetHost *server, ENetEvent &event)
+bool saveConnection(const Client &client, const WorldSaver &worldSaver)
 {
-	
-	for (auto &c : connections)
+	if (savePlayerToDisk(worldSaver.savePath, client.identity, client.playerData)) { return true; }
+	std::cerr << "Warning: could not save player " << client.identity.toString() << ".\n";
+	return false;
+}
+
+void saveAllConnections(const WorldSaver &worldSaver)
+{
+	for (const auto &connection : connections)
 	{
-		if (c.second.peer == event.peer)
+		saveConnection(connection.second, worldSaver);
+	}
+}
+
+void removeConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
+{
+	pendingConnections.erase(event.peer);
+
+	for (auto connection = connections.begin(); connection != connections.end(); ++connection)
+	{
+		if (connection->second.peer == event.peer)
 		{
 			Packet p = {};
 			p.header = headerDisconnectOtherPlayer;
-			p.cid = c.first;
+			p.cid = connection->first;
 
 			Packet_DisconectOtherPlayer data;
-			data.EID = c.first;
+			data.EID = connection->first;
 
 			broadCastNotLocked(p, &data, sizeof(data), 0, true, channelHandleConnections);
-
-			connections.erase(connections.find(c.first));
+			saveConnection(connection->second, worldSaver);
+			removeCidFromServerSettings(connection->first);
+			connections.erase(connection);
 			break;
 		}
 	}
@@ -345,7 +386,8 @@ void removeConnection(ENetHost *server, ENetEvent &event)
 
 }
 
-void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &serverTasks)
+void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &serverTasks,
+	WorldSaver &worldSaver)
 {
 
 
@@ -353,6 +395,32 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 	size_t size = 0;
 	auto data = parsePacket(event, p, size);
 	bool wasCompressed = false;
+
+	if (p.header == headerClientIdentity && pendingConnections.find(event.peer) != pendingConnections.end())
+	{
+		if (!p.isCompressed() && data && size == sizeof(Packet_ClientIdentity))
+		{
+			const auto &identityPacket = *reinterpret_cast<const Packet_ClientIdentity *>(data);
+			if (identityPacket.protocolVersion == PLAYER_IDENTITY_PROTOCOL_VERSION)
+			{
+				finishAddingConnection(event, worldSaver, identityPacket.identity);
+				return;
+			}
+		}
+
+		std::cout << "Rejected invalid player identity handshake.\n";
+		pendingConnections.erase(event.peer);
+		enet_peer_disconnect(event.peer, 0);
+		return;
+	}
+
+	if (pendingConnections.find(event.peer) != pendingConnections.end())
+	{
+		std::cout << "Rejected data received before player identity handshake.\n";
+		pendingConnections.erase(event.peer);
+		enet_peer_disconnect(event.peer, 0);
+		return;
+	}
 
 	if (p.isCompressed())
 	{
@@ -458,7 +526,22 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerSendPlayerData:
 		{
+			if (!data || size != sizeof(Packer_SendPlayerData))
+			{
+				reportError("corrupted packet or something Packer_SendPlayerData");
+				break;
+			}
+
 			Packer_SendPlayerData &packetData = *(Packer_SendPlayerData *)data;
+			const auto &position = packetData.playerData.position;
+			if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
+				!std::isfinite(position.z) || std::abs(position.x) > 30'000'000.0 ||
+				std::abs(position.y) > 30'000'000.0 || std::abs(position.z) > 30'000'000.0)
+			{
+				reportError("rejected player update with invalid position");
+				break;
+			}
+			packetData.playerData.chunkDistance = std::clamp(packetData.playerData.chunkDistance, 2, 64);
 
 			Client clientCopy = {};
 			std::uint64_t clientCopyCid = 0;
@@ -1029,6 +1112,7 @@ void enetServerFunction(std::string path)
 
 	float sendEntityTimer = 0.5;
 	float sentTimerUpdateTimer = 1;
+	float playerAutosaveTimer = 30;
 
 	float tickTimer = 0;
 
@@ -1047,6 +1131,7 @@ void enetServerFunction(std::string path)
 		float deltaTime = (std::chrono::duration_cast<std::chrono::microseconds>(stop - start)).count() / 1000000.0f;
 		start = std::chrono::high_resolution_clock::now();
 		tickTimer += deltaTime;
+		playerAutosaveTimer -= deltaTime;
 
 		serverProfiler.startFrame();
 
@@ -1076,7 +1161,7 @@ void enetServerFunction(std::string path)
 				}
 				case ENET_EVENT_TYPE_RECEIVE:
 				{
-					recieveData(server, event, serverTasks);
+					recieveData(server, event, serverTasks, worldSaver);
 
 					enet_packet_destroy(event.packet);
 
@@ -1088,7 +1173,7 @@ void enetServerFunction(std::string path)
 					std::cout << "disconnect from server: "
 						<< event.peer->address.host << " "
 						<< event.peer->address.port << "\n\n";
-					removeConnection(server, event);
+					removeConnection(server, event, worldSaver);
 					break;
 				}
 
@@ -1096,6 +1181,12 @@ void enetServerFunction(std::string path)
 			}
 		}
 		serverProfiler.endSubProfile("Recieve Network Updates");
+
+		if (playerAutosaveTimer <= 0)
+		{
+			playerAutosaveTimer = 30;
+			saveAllConnections(worldSaver);
+		}
 
 
 		if (!enetServerRunning) { break; }
@@ -1134,6 +1225,7 @@ void enetServerFunction(std::string path)
 		serverProfiler.endFrame();
 	}
 
+	saveAllConnections(worldSaver);
 	clearSD(worldSaver);
 	wg.clear();
 	structuresManager.clear();
@@ -1161,6 +1253,7 @@ bool startEnetListener(ENetHost *_server, const std::string &path)
 {
 	server = _server;
 	connections = {};
+	pendingConnections = {};
 
 	bool expected = 0;
 	if (enetServerRunning.compare_exchange_strong(expected, 1))

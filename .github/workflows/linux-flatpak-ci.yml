@@ -109,6 +109,15 @@ jobs:
             resources/shaders/basicEntity.vert \
             resources/shaders/basicEntity.frag
 
+      - name: Test player persistence format
+        run: |
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            tests/playerPersistenceTests.cpp \
+            src/gameLayer/multyPlayer/playerSaveFormat.cpp \
+            -o playerPersistenceTests
+          ./playerPersistenceTests
+
       - name: Build Flatpak repository
         shell: bash
         run: |
