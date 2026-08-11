@@ -18,6 +18,7 @@
 #include <thread>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 
 #ifdef __linux__
 #include <unistd.h>
@@ -340,6 +341,20 @@ int main(int argc, char **argv)
 
 #ifdef _WIN32
 	timeBeginPeriod(1);
+	// Resource and save paths in the Windows package are relative to the
+	// executable. Resolve them consistently even when the game is launched by
+	// another application or from a shortcut with a different working folder.
+	wchar_t executablePath[MAX_PATH] = {};
+	const DWORD executablePathLength = GetModuleFileNameW(nullptr, executablePath, MAX_PATH);
+	if (executablePathLength > 0 && executablePathLength < MAX_PATH)
+	{
+		wchar_t *lastSeparator = wcsrchr(executablePath, L'\\');
+		if (lastSeparator)
+		{
+			*lastSeparator = L'\0';
+			SetCurrentDirectoryW(executablePath);
+		}
+	}
 #ifdef _MSC_VER 
 #if INTERNAL_BUILD
 	AllocConsole();
@@ -372,7 +387,7 @@ int main(int argc, char **argv)
 	int w = 500;
 	int h = 500;
 #endif
-	wind = glfwCreateWindow(w, h, "geam", nullptr, nullptr);
+	wind = glfwCreateWindow(w, h, "Mie Survival", nullptr, nullptr);
 	glfwMakeContextCurrent(wind);
 	glfwSwapInterval(0);
 
@@ -410,7 +425,9 @@ int main(int argc, char **argv)
 #else
 		std::cout << "Error, ARB_bindless_texture is not supported by this GPU/driver.\n";
 #ifdef _WIN32
+	#if INTERNAL_BUILD
 		system("pause");
+	#endif
 #endif
 		return 1;
 #endif

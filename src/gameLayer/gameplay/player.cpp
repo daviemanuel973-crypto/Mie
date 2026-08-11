@@ -3,6 +3,10 @@
 #include "gameplay/player.h"
 #include <iostream>
 #include <rendering/model.h>
+#include <rendering/camera.h>
+#include <metrics.h>
+#include <algorithm>
+#include <cmath>
 
 void Player::flyFPS(glm::vec3 direction, glm::vec3 lookDirection)
 {
@@ -53,9 +57,70 @@ glm::vec3 Player::getColliderSize()
 
 void Player::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter)
 {
-	updateForces(deltaTime, !fly);
+	const float submersion = fly ? 0.f : getWaterSubmersion(chunkGetter);
+	if (submersion > 0.f)
+	{
+		// Water reduces gravity, damps momentum and provides enough buoyancy to
+		// stop a fully submerged player from being pinned to a river bed.
+		const float horizontalDrag = std::exp(-2.6f * submersion * deltaTime);
+		const float verticalDrag = std::exp(-1.8f * submersion * deltaTime);
+		forces.velocity.x *= horizontalDrag;
+		forces.velocity.z *= horizontalDrag;
+		forces.velocity.y *= verticalDrag;
+		forces.acceleration.y += 22.f * submersion;
+
+		PhysicalSettings waterPhysics;
+		waterPhysics.gravityModifier = glm::mix(1.f, 0.30f, submersion);
+		waterPhysics.sideFriction = 0.15f;
+		updateForces(deltaTime, true, waterPhysics);
+		forces.velocity.y = glm::clamp(forces.velocity.y, -4.f, 5.f);
+	}
+	else
+	{
+		updateForces(deltaTime, !fly);
+	}
 
 	resolveConstrainsAndUpdatePositions(chunkGetter, deltaTime, getColliderSize());
+}
+
+float Player::getWaterSubmersion(decltype(chunkGetterSignature) *chunkGetter) const
+{
+	if (!chunkGetter) { return 0.f; }
+
+	const float sampleHeights[] = {0.15f, 0.85f, 1.45f};
+	int waterSamples = 0;
+	for (float height : sampleHeights)
+	{
+		const auto worldBlock = from3DPointToBlock(position + glm::dvec3(0, height, 0));
+		if (worldBlock.y < 0 || worldBlock.y >= CHUNK_HEIGHT) { continue; }
+
+		const auto chunkPosition = fromBlockPosToChunkPos(worldBlock);
+		auto *chunk = chunkGetter(chunkPosition);
+		if (!chunk) { continue; }
+
+		const auto localBlock = fromBlockPosToBlockPosInChunk(worldBlock);
+		auto *block = chunk->safeGet(localBlock);
+		if (block && block->getType() == BlockTypes::water) { ++waterSamples; }
+	}
+
+	return static_cast<float>(waterSamples) /
+		static_cast<float>(sizeof(sampleHeights) / sizeof(sampleHeights[0]));
+}
+
+bool Player::isInWater(decltype(chunkGetterSignature) *chunkGetter) const
+{
+	return getWaterSubmersion(chunkGetter) > 0.f;
+}
+
+void Player::swimUp(decltype(chunkGetterSignature) *chunkGetter)
+{
+	const float submersion = getWaterSubmersion(chunkGetter);
+	if (submersion <= 0.f) { return; }
+
+	// Keep enough upward force at the water surface to climb onto a one-block
+	// river bank while Jump is held. Player::update caps the resulting speed.
+	forces.acceleration.y += 38.f * std::max(0.45f, submersion);
+	forces.velocity.y = std::min(forces.velocity.y, 7.f);
 }
 
 glm::vec3 Player::getMaxColliderSize()

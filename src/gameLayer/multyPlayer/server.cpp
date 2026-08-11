@@ -29,6 +29,8 @@
 #include <gameplay/food.h>
 #include <profiler.h>
 #include <magic_enum.hpp>
+#include <cmath>
+#include <iterator>
 
 static std::atomic<bool> serverRunning = false;
 
@@ -84,12 +86,116 @@ struct ServerData
 	float seccondsTimer = 0;
 
 	float saveEntitiesTimer = 5;
+	float hostileSpawnTimer = 4;
 	std::uint64_t lastTimer = 0;
 
 	//this is used as an unique id for chunk packets
 	unsigned int chunkPacketId = 0;
 
 }sd;
+
+namespace
+{
+	std::size_t countNaturalHostiles()
+	{
+		std::size_t count = 0;
+		for (const auto &entry : sd.chunkCache.savedChunks)
+		{
+			if (!entry.second || !entry.second->otherData.withinSimulationDistance) { continue; }
+			count += entry.second->entityData.zombies.size();
+			count += entry.second->entityData.goblins.size();
+		}
+		return count;
+	}
+
+	bool unsuitableHostileGround(BlockType type)
+	{
+		return type == BlockTypes::water || type == BlockTypes::ice ||
+			isAnyLeaves(type) || isAnyWoddenLOG(type) || isDecorativeFurniture(type);
+	}
+
+	bool farEnoughFromPlayers(const glm::dvec3 &position,
+		const std::unordered_map<std::uint64_t, Client> &clients)
+	{
+		for (const auto &entry : clients)
+		{
+			glm::dvec2 delta(position.x - entry.second.playerData.entity.position.x,
+				position.z - entry.second.playerData.entity.position.z);
+			if (glm::dot(delta, delta) < 18.0 * 18.0) { return false; }
+		}
+		return true;
+	}
+
+	bool findNaturalHostileSpawn(const glm::dvec3 &playerPosition,
+		std::minstd_rand &rng, glm::dvec3 &spawnPosition)
+	{
+		constexpr float pi = 3.14159265358979323846f;
+		for (int attempt = 0; attempt < 16; ++attempt)
+		{
+			const float angle = getRandomNumberFloat(rng, 0.f, pi * 2.f);
+			const float distance = getRandomNumberFloat(rng, 22.f, 46.f);
+			const int worldX = static_cast<int>(std::floor(playerPosition.x + std::cos(angle) * distance));
+			const int worldZ = static_cast<int>(std::floor(playerPosition.z + std::sin(angle) * distance));
+
+			auto *chunk = sd.chunkCache.getChunkOrGetNull(divideChunk(worldX), divideChunk(worldZ));
+			if (!chunk || !chunk->otherData.withinSimulationDistance) { continue; }
+
+			const int localX = modBlockToChunk(worldX);
+			const int localZ = modBlockToChunk(worldZ);
+			for (int y = CHUNK_HEIGHT - 3; y >= 2; --y)
+			{
+				auto *ground = chunk->chunk.safeGet(localX, y, localZ);
+				auto *feet = chunk->chunk.safeGet(localX, y + 1, localZ);
+				auto *head = chunk->chunk.safeGet(localX, y + 2, localZ);
+				if (!ground || !feet || !head) { continue; }
+				if (!ground->isColidable() || unsuitableHostileGround(ground->getType())) { continue; }
+				if (!feet->air() || !head->air()) { continue; }
+
+				spawnPosition = glm::dvec3(worldX, y + 0.51, worldZ);
+				if (farEnoughFromPlayers(spawnPosition, getAllClientsReff())) { return true; }
+				break;
+			}
+		}
+		return false;
+	}
+
+	void updateNaturalHostileSpawning(float deltaTime, WorldSaver &worldSaver,
+		std::minstd_rand &rng)
+	{
+		sd.hostileSpawnTimer -= deltaTime;
+		if (sd.hostileSpawnTimer > 0.f) { return; }
+		sd.hostileSpawnTimer = getRandomNumberFloat(rng, 3.5f, 6.5f);
+
+		auto &clients = getAllClientsReff();
+		if (clients.empty()) { return; }
+		const std::size_t hostileCap = std::max<std::size_t>(6, clients.size() * 10);
+		if (countNaturalHostiles() >= hostileCap) { return; }
+
+		auto selectedClient = clients.begin();
+		std::advance(selectedClient, getRandomNumber(rng, 0, static_cast<int>(clients.size()) - 1));
+		glm::dvec3 spawnPosition;
+		if (!findNaturalHostileSpawn(selectedClient->second.playerData.entity.position, rng, spawnPosition))
+		{
+			return;
+		}
+
+		if (getRandomChance(rng, 0.72f))
+		{
+			Zombie zombie;
+			zombie.position = spawnPosition;
+			zombie.lastPosition = spawnPosition;
+			spawnZombie(sd.chunkCache, zombie,
+				getEntityIdAndIncrement(worldSaver, EntityType::zombies));
+		}
+		else
+		{
+			Goblin goblin;
+			goblin.position = spawnPosition;
+			goblin.lastPosition = spawnPosition;
+			spawnGoblin(sd.chunkCache, goblin, worldSaver, rng);
+		}
+	}
+}
 
 int outTicksPerSeccond = 0;
 
@@ -423,6 +529,8 @@ void serverWorkerUpdate(
 			sd.chunkCache.entityChunkPositions[client.first] = cPos;
 
 		}
+
+		updateNaturalHostileSpawning(sd.tickDeltaTime, worldSaver, rng);
 
 	#pragma endregion
 
@@ -1270,5 +1378,3 @@ std::string executeServerCommand(std::uint64_t cid, const char *command)
 	return "Invalid command!";
 
 }
-
- 

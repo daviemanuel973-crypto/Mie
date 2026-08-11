@@ -6,6 +6,10 @@
 #include <multyPlayer/serverChunkStorer.h>
 #include <random>
 
+bool spawnZombie(ServerChunkStorer &chunkManager, Zombie zombie, std::uint64_t newId);
+bool spawnGoblin(ServerChunkStorer &chunkManager, Goblin goblin,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
+
 
 void entityDeleteFromServerToPlayer(std::uint64_t clientToSend, std::uint64_t eid, 
 	bool reliable);
@@ -27,6 +31,5 @@ void doGameTick(float deltaTime,
 void sendDamagePlayerPacket(Client &client);
 void sendIncreaseLifePlayerPacket(Client &client);
 void sendUpdateLifeLifePlayerPacket(Client &client);
-
 
 

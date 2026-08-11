@@ -109,7 +109,7 @@ jobs:
             resources/shaders/basicEntity.vert \
             resources/shaders/basicEntity.frag
 
-      - name: Test player persistence format
+      - name: Test persistence, world catalog and update protocol
         run: |
           c++ -std=c++17 -Wall -Wextra -pedantic \
             -Iinclude/gameLayer \
@@ -117,6 +117,20 @@ jobs:
             src/gameLayer/multyPlayer/playerSaveFormat.cpp \
             -o playerPersistenceTests
           ./playerPersistenceTests
+
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            tests/worldCatalogTests.cpp \
+            src/gameLayer/worldCatalog.cpp \
+            -o worldCatalogTests
+          ./worldCatalogTests
+
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            tests/updateProtocolTests.cpp \
+            src/gameLayer/updateProtocol.cpp \
+            -o updateProtocolTests
+          ./updateProtocolTests
 
       - name: Build Flatpak repository
         shell: bash

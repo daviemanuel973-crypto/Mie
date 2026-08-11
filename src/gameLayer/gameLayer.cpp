@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <audioEngine.h>
 #include <gameplay/loot.h>
+#include <worldCatalog.h>
 
 #include <platformTools.h>
 
@@ -467,6 +468,7 @@ bool hostServer(const std::string &path)
 		}
 		else
 		{
+			markWorldPlayed(USER_CONTENT_PATH "worlds", path);
 			return true;
 		}
 	}
@@ -565,6 +567,7 @@ bool gameLogic(float deltaTime)
 		//{
 		
 		//}
+		programData.ui.menuRenderer.Text("Mie Survival " MIE_VERSION, Colors_White);
 
 		displayWorldSelectorMenuButton(programData);
 
