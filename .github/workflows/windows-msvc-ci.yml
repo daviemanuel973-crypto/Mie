@@ -3,6 +3,7 @@ name: Windows Release CI
 on:
   push:
     branches:
+      - main
       - agent/content-exploration-v01
       - agent/release-packaging-stabilization
       - agent/release-packaging-windows-fix

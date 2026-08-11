@@ -159,7 +159,7 @@ namespace AudioEngine
 
 		allMusic[index].looping = false;
 		PlayMusicStream(allMusic[index]);
-		SetMusicVolume(allMusic[index], std::powf(musicVolume * masterVolume, 2));
+		SetMusicVolume(allMusic[index], std::pow(musicVolume * masterVolume, 2));
 
 		currentMusicPlaying = index;
 	}
@@ -196,7 +196,7 @@ namespace AudioEngine
 
 			for (auto &m : allMusic)
 			{
-				SetMusicVolume(m, std::powf(musicVolume * masterVolume, 2));
+				SetMusicVolume(m, std::pow(musicVolume * masterVolume, 2));
 			}
 		}
 

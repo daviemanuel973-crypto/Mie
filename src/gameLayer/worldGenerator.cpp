@@ -1407,7 +1407,7 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 				int valueToAddToStart = valuesToAddToStart[currentHeightLevel];
 				int valueToAddToEnd = valuesToAddToMax[currentHeightLevel];
 
-				newPeaks = std::powf(newPeaks, peaksPower[currentHeightLevel]);
+				newPeaks = std::pow(newPeaks, peaksPower[currentHeightLevel]);
 				newStartLevel += (newPeaks * valueToAddToStart) - 3;
 				newMaxMountainLevel += (newPeaks * valueToAddToEnd) - 3;
 
@@ -1559,7 +1559,7 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 					//heightNormalized = 0.1f;
 
 
-					density = std::powf(density, heightNormalized);
+					density = std::pow(density, heightNormalized);
 					density = glm::clamp(density, 0.f, 1.f);
 						
 					//density = linearRemap(density, 0, 1)
@@ -1855,7 +1855,7 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 				auto generateOneFeature = [&](float treeAmount, 
 					VegetationNoiseSettings &veg)
 				{
-					treeAmount = std::powf(treeAmount, vegetationPower);
+					treeAmount = std::pow(treeAmount, vegetationPower);
 					float noiseVal = treeAmount;
 
 					//one distribution element, can be multiple things there tho
@@ -2438,7 +2438,11 @@ void WorldGenerator::generateChunkPreview(gl2d::Texture &t, glm::ivec2 size, glm
 						c = Colors_Red;
 					}
 
-					Color cfinal{c.r * 255,c.g * 255,c.b * 255,c.a * 255};
+					Color cfinal{
+						static_cast<unsigned char>(glm::clamp(c.r, 0.f, 1.f) * 255.f),
+						static_cast<unsigned char>(glm::clamp(c.g, 0.f, 1.f) * 255.f),
+						static_cast<unsigned char>(glm::clamp(c.b, 0.f, 1.f) * 255.f),
+						static_cast<unsigned char>(glm::clamp(c.a, 0.f, 1.f) * 255.f)};
 					chunkPreviewData[i + j * size.x] = cfinal;
 				}
 

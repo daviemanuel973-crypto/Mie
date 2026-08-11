@@ -2713,11 +2713,11 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 	{
 		if (dayTime <= 0.25)
 		{
-			sunTwilight = std::powf(1 - (dayTime / 0.25f), 3.f);
+			sunTwilight = std::pow(1 - (dayTime / 0.25f), 3.f);
 		}
 		else if (dayTime <= 0.50)
 		{
-			sunTwilight = std::powf(((dayTime-0.25f) / 0.25f), 3.f);
+			sunTwilight = std::pow(((dayTime-0.25f) / 0.25f), 3.f);
 
 		}
 		else if (dayTime <= 0.75)
@@ -2745,25 +2745,25 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 		{
 			firstLight = twilightValue;
 			secondLight = dayValue;
-			mix = std::powf(dayTime / 0.25f, 1.f / bias);
+			mix = std::pow(dayTime / 0.25f, 1.f / bias);
 		}
 		else if (dayTime <= 0.50)
 		{
 			firstLight = dayValue;
 			secondLight = twilightValue;
-			mix = std::powf((dayTime - 0.25f) / 0.25f, bias);
+			mix = std::pow((dayTime - 0.25f) / 0.25f, bias);
 		}
 		else if (dayTime <= 0.75)
 		{
 			firstLight = twilightValue;
 			secondLight = nightValue;
-			mix = std::powf((dayTime - 0.50f) / 0.25f, 1.f / bias);
+			mix = std::pow((dayTime - 0.50f) / 0.25f, 1.f / bias);
 		}
 		else if (dayTime <= 1.f)
 		{
 			firstLight = nightValue;
 			secondLight = twilightValue;
-			mix = std::powf((dayTime - 0.75f) / 0.25f, bias);
+			mix = std::pow((dayTime - 0.75f) / 0.25f, bias);
 		}
 
 		return glm::mix(firstLight, secondLight, mix);
@@ -6638,4 +6638,3 @@ float AdaptiveExposure::getLuminosityOrDefaultValueIfDisabeled()
 {
 	return currentLuminosity;
 }
-

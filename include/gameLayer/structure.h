@@ -19,6 +19,7 @@ struct StructureData
 
 	glm::ivec3 getSizeRotated(int rotation)
 	{
+		rotation = (rotation % 4 + 4) % 4;
 		if (rotation == 1 || rotation == 3)
 		{
 			return glm::ivec3(sizeNotRotated.z, sizeNotRotated.y, sizeNotRotated.x);
@@ -29,6 +30,7 @@ struct StructureData
 
 	Block &unsafeGetRotated(int x, int y, int z, int r)
 	{
+		r = (r % 4 + 4) % 4;
 		auto size = getSizeRotated(r);
 
 		if (r == 0)
@@ -50,6 +52,7 @@ struct StructureData
 		else
 		{
 			assert(0);
+			return unsafeGet(x, y, z);
 		}
 	}
 
@@ -79,6 +82,7 @@ struct StructureDataAndFlags
 
 	PerCollomFlags &getPerCollomFlagsUnsafeRotated(int x, int z, int r, glm::ivec3 size)
 	{
+		r = (r % 4 + 4) % 4;
 		if (r == 0)
 		{
 			return getPerCollomFlagsUnsafe(x, z);
@@ -98,6 +102,7 @@ struct StructureDataAndFlags
 		else
 		{
 			assert(0);
+			return getPerCollomFlagsUnsafe(x, z);
 		}
 	}
 
@@ -142,4 +147,3 @@ struct StructuresManager
 
 	void clear();
 };
-

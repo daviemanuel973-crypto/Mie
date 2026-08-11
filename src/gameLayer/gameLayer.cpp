@@ -633,7 +633,7 @@ bool gameLogic(float deltaTime)
 				for (auto &c : s.perClientSettings)
 				{
 					ImGui::PushID(c.first);
-					ImGui::Text("%d", c.first);
+					ImGui::Text("%llu", static_cast<unsigned long long>(c.first));
 					ImGui::Text("Position: %lf %lf %lf", c.second.outPlayerPos.x,
 						c.second.outPlayerPos.y, c.second.outPlayerPos.z);
 

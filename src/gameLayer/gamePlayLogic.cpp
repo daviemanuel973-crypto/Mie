@@ -35,6 +35,7 @@
 #include <gameplay/battleUI.h>
 #include <gameplay/food.h>
 #include <cameraShaker.h>
+#include <cstdint>
 
 struct GameData
 {
@@ -1776,8 +1777,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		const float shortestTimer = 0.3;
 		const float longestTimer = 0.7;
 
-		//player.entity.forces.colidesBottom() && 
-		if (isPlayerMovingSpeed)
+		if (player.entity.forces.colidesBottom() && isPlayerMovingSpeed)
 		{
 			auto blockPos = from3DPointToBlock(player.entity.position - glm::dvec3(0, 0.1, 0));
 			auto block = gameData.chunkSystem.getBlockSafe(blockPos.x, blockPos.y, blockPos.z);
@@ -2218,7 +2218,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			if (ImGui::CollapsingHeader("Sun Shadow Map",
 				ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding))
 			{
-				ImGui::Image((void *)gameData.sunShadow.shadowTexturePreview.color, {256, 256}, 
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(gameData.sunShadow.shadowTexturePreview.color)), {256, 256},
 					{0, 1}, {1, 0});
 				//ImGui::Image((void *)gameData.sunShadow.shadowMap.depth, {256, 256},
 				//	{0, 1}, {1, 0});
@@ -2227,14 +2227,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			if (ImGui::CollapsingHeader("HBAO Map",
 				ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding))
 			{
-				ImGui::Image((void *)programData.renderer.fboHBAO.color, {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.fboHBAO.color)), {256, 256},
 					{0, 1}, {1, 0});
 			}
 
 			if (ImGui::CollapsingHeader("Sky Map",
 				ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding))
 			{
-				ImGui::Image((void *)programData.renderer.fboSkyBox.color, {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.fboSkyBox.color)), {256, 256},
 					{0, 1}, {1, 0});
 			}
 
@@ -2243,37 +2243,37 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			if (ImGui::CollapsingHeader("Screen space pos",
 				ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding))
 			{
-				ImGui::Image((void *)programData.renderer.fboLastFramePositions.color, {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.fboLastFramePositions.color)), {256, 256},
 					{0, 1}, {1, 0});
 			}
 
 			if (ImGui::CollapsingHeader("Last frame color",
 				ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding))
 			{
-				ImGui::Image((void *)programData.renderer.fboLastFrame.color, {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.fboLastFrame.color)), {256, 256},
 					{0, 1}, {1, 0});
 			}
 
 			if (ImGui::CollapsingHeader("Sun for SSGR",
 				ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding))
 			{
-				ImGui::Image((void *)programData.renderer.fboSunForGodRays.color, {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.fboSunForGodRays.color)), {256, 256},
 					{0, 1}, {1, 0});
 
-				ImGui::Image((void *)programData.renderer.fboSunForGodRaysSecond.color, {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.fboSunForGodRaysSecond.color)), {256, 256},
 					{0, 1}, {1, 0});
 			}
 
 			if (ImGui::CollapsingHeader("Filtered bloom color",
 				ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_FramePadding))
 			{
-				ImGui::Image((void *)programData.renderer.fboMain.fourthColor, {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.fboMain.fourthColor)), {256, 256},
 					{0, 1}, {1, 0});
 
-				ImGui::Image((void *)programData.renderer.bluredColorBuffer[0], {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.bluredColorBuffer[0])), {256, 256},
 					{0, 1}, {1, 0});
 
-				ImGui::Image((void *)programData.renderer.bluredColorBuffer[1], {256, 256},
+				ImGui::Image(reinterpret_cast<void *>(static_cast<std::uintptr_t>(programData.renderer.bluredColorBuffer[1])), {256, 256},
 					{0, 1}, {1, 0});
 
 				ImGui::SliderFloat("Multiplier", &getShadingSettings().bloomMultiplier, 0, 7);

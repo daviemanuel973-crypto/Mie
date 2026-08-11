@@ -104,25 +104,25 @@ void ZombieServer::configureVariant(std::uint64_t eId)
 	const unsigned int roll = getZombieVariantRoll(eId);
 	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 200.f;
 	const float lifePercent = glm::clamp(entity.life.life / oldMaxLife, 0.f, 1.f);
-	float newMaxLife = 180.f;
+	float newMaxLife = 200.f;
 
 	if (roll < 70)
 	{
 		variant = Walker;
 		moveSpeedMultiplier = 1.f;
-		newMaxLife = 180.f;
+		newMaxLife = 200.f;
 	}
 	else if (roll < 90)
 	{
 		variant = Runner;
-		moveSpeedMultiplier = 1.55f;
-		newMaxLife = 120.f;
+		moveSpeedMultiplier = 1.45f;
+		newMaxLife = 125.f;
 	}
 	else
 	{
 		variant = Brute;
 		moveSpeedMultiplier = 0.72f;
-		newMaxLife = 360.f;
+		newMaxLife = 320.f;
 	}
 
 	entity.life.maxLife = newMaxLife;

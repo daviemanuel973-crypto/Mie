@@ -262,22 +262,7 @@ bool spawnZombie(
 
 		ZombieServer serverZombie = {};
 		serverZombie.entity = zombie;
-
-		// Deterministic variants avoid adding bytes to the current spawn protocol.
-		// 70% walkers, 20% runners, 10% brutes.
-		const unsigned int variantRoll = static_cast<unsigned int>(newId % 10u);
-		if (variantRoll == 0u)
-		{
-			serverZombie.variant = ZombieServer::Brute;
-			serverZombie.moveSpeedMultiplier = 0.72f;
-			serverZombie.entity.life = Life{320};
-		}
-		else if (variantRoll <= 2u)
-		{
-			serverZombie.variant = ZombieServer::Runner;
-			serverZombie.moveSpeedMultiplier = 1.45f;
-			serverZombie.entity.life = Life{125};
-		}
+		serverZombie.configureVariant(newId);
 
 		c->entityData.zombies.insert({newId, serverZombie});
 		chunkManager.entityChunkPositions[newId] = determineChunkThatIsEntityIn(serverZombie.getPosition());
@@ -335,6 +320,7 @@ bool spawnGoblin(
 		e.entity = goblin;
 		//e.configureSpawnSettings(rng);
 		auto newId = getEntityIdAndIncrement(worldSaver, EntityType::goblins);
+		e.configureVariant(newId);
 		c->entityData.goblins.insert({newId, e});
 		chunkManager.entityChunkPositions[newId] = determineChunkThatIsEntityIn(e.getPosition());
 
@@ -2865,4 +2851,3 @@ void sendUpdateLifeLifePlayerPacket(Client &client)
 	p.life = client.playerData.newLife;
 	sendPacket(client.peer, headerUpdateLife, &p, sizeof(p), true, channelChunksAndBlocks);
 }
-

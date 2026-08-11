@@ -1442,13 +1442,13 @@ void BlocksLoader::loadAllTextures(std::string filePath, bool reportErrors)
 			{
 				in.y -= 0.1;
 				if (in.y < 0) { in.y = 0; }
-				in.z = std::powf(in.z, 0.25);
+				in.z = std::pow(in.z, 0.25);
 			}
 			else
 			{
 				in.y += 0.1;
 				if (in.y > 1) { in.y = 1; }
-				in.z = std::powf(in.z, 1.2);
+				in.z = std::pow(in.z, 1.2);
 			}
 
 

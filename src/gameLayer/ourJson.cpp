@@ -1,6 +1,7 @@
 #include <ourJson.h>
 #include <safeSave/include/safeSave.h>
 #include <platform/platformTools.h>
+#include <cctype>
 #include <iostream>
 
 bool KeyValuePair::loadElementsFromFile(const char *fileName)
@@ -39,7 +40,7 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 		char symbol = 0;
 		double number = 0;
 
-		bool operator==(Token &other)
+		bool operator==(const Token &other) const
 		{
 			return type == other.type &&
 				s == other.s &&
@@ -68,7 +69,8 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 
 			auto checkNumber = [&]() -> bool
 			{
-				if (std::isdigit(data[i]) || (data[i] == '-' && std::isdigit(data[i + 1])))
+				if (std::isdigit(static_cast<unsigned char>(data[i])) ||
+					(data[i] == '-' && std::isdigit(static_cast<unsigned char>(data[i + 1]))))
 				{
 					Token t;
 					t.type = TokenNumber;
@@ -77,7 +79,7 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 
 					for (; data[i] != '\0'; i++)
 					{
-						if (std::isdigit(data[i]) || data[i] == '.')
+						if (std::isdigit(static_cast<unsigned char>(data[i])) || data[i] == '.')
 						{
 							t.s += data[i];
 						}
@@ -86,7 +88,16 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 							break;
 						}
 					}
-					t.number = std::stod(t.s); //todo replace with something that reports errors
+				try
+				{
+					size_t processed = 0;
+					t.number = std::stod(t.s, &processed);
+					if (processed != t.s.size()) { return false; }
+				}
+				catch (...)
+				{
+					return false;
+				}
 
 					if (!t.s.empty()) { tokens.push_back(t); }
 
@@ -114,7 +125,8 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 
 				for (; data[i] != '\0'; i++)
 				{
-					if (isalnum(data[i]))
+					if (std::isalnum(static_cast<unsigned char>(data[i])) ||
+						data[i] == '_' || data[i] == '-' || data[i] == '.' || data[i] == '/')
 					{
 						t.s += data[i];
 					}
@@ -146,6 +158,7 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 	}
 #pragma endregion
 
+	if (tokens.empty()) { return true; }
 
 	for (int i = 0; i < tokens.size();)
 	{
@@ -209,7 +222,7 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 
 			if (tokens[i].type == TokenSymbol)
 			{
-				return tokens[i].symbol = ':';
+				return tokens[i].symbol == ':';
 			};
 			return 0;
 		};
@@ -220,7 +233,7 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 
 			if (tokens[i].type == TokenSymbol)
 			{
-				return tokens[i].symbol = ';';
+				return tokens[i].symbol == ';';
 			};
 			return 0;
 		};
@@ -284,9 +297,7 @@ bool KeyValuePair::loadElementsFromData(const char *data)
 
 	}
 
-
-
-
+	return false;
 }
 
 void KeyValuePair::printAll()
