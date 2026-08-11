@@ -74,8 +74,20 @@ jobs:
       - name: Verify console-free Windows executables
         shell: pwsh
         run: |
-          $gameHeaders = (dumpbin /headers "stage/Mie.exe") -join "`n"
-          $launcherHeaders = (dumpbin /headers "stage/MieLauncher.exe") -join "`n"
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe was not found" }
+          $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+          if (-not $vsInstall) { throw "Visual Studio C++ tools were not found" }
+          $dumpbin = Get-ChildItem (Join-Path $vsInstall "VC/Tools/MSVC") -Filter dumpbin.exe -Recurse |
+            Where-Object { $_.FullName -match '[\\/]bin[\\/]Hostx64[\\/]x64[\\/]dumpbin\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $dumpbin) { throw "x64 dumpbin.exe was not found" }
+
+          $gameHeaders = (& $dumpbin.FullName /headers "stage/Mie.exe" 2>&1) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin failed for Mie.exe" }
+          $launcherHeaders = (& $dumpbin.FullName /headers "stage/MieLauncher.exe" 2>&1) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin failed for MieLauncher.exe" }
           if ($gameHeaders -notmatch "Windows GUI") { throw "Mie.exe is not linked as a GUI application" }
           if ($launcherHeaders -notmatch "Windows GUI") { throw "MieLauncher.exe is not linked as a GUI application" }
           $launcherTest = Start-Process -FilePath "stage/MieLauncher.exe" -ArgumentList '--self-test' -Wait -PassThru
