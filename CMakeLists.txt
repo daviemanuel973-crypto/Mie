@@ -219,4 +219,10 @@ if (BUILD_TESTING)
 	target_include_directories(updateProtocolTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME update-protocol COMMAND updateProtocolTests)
+
+	set_tests_properties(
+		player-persistence-format
+		world-catalog
+		update-protocol
+		PROPERTIES TIMEOUT 60)
 endif()
