@@ -45,6 +45,10 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release --parallel 2
 
+      - name: Test player persistence format
+        shell: pwsh
+        run: ctest --test-dir build -C Release --output-on-failure -R player-persistence-format
+
       - name: Stage portable Windows build
         shell: pwsh
         run: |

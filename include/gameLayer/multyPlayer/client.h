@@ -4,6 +4,7 @@
 #include <multyPlayer/packet.h>
 #include <vector>
 #include <unordered_set>
+#include <multyPlayer/playerPersistence.h>
 
 struct Client
 {
@@ -14,6 +15,7 @@ struct Client
 	RevisionNumber revisionNumber = 1;
 
 	PlayerServer playerData;
+	PlayerIdentity identity = {};
 
 	std::vector<unsigned char> skinData;
 	bool skinDataCompressed = false;

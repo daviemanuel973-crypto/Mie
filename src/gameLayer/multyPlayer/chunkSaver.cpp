@@ -76,6 +76,27 @@ bool WorldSaver::loadChunk(ChunkData &c)
 		fileName += std::to_string(pos.y);
 		fileName += ".chz";
 
+		// New saves use SafeSave's checksum and mirrored recovery file. Keep the
+		// original .chz reader below so existing worlds remain compatible.
+		std::vector<char> safeData;
+		if (sfs::safeLoad(safeData, fileName.c_str(), false) == sfs::noError)
+		{
+			size_t newSize = 0;
+			char *newData = static_cast<char *>(unCompressData(safeData.data(), safeData.size(), newSize));
+			if (newData)
+			{
+				defer([&] { delete[] newData; });
+				static_assert(sizeof(c.blocks) == chunkDataSize);
+				if (newSize == chunkDataSize)
+				{
+					memcpy(c.blocks, newData, newSize);
+					c.clearLightLevels();
+					return 1;
+				}
+			}
+			std::cout << "Server warning: safe chunk data was invalid, trying legacy recovery.\n";
+		}
+
 		std::vector<unsigned char> data;
 		if (sfs::readEntireFile(data, fileName.c_str()) != sfs::noError) 
 		{
@@ -255,7 +276,7 @@ bool WorldSaver::loadChunk(ChunkData &c)
 
 }
 
-void WorldSaver::saveChunk(ChunkData &c)
+bool WorldSaver::saveChunk(ChunkData &c)
 {
 
 	const glm::ivec2 pos = {c.x, c.z};
@@ -269,14 +290,6 @@ void WorldSaver::saveChunk(ChunkData &c)
 	fileName += std::to_string(pos.y);
 	fileName += ".chz";
 
-	std::fstream f;
-	f.open(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!f.is_open())
-	{
-		std::cout << "Server error saving chunk cant open file!!!\n";
-	}
-	defer([&] { f.close(); });
-
 	size_t newSize = 0;
 	char *newData = (char*)compressDataForce((char*)&c.blocks, sizeof(c.blocks), newSize);
 	static_assert(sizeof(c.blocks) == chunkDataSize);
@@ -284,13 +297,18 @@ void WorldSaver::saveChunk(ChunkData &c)
 	if (!newData)
 	{
 		std::cout << "Server error saving chunk, cant compress data!!!\n";
-		return;
+		return false;
 	}
 	defer([&] { delete[] newData; });
 
-	f.write(newData, newSize);
+	const auto saveResult = sfs::safeSave(newData, newSize, fileName.c_str(), true);
+	if (saveResult != sfs::noError)
+	{
+		std::cout << "Server error saving chunk safely: " << sfs::getErrorString(saveResult) << "\n";
+		return false;
+	}
 
-	return;
+	return true;
 
 	/*
 	{

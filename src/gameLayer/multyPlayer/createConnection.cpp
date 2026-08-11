@@ -1023,7 +1023,7 @@ void closeConnection()
 			{
 				enet_packet_destroy(event.packet);
 			}
-			else if (event.type == ENET_EVENT_TYPE_RECEIVE)
+			else if (event.type == ENET_EVENT_TYPE_DISCONNECT)
 			{
 				break;
 			}
@@ -1034,7 +1034,8 @@ void closeConnection()
 
 	if (clientData.client)
 	enet_host_destroy(clientData.client);
-	
+
+	clientData = {};
 
 }
 
@@ -1097,6 +1098,19 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 		return false;
 	}
 	
+	Packet_ClientIdentity identityPacket;
+	identityPacket.identity = loadOrCreateLocalPlayerIdentity();
+	if (!identityPacket.identity.isValid())
+	{
+		reportError("could not create a persistent player identity");
+		enet_peer_reset(clientData.server);
+		enet_host_destroy(clientData.client);
+		return false;
+	}
+	sendPacket(clientData.server, headerClientIdentity, &identityPacket,
+		sizeof(identityPacket), true, channelHandleConnections);
+	enet_host_flush(clientData.client);
+
 
 	enet_peer_throttle_configure(clientData.server,
 		ENET_PEER_PACKET_THROTTLE_INTERVAL, 6, 3);
@@ -1124,6 +1138,15 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 
 			clientData.cid = p.cid;
 
+			if (size != sizeof(Packet_ReceiveCIDAndData) || !data)
+			{
+				enet_packet_destroy(event.packet);
+				enet_peer_reset(clientData.server);
+				enet_host_destroy(clientData.client);
+				reportError("server sent invalid handshake data");
+				return false;
+			}
+
 			playerData = *(Packet_ReceiveCIDAndData *)data;
 
 			//send player own info or sthing
@@ -1133,7 +1156,8 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 			enet_packet_destroy(event.packet);
 		};
 
-		return true;
+			clientData.conected = true;
+			return true;
 	}
 	else
 	{
@@ -1145,8 +1169,7 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 
 	#pragma endregion
 
-	clientData.conected = true;
-	return true;
+	return false;
 }
 
 

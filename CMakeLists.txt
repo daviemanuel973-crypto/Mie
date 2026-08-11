@@ -15,6 +15,8 @@ endif()
 
 project(ourCraft)
 
+include(CTest)
+
 option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
@@ -177,3 +179,12 @@ target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE glm glfw glad stb_image st
 	gl2d raudio imgui fastNoiseSIMD FastNoise2 enet glui
 	magic_enum safeSave profilerLib
 	libzstd_static assimp)
+
+if (BUILD_TESTING)
+	add_executable(playerPersistenceTests
+		tests/playerPersistenceTests.cpp
+		src/gameLayer/multyPlayer/playerSaveFormat.cpp)
+	target_include_directories(playerPersistenceTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME player-persistence-format COMMAND playerPersistenceTests)
+endif()

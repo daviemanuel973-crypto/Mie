@@ -324,7 +324,7 @@ struct PlayerInventory
 	//doesn't clear data vector!!
 	void formatIntoData(std::vector<unsigned char> &data);
 
-	bool readFromData(void *data, size_t size);
+	bool readFromData(void *data, size_t size, size_t *bytesRead = nullptr);
 
 	void sanitize();
 
