@@ -45,9 +45,9 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release --parallel 2
 
-      - name: Test player persistence format
+      - name: Test Mie persistence, world catalog and update protocol
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol)$'
 
       - name: Stage portable Windows build
         shell: pwsh
