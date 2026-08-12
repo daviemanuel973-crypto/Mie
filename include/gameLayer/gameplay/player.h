@@ -2,6 +2,7 @@
 #include <gameplay/entity.h>
 #include <multyPlayer/server.h>
 #include <gameplay/items.h>
+#include <gameplay/fieldGuide.h>
 #include <gl2d/gl2d.h>
 #include <gameplay/life.h>
 #include <gameplay/gameplayRules.h>
@@ -16,7 +17,6 @@ struct Player : public PhysicalEntity, public CollidesWithPlacedBlocks,
 	public HasEyesAndPupils<EYE_ANIMATION_TYPE_PLAYER>
 {
 
-	//todo use mem compare
 	bool operator== (Player & other)
 	{
 		if(
@@ -39,14 +39,11 @@ struct Player : public PhysicalEntity, public CollidesWithPlacedBlocks,
 	}
 
 	void flyFPS(glm::vec3 direction, glm::vec3 lookDirection);
-
 	void moveFPS(glm::vec3 direction, glm::vec3 lookDirection, float deltaTime);
 
-	int chunkDistance = 10; //TODO remove this from here!
+	int chunkDistance = 10;
 
 	glm::vec3 getColliderSize();
-
-	//todo implement!
 	void update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter);
 	float getWaterSubmersion(decltype(chunkGetterSignature) *chunkGetter) const;
 	bool isInWater(decltype(chunkGetterSignature) *chunkGetter) const;
@@ -54,33 +51,26 @@ struct Player : public PhysicalEntity, public CollidesWithPlacedBlocks,
 	bool isOnClimbable(decltype(chunkGetterSignature) *chunkGetter) const;
 	void climb(float direction, bool fast, decltype(chunkGetterSignature) *chunkGetter);
 
-
 	static glm::vec3 getMaxColliderSize();
 
 	bool fly = 0;
 };
 
-//here we store things like gamemode
 struct OtherPlayerSettings
 {
 	constexpr static int SURVIVAL = 0;
 	constexpr static int CREATIVE = 1;
 
 	unsigned char gameMode = 0;
-	char commandPermisionLevel = 2; //0 means nothing, 1 is basic stuff, 2 is admin, 3 is main admin.
+	char commandPermisionLevel = 2;
 };
 
-//this is the player struct when playing locally
 struct LocalPlayer
 {
 	PlayerInventory inventory;
-
 	Player entity = {};
-
 	std::uint64_t entityId = 0;
-
 	OtherPlayerSettings otherPlayerSettings = {};
-	//dodo add some other data here like inventory
 
 	glm::ivec3 currentBlockInteractWith = {0,-1,0};
 	unsigned char isInteractingWithBlock = 0;
@@ -90,36 +80,28 @@ struct LocalPlayer
 	SurvivalStats survivalStats = {};
 	float justHealedTimer = 0;
 	float justRecievedDamageTimer = 0;
+	GuideProgress guideProgress = {};
 
 	Effects effects;
 };
 
-
-//the other players locally
 struct PlayerClient: public ClientEntity<Player, PlayerClient>
 {
-
-	//todo other player settings here!
-
-
 	void update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter);
 	void setEntityMatrix(glm::mat4 *skinningMatrix);
-
 	int getTextureIndex();
-
 };
 
-
-//todo update function
 struct PlayerServer: public ServerEntity<Player>
 {
-
 	OtherPlayerSettings otherPlayerSettings = {};
-
 	PlayerInventory inventory;
 
+	// v0.7 survival-guide state. This is persisted in player save version 3.
+	bool starterFieldGuideGranted = false;
+	GuideProgress guideProgress = {};
+	bool guideProgressDirty = true;
 
-	//this also represents the interaction type
 	unsigned char interactingWithBlock = 0;
 	unsigned char revisionNumberInteraction = 0;
 	glm::ivec3 currentBlockInteractWithPosition = {0, -1, 0};
@@ -133,8 +115,6 @@ struct PlayerServer: public ServerEntity<Player>
 	bool hungerPositionInitialized = false;
 	bool forceUpdateLife = 0;
 
-	//we update the effects every 20 ticks or if we set it
-	// as dirty by setting this to 0
 	short updateEffectsTicksTimer = 20;
 
 	void applyDamageOrLife(short difference)
@@ -143,7 +123,6 @@ struct PlayerServer: public ServerEntity<Player>
 
 		int life = newLife.life;
 		life += difference;
-
 		if (life > newLife.maxLife) { life = newLife.maxLife; }
 
 		newLife.life = life;
@@ -153,36 +132,27 @@ struct PlayerServer: public ServerEntity<Player>
 		}
 	}
 
-	//todo move to server entity
 	struct EffectsTimer
 	{
 		float regen = 0;
 		float poison = 0;
-
-
 	}effectsTimers;
 
 	bool killed = 0;
-
-	//used for life regeneration
 	float notIncreasedLifeSinceTimeSecconds = 0;
 	float healingDelayCounterSecconds = BASE_HEALTH_DELAY_TIME;
 
 	void kill();
 
-	//todo calculate armour based on inventory
 	Armour getArmour() 
 	{
 		Armour rez{};
-
 		rez.armour += inventory.headArmour.getItemStats().armour;
 		rez.armour += inventory.chestArmour.getItemStats().armour;
 		rez.armour += inventory.bootsArmour.getItemStats().armour;
 		rez.armour += effects.getArmour();
 		rez.normalize();
-		
 		return rez;
-	
 	};
 
 	glm::ivec2 lastChunkPositionWhenAnUpdateWasSent = {};
@@ -191,9 +161,7 @@ struct PlayerServer: public ServerEntity<Player>
 	float calculateHealingRegenTime();
 
 	bool isUnaware() { return false; }
-
 	void signalHit(glm::vec3 d) {};
 };
-
 
 EntityStats getPlayerStats(PlayerInventory &inventory);
