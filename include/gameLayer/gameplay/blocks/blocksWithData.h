@@ -35,7 +35,10 @@ struct BlocksWithDataHolder
 
 	void formatBlockData(std::vector<unsigned char> &dataToAppend, int chunkXChunkSpace, int chunkZChunkSpace);
 
-	void loadBlockData(std::vector<unsigned char> &data, int chunkXChunkSpace, int chunkZChunkSpace);
+	// Parses into a temporary holder and commits only after the whole payload is
+	// valid. This prevents a truncated/corrupt .block file from leaving a
+	// partially reconstructed chest/base-block state behind.
+	bool loadBlockData(const std::vector<unsigned char> &data, int chunkXChunkSpace, int chunkZChunkSpace);
 
 };
 
