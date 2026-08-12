@@ -135,4 +135,45 @@ namespace mie::native
 			"mie:recipe/prototype_processing", false});
 		return registry;
 	}
+
+	ContentRegistry createV07ContentRegistry()
+	{
+		ContentRegistry registry = createV06ContentRegistry();
+
+		// These IDs and stable keys were recovered from the shipped v0.7.0
+		// executable. They are part of the persisted save contract now.
+		constexpr std::array<const char *, 9> itemKeys = {
+			"mie:item/field_guide",
+			"mie:item/charcoal",
+			"mie:item/tin_concentrate",
+			"mie:item/tin_ingot",
+			"mie:item/bronze_ingot",
+			"mie:item/bronze_pickaxe",
+			"mie:item/bronze_axe",
+			"mie:item/bronze_shovel",
+			"mie:item/bronze_sword",
+		};
+		for (std::uint32_t offset = 0; offset < itemKeys.size(); ++offset)
+		{
+			registry.registerContent({ContentKind::Item, V07_FIRST_ITEM_ID + offset,
+				itemKeys[offset], false});
+		}
+
+		constexpr std::array<const char *, 7> recipeKeys = {
+			"mie:recipe/process_copper_ore",
+			"mie:recipe/process_lead_ore",
+			"mie:recipe/process_iron_ore",
+			"mie:recipe/process_silver_ore",
+			"mie:recipe/process_gold_ore",
+			"mie:recipe/refine_tin",
+			"mie:recipe/alloy_bronze",
+		};
+		for (std::uint32_t offset = 0; offset < recipeKeys.size(); ++offset)
+		{
+			registry.registerContent({ContentKind::Recipe, 2u + offset,
+				recipeKeys[offset], false});
+		}
+
+		return registry;
+	}
 }
