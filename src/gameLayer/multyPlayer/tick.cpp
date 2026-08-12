@@ -307,7 +307,7 @@ bool spawnPig(
 bool spawnGoblin(
 	ServerChunkStorer &chunkManager,
 	Goblin goblin, WorldSaver &worldSaver,
-	std::minstd_rand &rng)
+	std::minstd_rand &rng, std::uint64_t *spawnedId)
 {
 	//todo also send packets
 	//todo generic spawn for any entity
@@ -323,6 +323,7 @@ bool spawnGoblin(
 		e.configureVariant(newId);
 		c->entityData.goblins.insert({newId, e});
 		chunkManager.entityChunkPositions[newId] = determineChunkThatIsEntityIn(e.getPosition());
+		if (spawnedId) { *spawnedId = newId; }
 
 	}
 	else

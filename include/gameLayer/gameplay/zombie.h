@@ -54,6 +54,7 @@ struct ZombieServer: public ServerEntity<Zombie>
 
 	void ensureBehaviour();
 	void configureVariant(std::uint64_t eId);
+	void forceTarget(std::uint64_t playerId);
 
 	void appendDataToDisk(std::ofstream &f, std::uint64_t eId);
 

@@ -1509,6 +1509,8 @@ const char *blockNames[] = {
 	"Goblin table",
 	"Goblin torch",
 	"Goblin stitching station",
+	"Reinforced Barricade",
+	"Wooden Spike Trap",
 
 };
 

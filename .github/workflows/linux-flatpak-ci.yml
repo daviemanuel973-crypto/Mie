@@ -109,7 +109,7 @@ jobs:
             resources/shaders/basicEntity.vert \
             resources/shaders/basicEntity.frag
 
-      - name: Test persistence, world catalog and update protocol
+      - name: Test persistence, world catalog, updates and siege director
         run: |
           c++ -std=c++17 -Wall -Wextra -pedantic \
             -Iinclude/gameLayer \
@@ -131,6 +131,14 @@ jobs:
             src/gameLayer/updateProtocol.cpp \
             -o updateProtocolTests
           ./updateProtocolTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/siegeDirectorTests.cpp \
+            src/gameLayer/gameplay/siege.cpp \
+			src/gameLayer/gameplay/worldTime.cpp \
+            -o siegeDirectorTests
+          ./siegeDirectorTests
 
       - name: Build Flatpak repository
         shell: bash

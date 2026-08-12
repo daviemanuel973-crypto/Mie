@@ -89,6 +89,13 @@ void GoblinServer::configureVariant(std::uint64_t eId)
 	variantConfigured = true;
 }
 
+void GoblinServer::forceTarget(std::uint64_t playerId)
+{
+	basicEnemyBehaviour.playerLockedOn = playerId;
+	basicEnemyBehaviour.currentState = BasicEnemyBehaviour::stateTargetedPlayer;
+	basicEnemyBehaviour.worriedTimer = 60.f;
+}
+
 bool GoblinServer::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter,
 	ServerChunkStorer &serverChunkStorer, std::minstd_rand &rng, std::uint64_t yourEID,
 	std::unordered_set<std::uint64_t> &othersDeleted,

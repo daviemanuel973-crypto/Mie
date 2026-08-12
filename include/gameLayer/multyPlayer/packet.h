@@ -16,6 +16,7 @@
 #include <gameplay/life.h>
 #include <gameplay/battleUI.h>
 #include <multyPlayer/playerPersistence.h>
+#include <gameplay/siege.h>
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
@@ -97,6 +98,8 @@ enum : std::uint32_t
 	headerChangeBlockData,
 	headerTrainingDummyGotAttacked, //from server to players!
 	headerClientIdentity,
+	headerUpdateSiegeStatus,
+	headerUpdateWorldTime,
 
 };
 
@@ -233,6 +236,18 @@ struct Packet_UpdateLife
 struct Packet_UpdateSurvivalStats
 {
 	SurvivalStats stats;
+};
+
+struct Packet_UpdateSiegeStatus
+{
+	SiegeStatus status;
+};
+
+struct Packet_UpdateWorldTime
+{
+	float dayPhase = 0.25f;
+	std::uint64_t completedCycles = 0;
+	std::uint8_t advancing = 0;
 };
 
 struct Packet_UpdateGenericEntity

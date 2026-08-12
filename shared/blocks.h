@@ -251,6 +251,11 @@ enum BlockTypes : unsigned short
 	goblinTorch,
 	goblinStitchingPost,
 
+	// v0.5 defenses. Keep new entries immediately before BlocksCount so every
+	// pre-v0.5 block keeps its on-disk numeric ID.
+	reinforcedBarricade,
+	woodenSpikeTrap,
+
 	BlocksCount
 };
 
@@ -820,4 +825,3 @@ namespace InteractionTypes
 };
 
 float getBlockBaseMineDuration(BlockType type);
-

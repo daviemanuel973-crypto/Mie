@@ -49,6 +49,7 @@ int blockReorder[] = {
 
 	// Structures & Functional Blocks
 	workBench, furnace, cookingPot, ladder, trainingDummy, target,
+	reinforcedBarricade, woodenSpikeTrap,
 
 	// Furniture
 	bookShelf,
@@ -170,6 +171,7 @@ bool isSlabMesh(BlockType type)
 bool isWallMesh(BlockType type)
 {
 	return type == wooden_wall ||
+		type == reinforcedBarricade ||
 		type == bricks_wall ||
 		type == stone_wall ||
 		type == cobbleStone_wall ||
@@ -285,6 +287,7 @@ bool isDecorativeFurniture(BlockType type)
 		type == goblinChair ||
 		type == goblinTable ||
 		type == goblinStitchingPost ||
+		type == woodenSpikeTrap ||
 		type == globe
 		
 		;
@@ -347,6 +350,7 @@ bool isColidable(BlockType type)
 		type != BlockTypes::trainingDummy &&
 		type != BlockTypes::craftingItems &&
 		type != BlockTypes::target &&
+		type != BlockTypes::woodenSpikeTrap &&
 		type != BlockTypes::mug;
 }
 
@@ -399,7 +403,9 @@ bool isAnyWoddenBlock(BlockType type)
 		type == strippedOakLog ||
 		type == strippedBirchLog ||
 		type == strippedSpruceLog ||
-		type == logWall;
+		type == logWall ||
+		type == reinforcedBarricade ||
+		type == woodenSpikeTrap;
 		
 }
 
@@ -923,6 +929,7 @@ BlockType fromAnyShapeToNormalBlockType(BlockType b)
 
 	switch (b)
 	{
+	case reinforcedBarricade: { return reinforcedBarricade; }
 
 	case oakLogChair:
 	case oakLogSlab:
