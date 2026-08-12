@@ -179,9 +179,25 @@ enum ItemTypes : unsigned short
 	pawKeychain,
 	vitamins,
 
-	lastItem,
+	// v0.7 survival progression. These numeric IDs are persisted in shipped
+	// 0.7.0 saves and must never be reordered or inserted into the legacy range.
+	fieldGuide,          // 2184
+	charcoal,            // 2185
+	tinConcentrate,      // 2186 (Cassiterite Concentrate)
+	tinIngot,            // 2187
+	bronzeIngot,         // 2188
+	bronzePickaxe,       // 2189
+	bronzeAxe,           // 2190
+	bronzeShovel,        // 2191
+	bronzeSword,         // 2192
+
+	lastItem,            // 2193
 
 };
+
+static_assert(ItemTypes::fieldGuide == 2184, "v0.7 Field Guide ID changed");
+static_assert(ItemTypes::bronzeSword == 2192, "v0.7 bronze sword ID changed");
+static_assert(ItemTypes::lastItem == 2193, "v0.7 item range changed");
 
 const char *getItemTextureName(int itemId);
 
