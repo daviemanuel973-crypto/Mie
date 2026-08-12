@@ -1,6 +1,7 @@
 #include <gameplay/fieldGuide.h>
 
 #include <gameplay/items.h>
+#include <utility>
 
 namespace
 {
@@ -75,8 +76,6 @@ bool guideObjectiveForCraftedType(std::uint16_t type, GuideObjective &objective)
 
 bool isGuideWoodLogType(std::uint16_t type)
 {
-	// Exact log families used by the shipped v0.7 objective: oak, birch,
-	// jungle, palm, spruce and the three stripped-log variants.
 	switch (type)
 	{
 		case 5:
