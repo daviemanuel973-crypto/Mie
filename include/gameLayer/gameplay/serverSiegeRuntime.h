@@ -1,0 +1,18 @@
+#pragma once
+
+#include <cstdint>
+#include <random>
+
+#include <gameplay/siege.h>
+
+struct ServerChunkStorer;
+struct WorldSaver;
+
+void resetServerSiegeRuntime();
+bool loadServerSiegeRuntime(const WorldSaver &worldSaver);
+bool saveServerSiegeRuntime(const WorldSaver &worldSaver);
+void updateServerSiegeRuntime(float deltaTime, ServerChunkStorer &chunkStorer,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
+SiegeStatus getServerSiegeStatus();
+bool isServerSiegeWaveActive();
+bool forceServerSiegeWarning();

@@ -46,6 +46,7 @@ struct GoblinServer: public ServerEntity<Goblin>
 	float moveSpeedMultiplier = 1.f;
 
 	void configureVariant(std::uint64_t eId);
+	void forceTarget(std::uint64_t playerId);
 
 	bool isUnaware() { return  basicEnemyBehaviour.isUnaware(); };
 

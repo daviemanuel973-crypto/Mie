@@ -34,6 +34,7 @@
 #include <gameplay/mapEngine.h>
 #include <gameplay/battleUI.h>
 #include <gameplay/food.h>
+#include <gameplay/worldTime.h>
 #include <cameraShaker.h>
 #include <cstdint>
 
@@ -1690,11 +1691,9 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	//
 #pragma region weather and time
 
-	static float dayTime = 0.25;
+	updateClientWorldTime(deltaTime);
+	const float dayTime = getClientWorldDayPhase();
 	programData.renderer.sunPos = calculateSunPosition(dayTime);
-	
-	//dayTime += deltaTime * 0.05f;
-	if (dayTime > 0) { dayTime -= (int)dayTime; }
 
 #pragma endregion
 
@@ -2001,7 +2000,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		if (ImGui::Begin("client controll"))
 		{
 
-			ImGui::SliderFloat("Day time", &dayTime, 0, 1);
+			ImGui::Text("Day time: %.3f (cycle %llu)", dayTime,
+				static_cast<unsigned long long>(getClientCompletedWorldCycles()));
 
 			if (centerChunk)
 			{

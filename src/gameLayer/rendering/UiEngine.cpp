@@ -8,6 +8,7 @@
 #include <gameplay/blocks/structureBaseBlock.h>
 #include <gameplay/blocks/chestBlock.h>
 #include <gameplay/crafting.h>
+#include <gameplay/siege.h>
 #include <audioEngine.h>
 #include <iostream>
 #include <magic_enum.hpp>
@@ -1639,6 +1640,46 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 						renderer2d.renderRectangle(partial, {0.92f, 0.63f, 0.18f, 1.f});
 					}
 					hungerBox.x += hungerBox.z;
+				}
+
+				const SiegeStatus &siege = getClientSiegeStatus();
+				const bool showSiege = siege.phase != SiegePhase::Peace ||
+					(siege.secondsRemaining > 0 && siege.secondsRemaining <= 60);
+				if (showSiege)
+				{
+					std::ostringstream label;
+					glm::vec4 accent{0.85f, 0.22f, 0.16f, 1.f};
+					if (siege.phase == SiegePhase::Warning)
+					{
+						label << "SIEGE IN " << siege.secondsRemaining << "s - PREPARE DEFENCES";
+					}
+					else if (siege.phase == SiegePhase::Wave)
+					{
+						label << "SIEGE  WAVE " << static_cast<int>(siege.currentWave)
+							<< '/' << static_cast<int>(siege.totalWaves)
+							<< "  ENEMIES " << siege.enemiesRemaining;
+					}
+					else if (siege.phase == SiegePhase::Intermission)
+					{
+						label << "NEXT WAVE IN " << siege.secondsRemaining << "s";
+						accent = {0.94f, 0.62f, 0.16f, 1.f};
+					}
+					else
+					{
+						label << "NEXT SIEGE IN " << static_cast<int>(siege.cyclesUntilSiege)
+							<< " CYCLES";
+						accent = {0.94f, 0.62f, 0.16f, 1.f};
+					}
+
+					const std::string text = label.str();
+					const float textSize = std::clamp(w / 42.f, 22.f, 34.f);
+					const glm::vec2 dimensions = renderer2d.getTextSize(text.c_str(), font, textSize);
+					glm::vec4 panel{w * 0.5f - dimensions.x * 0.5f - 18.f, 18.f,
+						dimensions.x + 36.f, dimensions.y + 18.f};
+					renderer2d.renderRectangle(panel, {0.05f, 0.04f, 0.04f, 0.82f});
+					renderer2d.renderRectangle({panel.x, panel.y + panel.w - 4.f, panel.z, 4.f}, accent);
+					renderer2d.renderText({w * 0.5f - dimensions.x * 0.5f,
+						panel.y + 6.f}, text.c_str(), font, Colors_White, textSize, 3, 0, false);
 				}
 
 			}

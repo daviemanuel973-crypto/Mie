@@ -27,6 +27,7 @@
 #include <gameplay/cat.h>
 #include <gameplay/gameplayRules.h>
 #include <gameplay/food.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <profiler.h>
 #include <magic_enum.hpp>
 #include <cmath>
@@ -324,6 +325,7 @@ bool serverStartupStuff(const std::string &path)
 {
 	//reset data
 	sd = ServerData{};
+	resetServerSiegeRuntime();
 
 
 	//start enet server
@@ -530,7 +532,11 @@ void serverWorkerUpdate(
 
 		}
 
-		updateNaturalHostileSpawning(sd.tickDeltaTime, worldSaver, rng);
+		updateServerSiegeRuntime(sd.tickDeltaTime, sd.chunkCache, worldSaver, rng);
+		if (!isServerSiegeWaveActive())
+		{
+			updateNaturalHostileSpawning(sd.tickDeltaTime, worldSaver, rng);
+		}
 
 	#pragma endregion
 
@@ -1320,6 +1326,29 @@ std::string executeServerCommand(std::uint64_t cid, const char *command)
 			}
 
 			return "Invalid command!";
+		}
+
+		if (consumeStringToken("siege"))
+		{
+			if (consumeStringToken("status"))
+			{
+				const SiegeStatus status = getServerSiegeStatus();
+				return std::string("Siege: ") + getSiegePhaseName(status.phase) +
+					", wave " + std::to_string(status.currentWave) + "/" +
+					std::to_string(status.totalWaves) + ", enemies " +
+					std::to_string(status.enemiesRemaining) + ", timer " +
+					std::to_string(status.secondsRemaining) + "s, cycles until natural siege " +
+					std::to_string(status.cyclesUntilSiege);
+			}
+
+			if (consumeStringToken("start"))
+			{
+				if (commandPermisionLevel < 2) { return "You need admin permission"; }
+				return forceServerSiegeWarning() ? "Siege warning started" :
+					"A siege is already active";
+			}
+
+			return "Usage: /siege status or /siege start";
 		}
 
 		if (consumeStringToken("give"))

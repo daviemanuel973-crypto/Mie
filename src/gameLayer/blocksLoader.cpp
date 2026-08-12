@@ -663,7 +663,14 @@ uint16_t blocksLookupTable[] = {
 	140, 140, 140, 140, 140, 140, //goblin torch
 	141, 141, 141, 141, 141, 141,//goblin stitching post
 
+	7, 7, 7, 7, 7, 7, //reinforced barricade
+	7, 7, 7, 7, 7, 7, //wooden spike trap
+
 };
+
+static_assert(sizeof(blocksLookupTable) / sizeof(blocksLookupTable[0]) ==
+	static_cast<std::size_t>(BlockTypes::BlocksCount) * 6,
+	"Each block needs six texture lookup entries");
 
 void fixAlphaForNormals(unsigned char *buffer, int w, int h)
 {

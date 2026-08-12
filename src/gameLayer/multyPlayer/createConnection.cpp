@@ -10,6 +10,8 @@
 #include <gameplay/items.h>
 #include <audioEngine.h>
 #include <gameplay/blocks/blocksWithData.h>
+#include <gameplay/siege.h>
+#include <gameplay/worldTime.h>
 #include <lightSystem.h>
 
 static ConnectionData clientData;
@@ -792,6 +794,23 @@ void recieveDataClient(ENetEvent &event,
 		}
 		break;
 
+		case headerUpdateSiegeStatus:
+		{
+			if (size != sizeof(Packet_UpdateSiegeStatus)) { break; }
+			const auto *packetData = reinterpret_cast<const Packet_UpdateSiegeStatus *>(data);
+			setClientSiegeStatus(packetData->status);
+		}
+		break;
+
+		case headerUpdateWorldTime:
+		{
+			if (size != sizeof(Packet_UpdateWorldTime)) { break; }
+			const auto *packetData = reinterpret_cast<const Packet_UpdateWorldTime *>(data);
+			setClientWorldTime(packetData->dayPhase, packetData->completedCycles,
+				packetData->advancing != 0);
+		}
+		break;
+
 		case headerRecieveDamage:
 		{
 			if (sizeof(Packet_UpdateLife) != size) { break; }
@@ -1007,7 +1026,12 @@ void sendBlockInteractionMessage(std::uint64_t playerID,
 void closeConnection()
 {
 
-	if (!clientData.conected) { return; }
+	if (!clientData.conected)
+	{
+		resetClientSiegeStatus();
+		resetClientWorldTime();
+		return;
+	}
 	
 	if (clientData.server)
 	{
@@ -1036,12 +1060,16 @@ void closeConnection()
 	enet_host_destroy(clientData.client);
 
 	clientData = {};
+	resetClientSiegeStatus();
+	resetClientWorldTime();
 
 }
 
 bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 {
 	if (clientData.conected) { return false; }
+	resetClientSiegeStatus();
+	resetClientWorldTime();
 
 	clientData = ConnectionData{};
 

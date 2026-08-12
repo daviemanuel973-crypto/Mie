@@ -222,6 +222,7 @@ struct ModelsManager
 		goblinChairModel,
 		goblinTableModel,
 		goblinStitchingPostModel,
+		spikeTrapModel,
 
 		BLOCK_MODELS_COUNT
 

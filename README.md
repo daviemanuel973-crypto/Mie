@@ -36,6 +36,16 @@ The current Windows work adds a reliable saved-world selector, water swimming/bu
 
 See [`docs/V0.4_WORLD_AND_RUNTIME.md`](docs/V0.4_WORLD_AND_RUNTIME.md) and [`docs/WINDOWS_UPDATES.md`](docs/WINDOWS_UPDATES.md).
 
+## v0.5 base defence
+
+The v0.5 work adds a server-authoritative siege loop with a preparation warning,
+three scaling waves, reinforced barricades, wooden spike traps and a compact HUD.
+Raid enemies deliberately lock onto survival players, damage nearby wooden
+defences and remain capped for Low-preset hardware. Use `/siege start` as an
+administrator to begin the warning immediately during a playtest.
+
+See [`docs/V0.5_BASE_DEFENCE.md`](docs/V0.5_BASE_DEFENCE.md).
+
 Features and todos:
 
 - [ ] Rendering system

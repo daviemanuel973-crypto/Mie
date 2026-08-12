@@ -868,6 +868,7 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 		"goblinChair.glb",
 		"goblinTable.glb",
 		"goblinStitchingPost.glb",
+		"woodenSpikeTrap.obj",
 	};
 
 	static_assert(sizeof(blockModelsNames) / sizeof(blockModelsNames[0]) == BLOCK_MODELS_COUNT);
@@ -957,6 +958,7 @@ int getDefaultBlockShapeForFurniture(unsigned int b)
 		case goblinChair: return ModelsManager::goblinChairModel;
 		case goblinTable: return ModelsManager::goblinTableModel;
 		case goblinStitchingPost: return ModelsManager::goblinStitchingPostModel;
+		case woodenSpikeTrap: return ModelsManager::spikeTrapModel;
 
 	}
 

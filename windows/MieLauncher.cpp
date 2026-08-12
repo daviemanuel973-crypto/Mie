@@ -18,7 +18,7 @@
 #include <vector>
 
 #ifndef MIE_VERSION
-#define MIE_VERSION "0.4.0"
+#define MIE_VERSION "0.5.0"
 #endif
 #define MIE_WIDEN_INNER(value) L##value
 #define MIE_WIDEN(value) MIE_WIDEN_INNER(value)
@@ -450,7 +450,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int)
 	if (self.empty()) { return 1; }
 	if (commandLine && std::wstring(commandLine) == L"--self-test")
 	{
-		return compareSemanticVersions("0.4.0", "0.3.0") > 0 ? 0 : 1;
+		return compareSemanticVersions("0.5.0", "0.4.0") > 0 ? 0 : 1;
 	}
 	if (commandLine && std::wstring(commandLine).rfind(L"--apply", 0) == 0)
 	{

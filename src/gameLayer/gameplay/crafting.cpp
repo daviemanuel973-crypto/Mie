@@ -148,6 +148,12 @@ static CraftingRecepie recepies[] =
 	recepie<2>(Item(BlockTypes::cookingPot, 1),{Item(ItemTypes::ironIngot, 5), Item(BlockTypes::wooden_plank, 2)}).setAnyWood().setRequiresWorkBench(),
 	recepie<1>(Item(BlockTypes::woddenChest, 1), {Item(BlockTypes::wooden_plank, 8)}).setAnyWood().setRequiresWorkBench(),
 	recepie<1>(Item(ItemTypes::bandage, 1), {Item(ItemTypes::cloth, 3)}),
+	recepie<2>(Item(BlockTypes::reinforcedBarricade, 2),
+		{Item(BlockTypes::wooden_plank, 6), Item(ItemTypes::stick, 2)})
+		.setAnyWood().setRequiresWorkBench(),
+	recepie<2>(Item(BlockTypes::woodenSpikeTrap, 2),
+		{Item(BlockTypes::wooden_plank, 4), Item(ItemTypes::stick, 4)})
+		.setAnyWood().setRequiresWorkBench(),
 
 	// legacy alternatives stay available
 	recepie<1>(Item(BlockTypes::workBench, 1),{Item(BlockTypes::wooden_plank, 10)}).setAnyWood(),

@@ -8,7 +8,9 @@
 
 bool spawnZombie(ServerChunkStorer &chunkManager, Zombie zombie, std::uint64_t newId);
 bool spawnGoblin(ServerChunkStorer &chunkManager, Goblin goblin,
-	WorldSaver &worldSaver, std::minstd_rand &rng);
+	WorldSaver &worldSaver, std::minstd_rand &rng, std::uint64_t *spawnedId = nullptr);
+
+void killEntity(WorldSaver &worldSaver, std::uint64_t entity, ServerChunkStorer &chunkCache);
 
 
 void entityDeleteFromServerToPlayer(std::uint64_t clientToSend, std::uint64_t eid, 
@@ -31,5 +33,4 @@ void doGameTick(float deltaTime,
 void sendDamagePlayerPacket(Client &client);
 void sendIncreaseLifePlayerPacket(Client &client);
 void sendUpdateLifeLifePlayerPacket(Client &client);
-
 

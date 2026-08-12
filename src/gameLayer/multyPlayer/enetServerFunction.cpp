@@ -24,6 +24,7 @@
 #include <platformTools.h>
 #include <profiler.h>
 #include <multyPlayer/playerPersistence.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <unordered_set>
 #include <cmath>
 #include <algorithm>
@@ -1029,6 +1030,7 @@ void enetServerFunction(std::string path)
 			exit(0); 
 		}
 	}
+	loadServerSiegeRuntime(worldSaver);
 	
 	if (!structuresManager.loadAllStructures())
 	{
@@ -1186,6 +1188,10 @@ void enetServerFunction(std::string path)
 		{
 			playerAutosaveTimer = 30;
 			saveAllConnections(worldSaver);
+			if (!saveServerSiegeRuntime(worldSaver))
+			{
+				std::cerr << "Warning: could not autosave world time and siege schedule.\n";
+			}
 		}
 
 
@@ -1226,6 +1232,10 @@ void enetServerFunction(std::string path)
 	}
 
 	saveAllConnections(worldSaver);
+	if (!saveServerSiegeRuntime(worldSaver))
+	{
+		std::cerr << "Warning: could not save world time and siege schedule during shutdown.\n";
+	}
 	clearSD(worldSaver);
 	wg.clear();
 	structuresManager.clear();
