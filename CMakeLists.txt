@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.5.0" CACHE STRING "Mie Survival semantic version")
+set(OURCRAFT_VERSION "0.6.0" CACHE STRING "Mie Survival semantic version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -228,10 +228,34 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME siege-director COMMAND siegeDirectorTests)
 
+	add_executable(nativeSystemsTests
+		tests/nativeSystemsTests.cpp
+		src/gameLayer/native/contentRegistry.cpp
+		src/gameLayer/native/gameplayFoundation.cpp
+		src/gameLayer/native/gameplayScheduler.cpp
+		src/gameLayer/native/prototypeMachine.cpp
+		src/gameLayer/native/worldSchema.cpp)
+	target_include_directories(nativeSystemsTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME native-systems COMMAND nativeSystemsTests)
+
+	add_executable(playerControlSettingsTests
+		tests/playerControlSettingsTests.cpp
+		src/gameLayer/gameplay/playerControlSettings.cpp)
+	target_include_directories(playerControlSettingsTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/safeSave/include/")
+	target_compile_definitions(playerControlSettingsTests PRIVATE
+		USER_SETTINGS_PATH="${CMAKE_CURRENT_BINARY_DIR}/testPlayerSettings/")
+	target_link_libraries(playerControlSettingsTests PRIVATE safeSave)
+	add_test(NAME player-control-settings COMMAND playerControlSettingsTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
 		update-protocol
 		siege-director
+		native-systems
+		player-control-settings
 		PROPERTIES TIMEOUT 60)
 endif()

@@ -28,6 +28,7 @@
 #include <gameplay/gameplayRules.h>
 #include <gameplay/food.h>
 #include <gameplay/serverSiegeRuntime.h>
+#include <native/serverNativeSystems.h>
 #include <profiler.h>
 #include <magic_enum.hpp>
 #include <cmath>
@@ -326,6 +327,7 @@ bool serverStartupStuff(const std::string &path)
 	//reset data
 	sd = ServerData{};
 	resetServerSiegeRuntime();
+	mie::native::resetServerNativeSystems();
 
 
 	//start enet server
@@ -533,6 +535,7 @@ void serverWorkerUpdate(
 		}
 
 		updateServerSiegeRuntime(sd.tickDeltaTime, sd.chunkCache, worldSaver, rng);
+		mie::native::updateServerNativeSystems(sd.tickDeltaTime);
 		if (!isServerSiegeWaveActive())
 		{
 			updateNaturalHostileSpawning(sd.tickDeltaTime, worldSaver, rng);

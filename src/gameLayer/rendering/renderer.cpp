@@ -4614,7 +4614,8 @@ void Renderer::renderEntities(
 
 	std::minstd_rand rng{std::random_device()()};
 
-	auto renderAllEntitiesOfOneType = [&](Model &model, auto &container, bool isPlayers = 0)
+	auto renderAllEntitiesOfOneType = [&](Model &model, auto &container, bool isPlayers = 0,
+		GLuint64 playerTextureOverride = 0)
 	{
 
 		if (container.empty() || model.transforms.empty() || model.vertexCount == 0 || model.vao == 0)
@@ -4685,6 +4686,22 @@ void Renderer::renderEntities(
 
 			if (isPlayers)
 			{
+				if (playerTextureOverride != 0)
+				{
+#if defined(OURCRAFT_FLATPAK)
+					data.textureId0 = static_cast<GLuint64>(ModelsManager::SteveTexture);
+					data.textureId1 = static_cast<GLuint64>(ModelsManager::HelmetTestTexture);
+					data.textureId2 = data.textureId0;
+					data.textureId3 = data.textureId0;
+#else
+					data.textureId0 = playerTextureOverride;
+					data.textureId1 = modelsManager.gpuIds[ModelsManager::HelmetTestTexture];
+					data.textureId2 = playerTextureOverride;
+					data.textureId3 = playerTextureOverride;
+#endif
+				}
+				else
+				{
 
 				auto found = playersConnectionData.find(e.first);
 
@@ -4714,6 +4731,7 @@ void Renderer::renderEntities(
 					data.textureId1 = data.textureId0;
 					data.textureId2 = data.textureId0;
 					data.textureId3 = data.textureId0;
+				}
 				}
 
 			}
@@ -4802,6 +4820,8 @@ void Renderer::renderEntities(
 	//todo remove
 	entityRenderer.itemEntitiesToRender.clear();
 
+	renderAllEntitiesOfOneType(modelsManager.human, entityManager.localPlayersForRendering,
+		true, currentSkinBindlessTexture);
 	renderAllEntitiesOfOneType(modelsManager.human, entityManager.players, true);
 	renderAllEntitiesOfOneType(modelsManager.human, entityManager.zombies);
 	renderAllEntitiesOfOneType(modelsManager.pig, entityManager.pigs);

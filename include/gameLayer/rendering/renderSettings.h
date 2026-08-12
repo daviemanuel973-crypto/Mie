@@ -16,6 +16,9 @@ void displayRenderSettingsMenu(ProgramData &programData);
 void displaySettingsMenuButton(ProgramData &programData);
 void displaySettingsMenu(ProgramData &programData);
 
+void displayControlsSettingsMenuButton(ProgramData &programData);
+void displayControlsSettingsMenu(ProgramData &programData);
+
 bool shouldReloadTexturePacks();
 
 std::vector<std::filesystem::path> getUsedTexturePacksAndResetFlag();

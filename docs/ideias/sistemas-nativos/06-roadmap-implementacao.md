@@ -4,6 +4,19 @@
 
 Implementar os sistemas nativos sem transformar o Mie em um conjunto de features frágeis. A ordem abaixo prioriza fundações reutilizáveis, compatibilidade multiplayer/save e performance Low-first.
 
+## Estado após a v0.5
+
+A v0.4 e a v0.5 já entregaram partes reutilizáveis: save de jogador versionado,
+relógio persistente, autoridade de servidor para spawn/cercos, limites de inimigos,
+dirty flags de chunks e profiling interno. Isso não conclui a Fase 0: IDs de
+conteúdo ainda são posicionais e não existem manifesto central de schemas,
+scheduler comum nem contrato genérico de interesse.
+
+A v0.6 começa formalmente por essas lacunas. O quadro de execução, a auditoria e a
+rastreabilidade de todas as mecânicas estão em
+[`07-plano-v0.6.md`](07-plano-v0.6.md). Este roadmap continua sendo a ordem de longo
+prazo; o plano da v0.6 é a decomposição operacional da primeira fase.
+
 ## Fase 0 — contratos técnicos
 
 Antes de conteúdo grande:

@@ -51,6 +51,8 @@ struct Player : public PhysicalEntity, public CollidesWithPlacedBlocks,
 	float getWaterSubmersion(decltype(chunkGetterSignature) *chunkGetter) const;
 	bool isInWater(decltype(chunkGetterSignature) *chunkGetter) const;
 	void swimUp(decltype(chunkGetterSignature) *chunkGetter);
+	bool isOnClimbable(decltype(chunkGetterSignature) *chunkGetter) const;
+	void climb(float direction, bool fast, decltype(chunkGetterSignature) *chunkGetter);
 
 
 	static glm::vec3 getMaxColliderSize();

@@ -43,6 +43,9 @@ struct ClientEntityManager : public EntityDataClient
 	}
 
 	LocalPlayer localPlayer;
+	// A render-only proxy for the local body. It is populated only while using
+	// either third-person camera and never participates in networking/physics.
+	std::unordered_map<std::uint64_t, PlayerClient> localPlayersForRendering;
 
 	void dropEntitiesThatAreTooFar(glm::ivec2 playerPos2D, int playerSquareDistance);
 

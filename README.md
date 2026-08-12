@@ -46,6 +46,19 @@ administrator to begin the warning immediately during a playtest.
 
 See [`docs/V0.5_BASE_DEFENCE.md`](docs/V0.5_BASE_DEFENCE.md).
 
+## v0.6 native systems foundation
+
+The executable v0.6 foundation freezes v0.5 content/save contracts and adds stable
+content IDs, atomic world-schema migrations, budgeted gameplay scheduling,
+dirty-state replication, multiplayer interest, headless metrics and a persistent
+server-authoritative prototype machine. Player traversal now includes optional
+automatic jumping/running, faster ladder and vine climbing, and `F5` cycling among
+first person, third person back and third person front.
+
+Packaged builds now identify as `0.6.0`. See
+[`docs/V0.6_NATIVE_FOUNDATION.md`](docs/V0.6_NATIVE_FOUNDATION.md) and the
+[`v0.6 execution plan`](docs/ideias/sistemas-nativos/07-plano-v0.6.md).
+
 Features and todos:
 
 - [ ] Rendering system

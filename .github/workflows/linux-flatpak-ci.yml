@@ -109,7 +109,7 @@ jobs:
             resources/shaders/basicEntity.vert \
             resources/shaders/basicEntity.frag
 
-      - name: Test persistence, world catalog, updates and siege director
+      - name: Test all Mie gameplay contracts
         run: |
           c++ -std=c++17 -Wall -Wextra -pedantic \
             -Iinclude/gameLayer \
@@ -139,6 +139,27 @@ jobs:
             src/gameLayer/gameplay/worldTime.cpp \
             -o siegeDirectorTests
           ./siegeDirectorTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/nativeSystemsTests.cpp \
+            src/gameLayer/native/contentRegistry.cpp \
+            src/gameLayer/native/gameplayFoundation.cpp \
+            src/gameLayer/native/gameplayScheduler.cpp \
+            src/gameLayer/native/prototypeMachine.cpp \
+            src/gameLayer/native/worldSchema.cpp \
+            -o nativeSystemsTests
+          ./nativeSystemsTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            -Ithirdparty/safeSave/include \
+            -DUSER_SETTINGS_PATH='"/tmp/mie-player-settings/"' \
+            tests/playerControlSettingsTests.cpp \
+            src/gameLayer/gameplay/playerControlSettings.cpp \
+            thirdparty/safeSave/src/safeSave.cpp \
+            -o playerControlSettingsTests
+          ./playerControlSettingsTests
 
       - name: Build Flatpak repository
         shell: bash

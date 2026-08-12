@@ -58,6 +58,7 @@ glm::vec3 Player::getColliderSize()
 void Player::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter)
 {
 	const float submersion = fly ? 0.f : getWaterSubmersion(chunkGetter);
+	const bool climbing = !fly && submersion <= 0.f && isOnClimbable(chunkGetter);
 	if (submersion > 0.f)
 	{
 		// Water reduces gravity, damps momentum and provides enough buoyancy to
@@ -74,6 +75,20 @@ void Player::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter
 		waterPhysics.sideFriction = 0.15f;
 		updateForces(deltaTime, true, waterPhysics);
 		forces.velocity.y = glm::clamp(forces.velocity.y, -4.f, 5.f);
+	}
+	else if (climbing)
+	{
+		const float horizontalDrag = std::exp(-4.f * deltaTime);
+		const float verticalDrag = std::exp(-6.f * deltaTime);
+		forces.velocity.x *= horizontalDrag;
+		forces.velocity.z *= horizontalDrag;
+		forces.velocity.y *= verticalDrag;
+
+		PhysicalSettings ladderPhysics;
+		ladderPhysics.gravityModifier = 0.08f;
+		ladderPhysics.sideFriction = 0.18f;
+		updateForces(deltaTime, true, ladderPhysics);
+		forces.velocity.y = glm::clamp(forces.velocity.y, -5.5f, 7.5f);
 	}
 	else
 	{
@@ -121,6 +136,34 @@ void Player::swimUp(decltype(chunkGetterSignature) *chunkGetter)
 	// river bank while Jump is held. Player::update caps the resulting speed.
 	forces.acceleration.y += 38.f * std::max(0.45f, submersion);
 	forces.velocity.y = std::min(forces.velocity.y, 7.f);
+}
+
+bool Player::isOnClimbable(decltype(chunkGetterSignature) *chunkGetter) const
+{
+	if (!chunkGetter) { return false; }
+	const float sampleHeights[] = {0.2f, 0.9f, 1.55f};
+	for (float height : sampleHeights)
+	{
+		const auto worldBlock = from3DPointToBlock(position + glm::dvec3(0, height, 0));
+		if (worldBlock.y < 0 || worldBlock.y >= CHUNK_HEIGHT) { continue; }
+		auto *chunk = chunkGetter(fromBlockPosToChunkPos(worldBlock));
+		if (!chunk) { continue; }
+		auto *block = chunk->safeGet(fromBlockPosToBlockPosInChunk(worldBlock));
+		if (block && (block->getType() == BlockTypes::ladder ||
+			block->getType() == BlockTypes::vines))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void Player::climb(float direction, bool fast, decltype(chunkGetterSignature) *chunkGetter)
+{
+	if (direction == 0.f || !isOnClimbable(chunkGetter)) { return; }
+	const float climbSpeed = fast ? 7.f : 5.5f;
+	forces.velocity.y = glm::clamp(direction, -1.f, 1.f) * climbSpeed;
+	forces.acceleration.y = 0.f;
 }
 
 glm::vec3 Player::getMaxColliderSize()

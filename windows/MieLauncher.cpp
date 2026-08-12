@@ -18,7 +18,7 @@
 #include <vector>
 
 #ifndef MIE_VERSION
-#define MIE_VERSION "0.5.0"
+#define MIE_VERSION "0.6.0"
 #endif
 #define MIE_WIDEN_INNER(value) L##value
 #define MIE_WIDEN(value) MIE_WIDEN_INNER(value)

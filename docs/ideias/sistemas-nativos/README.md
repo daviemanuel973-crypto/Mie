@@ -35,6 +35,16 @@ As referências de inspiração são apenas conceituais:
 - `04-arquitetura-integracao.md`: como os sistemas compartilham dados, eventos, saves e multiplayer.
 - `05-performance-low-first.md`: regras obrigatórias de performance e escalabilidade.
 - `06-roadmap-implementacao.md`: ordem segura de desenvolvimento.
+- `07-plano-v0.6.md`: auditoria da v0.5, contratos, pacotes de trabalho e
+  rastreabilidade usados para iniciar a v0.6.
+
+## Estado de execução
+
+A Fase 0 foi implementada na v0.6: compatibilidade, IDs estáveis, schemas de save,
+scheduler, dirty flags, interesse multiplayer, profiling e uma máquina piloto
+interna. O plano e o estado de validação estão em
+[`07-plano-v0.6.md`](07-plano-v0.6.md). As demais mecânicas continuam organizadas
+por dependência e não devem avançar antes da validação distributiva dessa fundação.
 
 ## Regra de decisão
 

@@ -25,6 +25,7 @@
 #include <profiler.h>
 #include <multyPlayer/playerPersistence.h>
 #include <gameplay/serverSiegeRuntime.h>
+#include <native/serverNativeSystems.h>
 #include <unordered_set>
 #include <cmath>
 #include <algorithm>
@@ -1031,6 +1032,7 @@ void enetServerFunction(std::string path)
 		}
 	}
 	loadServerSiegeRuntime(worldSaver);
+	mie::native::loadServerNativeSystems(worldSaver);
 	
 	if (!structuresManager.loadAllStructures())
 	{
@@ -1192,6 +1194,10 @@ void enetServerFunction(std::string path)
 			{
 				std::cerr << "Warning: could not autosave world time and siege schedule.\n";
 			}
+			if (!mie::native::saveServerNativeSystems(worldSaver))
+			{
+				std::cerr << "Warning: could not autosave v0.6 native systems.\n";
+			}
 		}
 
 
@@ -1235,6 +1241,10 @@ void enetServerFunction(std::string path)
 	if (!saveServerSiegeRuntime(worldSaver))
 	{
 		std::cerr << "Warning: could not save world time and siege schedule during shutdown.\n";
+	}
+	if (!mie::native::saveServerNativeSystems(worldSaver, true))
+	{
+		std::cerr << "Warning: could not save v0.6 native systems during shutdown.\n";
 	}
 	clearSD(worldSaver);
 	wg.clear();

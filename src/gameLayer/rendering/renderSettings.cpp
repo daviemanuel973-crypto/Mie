@@ -11,6 +11,7 @@
 #include <cctype>
 #include <chrono>
 #include <worldCatalog.h>
+#include <gameplay/playerControlSettings.h>
 
 void displayRenderSettingsMenuButton(ProgramData &programData)
 {
@@ -433,6 +434,36 @@ void displaySettingsMenu(ProgramData &programData)
 	displayRenderSettingsMenuButton(programData);
 	
 	displayVolumeMenuButton(programData);
+
+	displayControlsSettingsMenuButton(programData);
+}
+
+void displayControlsSettingsMenuButton(ProgramData &programData)
+{
+	programData.ui.menuRenderer.BeginMenu("Controls", Colors_Gray, programData.ui.buttonTexture);
+	displayControlsSettingsMenu(programData);
+	programData.ui.menuRenderer.EndMenu();
+}
+
+void displayControlsSettingsMenu(ProgramData &programData)
+{
+	auto &settings = getPlayerControlSettings();
+	programData.ui.menuRenderer.Text("Movement assists", Colors_White);
+	const bool autoJumpChanged = programData.ui.menuRenderer.ToggleButton("Auto jump on half blocks",
+		Colors_White, &settings.autoJump, programData.ui.buttonTexture, Colors_Gray);
+	const bool autoRunChanged = programData.ui.menuRenderer.ToggleButton("Auto run",
+		Colors_White, &settings.autoRun, programData.ui.buttonTexture, Colors_Gray);
+	programData.ui.menuRenderer.Text(std::string("Camera: ") +
+		getPlayerCameraModeName(settings.cameraMode), Colors_White);
+	if (programData.ui.menuRenderer.Button("Cycle camera (F5)", Colors_Gray,
+		programData.ui.buttonTexture))
+	{
+		cyclePlayerCameraMode();
+	}
+	else if (autoJumpChanged || autoRunChanged)
+	{
+		savePlayerControlSettings();
+	}
 }
 
 bool shouldReloadTexturePacks()

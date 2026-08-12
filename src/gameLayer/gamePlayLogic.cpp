@@ -34,13 +34,16 @@
 #include <gameplay/mapEngine.h>
 #include <gameplay/battleUI.h>
 #include <gameplay/food.h>
+#include <gameplay/playerControlSettings.h>
 #include <gameplay/worldTime.h>
 #include <cameraShaker.h>
+#include <cmath>
 #include <cstdint>
 
 struct GameData
 {
 	Camera c;
+	Camera inputCamera;
 	ChunkSystem chunkSystem;
 	bool escapePressed = 0;
 	bool showLightLevels = 0;
@@ -133,6 +136,63 @@ struct GameData
 	}
 }gameData;
 
+namespace
+{
+	glm::dvec3 placeThirdPersonCamera(ChunkSystem &chunkSystem, glm::dvec3 anchor,
+		glm::dvec3 desired)
+	{
+		const glm::dvec3 offset = desired - anchor;
+		const double distance = glm::length(offset);
+		if (distance <= 0.001) { return anchor; }
+		const glm::dvec3 direction = offset / distance;
+		const int steps = std::max(1, static_cast<int>(std::ceil(distance / 0.12)));
+		glm::dvec3 lastClear = anchor;
+		for (int step = 1; step <= steps; ++step)
+		{
+			const double progress = std::min(distance, step * 0.12);
+			const glm::dvec3 candidate = anchor + direction * progress;
+			Block *block = chunkSystem.getBlockSafe(candidate);
+			if (block && block->isColidable()) { break; }
+			lastClear = candidate;
+		}
+		return lastClear;
+	}
+
+	bool hasHalfBlockAhead(ChunkSystem &chunkSystem, const Player &player,
+		glm::vec3 localMove, glm::vec3 cameraDirection, bool &headClearance)
+	{
+		headClearance = false;
+		cameraDirection.y = 0.f;
+		if (glm::length(cameraDirection) <= 0.001f) { return false; }
+		cameraDirection = glm::normalize(cameraDirection);
+		const glm::vec3 right = glm::normalize(glm::cross(cameraDirection, glm::vec3(0, 1, 0)));
+		glm::vec3 worldMove = right * localMove.x + cameraDirection * -localMove.z;
+		worldMove.y = 0.f;
+		if (glm::length(worldMove) <= 0.1f) { return false; }
+		worldMove = glm::normalize(worldMove);
+
+		const glm::ivec3 footBlock = from3DPointToBlock(player.position +
+			glm::dvec3(worldMove) * 0.72 - glm::dvec3(0, 0.08, 0));
+		const glm::ivec3 currentFloor = from3DPointToBlock(player.position -
+			glm::dvec3(0, 0.08, 0));
+		Block *standingOn = chunkSystem.getBlockSafe(currentFloor);
+		if (standingOn && (standingOn->isSlabMesh() || standingOn->isStairsMesh()))
+		{
+			return false;
+		}
+		Block *halfBlock = chunkSystem.getBlockSafe(footBlock);
+		if (!halfBlock || (!halfBlock->isSlabMesh() && !halfBlock->isStairsMesh()))
+		{
+			return false;
+		}
+		Block *above = chunkSystem.getBlockSafe(footBlock + glm::ivec3(0, 1, 0));
+		Block *aboveHead = chunkSystem.getBlockSafe(footBlock + glm::ivec3(0, 2, 0));
+		headClearance = (!above || !above->isColidable()) &&
+			(!aboveHead || !aboveHead->isColidable());
+		return true;
+	}
+}
+
 ThreadPool threadPoolForChunkBaking;
 
 float &getHitLensDirt()
@@ -221,6 +281,7 @@ bool initGameplay(ProgramData &programData, const char *c) //GAME STUFF!
 	gameData.clearData();
 	//threadPoolForChunkBaking.setThreadsNumber(2, bakeWorkerThread);
 	gameData.c.position = glm::vec3(0, 65, 0);
+	gameData.inputCamera = gameData.c;
 
 	gameData.entityManager.localPlayer.entity = playerData.entity;
 	gameData.entityManager.localPlayer.entityId = playerData.yourPlayerEntityId;
@@ -332,6 +393,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	if (h != 0)
 	{
 		gameData.c.aspectRatio = (float)w / h;
+		gameData.inputCamera.aspectRatio = (float)w / h;
 	}
 	glViewport(0, 0, w, h);
 
@@ -370,7 +432,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		bool respawned = 0;
 
 		clientMessageLoop(validateEvent, inValidateRevision,
-			from3DPointToBlock(gameData.c.position), gameData.chunkSystem.squareSize,
+			from3DPointToBlock(gameData.inputCamera.position), gameData.chunkSystem.squareSize,
 			gameData.entityManager, gameData.undoQueue,
 			gameData.chunkSystem, gameData.lightSystem,
 			gameData.serverTimer, disconnect,
@@ -645,6 +707,11 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		gameData.showUI = !gameData.showUI;
 	}
 
+	if (!stopMainInput && platform::isKeyReleased(platform::Button::F5))
+	{
+		cyclePlayerCameraMode();
+	}
+
 	if (!stopMainInput || gameData.insideInventoryMenu)
 		if (platform::isKeyReleased(platform::Button::E))
 		{
@@ -661,7 +728,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 	//inventory and menu stuff
 
-	gameData.c.fovRadians = glm::radians(70.f);
+	gameData.inputCamera.fovRadians = glm::radians(70.f);
 
 	glm::vec3 movementForCameraShake = {};
 	if (!stopMainInput)
@@ -669,7 +736,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 		if (platform::isKeyHeld(platform::Button::C))
 		{
-			gameData.c.fovRadians = glm::radians(30.f);
+			gameData.inputCamera.fovRadians = glm::radians(30.f);
 		}
 
 		//move
@@ -726,7 +793,18 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				moveDir.x += 1;
 			}
 
+			// Apply analog movement before evaluating contextual movement assists.
+			glm::vec2 controllerMove = prelucrateControllerMovement(
+				platform::getControllerButtons().LStick.x,
+				platform::getControllerButtons().LStick.y);
+			moveDir.x += controllerMove.x;
+			moveDir.z += controllerMove.y;
+
 			const bool playerInWater = !player.entity.fly && player.entity.isInWater(localChunkGetter);
+			const bool playerClimbing = !player.entity.fly && !playerInWater &&
+				player.entity.isOnClimbable(localChunkGetter);
+			const bool manualJumpRequested = platform::isKeyPressedOn(platform::Button::Space) ||
+				platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held;
 
 			if (player.entity.fly)
 			{
@@ -751,21 +829,45 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 					player.entity.swimUp(localChunkGetter);
 				}
 			}
+			else if (playerClimbing)
+			{
+				float climbDirection = 0.f;
+				if (platform::isKeyHeld(platform::Button::LeftShift)) { climbDirection = -1.f; }
+				else if (platform::isKeyHeld(platform::Button::Space) ||
+					platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held ||
+					moveDir.z < -0.1f)
+				{
+					climbDirection = 1.f;
+				}
+				const bool fastClimb = getPlayerControlSettings().autoRun &&
+					glm::length(glm::vec2(moveDir.x, moveDir.z)) > 0.1f;
+				player.entity.climb(climbDirection, fastClimb, localChunkGetter);
+			}
 			else
 			{
-				if (platform::isKeyPressedOn(platform::Button::Space)
-					|| platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held
-					)
+				if (manualJumpRequested)
 				{
 					gameData.entityManager.localPlayer.entity.jump();
 				}
 			}
 
-			//apply controller move
-			glm::vec2 controllerMove = prelucrateControllerMovement(platform::getControllerButtons().LStick.x, 
-				platform::getControllerButtons().LStick.y);
-			moveDir.x += controllerMove.x;
-			moveDir.z += controllerMove.y;
+			bool headClearance = false;
+			const bool halfBlockAhead = hasHalfBlockAhead(gameData.chunkSystem, player.entity,
+				moveDir, gameData.inputCamera.viewDirection, headClearance);
+			MovementAssistInput assistInput;
+			assistInput.movingForward = glm::length(glm::vec2(moveDir.x, moveDir.z)) > 0.1f;
+			assistInput.grounded = player.entity.forces.colidesBottom();
+			assistInput.halfBlockAhead = halfBlockAhead;
+			assistInput.hasHeadClearance = headClearance;
+			const MovementAssistOutput movementAssist = evaluateMovementAssist(
+				getPlayerControlSettings(), assistInput);
+			if (movementAssist.jump && !manualJumpRequested && !playerClimbing && !playerInWater &&
+				!player.entity.fly)
+			{
+				// A half block needs less impulse than a full manual jump, keeping the
+				// assist smooth without turning slabs into launch pads.
+				player.entity.jump(7.2f);
+			}
 
 			{
 				float l = glm::length(glm::vec2(moveDir.x, moveDir.z));
@@ -776,6 +878,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				}
 
 				float speed = playerInWater ? moveSpeed * 0.68f : moveSpeed;
+				if (!player.entity.fly && !playerInWater && movementAssist.run) { speed *= 1.35f; }
 				moveDir *= speed;
 			}
 
@@ -803,27 +906,28 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 			if (player.entity.fly)
 			{
-				gameData.entityManager.localPlayer.entity.flyFPS(moveDir * deltaTime, gameData.c.viewDirection);
+				gameData.entityManager.localPlayer.entity.flyFPS(moveDir * deltaTime, gameData.inputCamera.viewDirection);
 			}
 			else
 			{
-				gameData.entityManager.localPlayer.entity.moveFPS(moveDir, gameData.c.viewDirection, deltaTime);
+				gameData.entityManager.localPlayer.entity.moveFPS(moveDir, gameData.inputCamera.viewDirection, deltaTime);
 			}
 
 			//gameData.c.moveFPS(moveDir);
 
 			setBodyAndLookOrientation(gameData.entityManager.localPlayer.entity.bodyOrientation,
-				gameData.entityManager.localPlayer.entity.lookDirectionAnimation, moveDir, gameData.c.viewDirection);
+				gameData.entityManager.localPlayer.entity.lookDirectionAnimation, moveDir,
+				gameData.inputCamera.viewDirection);
 
 			//gameData.entityManager.localPlayer.bodyOrientation = 
 			//gameData.entityManager.localPlayer.lookDirection = 
 
 			bool rotate = !gameData.escapePressed;
-			gameData.c.rotateFPS(platform::getRelMousePosition(), 0.22f * 0.02f, rotate);
+			gameData.inputCamera.rotateFPS(platform::getRelMousePosition(), 0.22f * 0.02f, rotate);
 
 			if (rotate) //controller
 			{
-				gameData.c.rotateFPSController(
+				gameData.inputCamera.rotateFPSController(
 					-prelucrateControllerMovementPower(platform::getControllerButtons().RStick.x, platform::getControllerButtons().RStick.y),
 					11.0f * deltaTime
 				);
@@ -832,7 +936,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			if (!gameData.escapePressed)
 			{
 				platform::setRelMousePosition(w / 2, h / 2);
-				gameData.c.lastMousePos = {w / 2, h / 2};
+				gameData.inputCamera.lastMousePos = {w / 2, h / 2};
 			}
 
 			if (glm::length(glm::vec2{moveDir.x, moveDir.z}))
@@ -892,7 +996,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		{
 			gameData.entityManager.dropItemByClient(
 				gameData.entityManager.localPlayer.entity.position,
-				gameData.currentItemSelected, gameData.undoQueue, gameData.c.viewDirection * 5.f,
+				gameData.currentItemSelected, gameData.undoQueue,
+				gameData.inputCamera.viewDirection * 5.f,
 				gameData.serverTimer, player.inventory, !platform::isKeyHeld(platform::Button::LeftCtrl));
 
 			gameData.currentBlockBreaking = {};
@@ -1036,8 +1141,39 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		}
 		
 
-		gameData.c.position = gameData.entityManager.localPlayer.entity.position
-			+ glm::dvec3(0,1.5,0);
+		const glm::dvec3 cameraAnchor = gameData.entityManager.localPlayer.entity.position
+			+ glm::dvec3(0, 1.5, 0);
+		gameData.inputCamera.position = cameraAnchor;
+		const glm::mat4 lastRenderViewProjection = gameData.c.lastFrameViewProjMatrix;
+		gameData.c = gameData.inputCamera;
+		gameData.c.lastFrameViewProjMatrix = lastRenderViewProjection;
+
+		auto &controlSettings = getPlayerControlSettings();
+		controlSettings.normalize();
+		gameData.entityManager.localPlayersForRendering.clear();
+		if (controlSettings.cameraMode != PlayerCameraMode::FirstPerson)
+		{
+			const double directionSign = controlSettings.cameraMode ==
+				PlayerCameraMode::ThirdPersonBack ? -1.0 : 1.0;
+			const glm::dvec3 desiredCamera = cameraAnchor +
+				glm::dvec3(gameData.inputCamera.viewDirection) *
+				(static_cast<double>(controlSettings.thirdPersonDistance) * directionSign);
+			gameData.c.position = placeThirdPersonCamera(gameData.chunkSystem,
+				cameraAnchor, desiredCamera);
+			if (controlSettings.cameraMode == PlayerCameraMode::ThirdPersonFront)
+			{
+				gameData.c.viewDirection = -gameData.inputCamera.viewDirection;
+			}
+
+			auto &renderPlayer = gameData.entityManager.localPlayersForRendering[
+				gameData.entityManager.localPlayer.entityId];
+			renderPlayer.entityBuffered = gameData.entityManager.localPlayer.entity;
+			renderPlayer.rubberBand = {};
+			renderPlayer.rubberBandOrientation.rubberBandOrientation =
+				renderPlayer.entityBuffered.bodyOrientation;
+			renderPlayer.rubberBandOrientation.rubberBandLookDirectionAnimation =
+				renderPlayer.entityBuffered.lookDirectionAnimation;
+		}
 
 
 		gameData.entityManager.doAllUpdates(deltaTime, localChunkGetter, gameData.serverTimer);
@@ -1060,14 +1196,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 	glm::ivec3 rayCastPos = {};
 	std::optional<glm::ivec3> blockToPlace = std::nullopt;
-	glm::dvec3 cameraRayPos = gameData.c.position;
+	glm::dvec3 cameraRayPos = gameData.inputCamera.position;
 	Block *raycastBlock = 0;
 	glm::uint64 targetedEntity = 0;
 	float entityHitDistance = 0;
 	float raycastDist = 0;
 	bool topPartForSlabs = 0;
 
-	int facingDirection = gameData.c.getViewDirectionRotation();
+	int facingDirection = gameData.inputCamera.getViewDirectionRotation();
 	//std::cout << facingDirection << "\n";
 
 	if (!stopMainInput)
@@ -1082,7 +1218,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		float dist = TARGET_DIST;
 
 
-		raycastBlock = gameData.chunkSystem.rayCast(cameraRayPos, gameData.c.viewDirection,
+		raycastBlock = gameData.chunkSystem.rayCast(cameraRayPos, gameData.inputCamera.viewDirection,
 			rayCastPos, TARGET_DIST, blockToPlace, raycastDist);
 
 		if (raycastBlock)
@@ -1092,7 +1228,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			float intersectDist = 0;
 			int intersectFace = 0;
 
-			if (lineIntersectBoxGetPos(cameraRayPos, gameData.c.viewDirection, glm::dvec3(rayCastPos) -
+			if (lineIntersectBoxGetPos(cameraRayPos, gameData.inputCamera.viewDirection,
+				glm::dvec3(rayCastPos) -
 				glm::dvec3(0, 0.5, 0), glm::dvec3(1.f), intersectPos, intersectDist, intersectFace))
 			{
 
@@ -1130,7 +1267,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		auto weaponStats = item.getWeaponStats();
 
 		targetedEntity = gameData.entityManager.intersectAllAttackableEntities(cameraRayPos,
-			gameData.c.viewDirection, std::min(dist, weaponStats.range) , entityHitDistance,
+			gameData.inputCamera.viewDirection, std::min(dist, weaponStats.range), entityHitDistance,
 			weaponStats.getAccuracyAdjusted());
 
 		//std::cout << targetedEntity << "\n";
@@ -1639,7 +1776,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 #pragma region get player positions and stuff
 
-	glm::ivec3 blockPositionPlayer = from3DPointToBlock(gameData.c.position);
+	glm::ivec3 blockPositionPlayer = from3DPointToBlock(gameData.inputCamera.position);
 	bool underWater = 0;
 	auto inBlock = gameData.chunkSystem.getBlockSafe(blockPositionPlayer);
 	if (inBlock)
@@ -1743,7 +1880,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			gameData.point, underWater, w, h, deltaTime, dayTime, gameData.currentSkinBindlessTexture,
 			gameData.handHit, isPlayerMovingSpeed, gameData.playerFOVHandTransform,
 			gameData.currentItemSelected, finalDropStrength, 
-			gameData.showUI, gameData.playersConnectionData
+			gameData.showUI && getPlayerControlSettings().cameraMode ==
+				PlayerCameraMode::FirstPerson, gameData.playersConnectionData
 			);
 
 
@@ -2486,7 +2624,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 					//std::cout << "Attack! ";
 
 					attackEntity(targetedEntity, gameData.currentItemSelected,
-						gameData.c.viewDirection, hitStatus);
+						gameData.inputCamera.viewDirection, hitStatus);
 
 					AudioEngine::playHitSound();
 				}
@@ -2989,14 +3127,16 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				{
 					gameData.entityManager.dropItemByClient(
 						gameData.entityManager.localPlayer.entity.position,
-						PlayerInventory::CURSOR_INDEX, gameData.undoQueue, gameData.c.viewDirection * 5.f,
+						PlayerInventory::CURSOR_INDEX, gameData.undoQueue,
+						gameData.inputCamera.viewDirection * 5.f,
 						gameData.serverTimer, player.inventory, 0);
 				}
 				else if (platform::isRMousePressed())
 				{
 					gameData.entityManager.dropItemByClient(
 						gameData.entityManager.localPlayer.entity.position,
-						PlayerInventory::CURSOR_INDEX, gameData.undoQueue, gameData.c.viewDirection * 5.f,
+						PlayerInventory::CURSOR_INDEX, gameData.undoQueue,
+						gameData.inputCamera.viewDirection * 5.f,
 						gameData.serverTimer, player.inventory, 1);
 				}
 
@@ -3039,7 +3179,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			{
 				gameData.entityManager.dropItemByClient(
 					gameData.entityManager.localPlayer.entity.position,
-					PlayerInventory::CURSOR_INDEX, gameData.undoQueue, gameData.c.viewDirection * 5.f,
+					PlayerInventory::CURSOR_INDEX, gameData.undoQueue,
+					gameData.inputCamera.viewDirection * 5.f,
 					gameData.serverTimer, player.inventory, 0);
 			}
 

@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <audioEngine.h>
 #include <gameplay/loot.h>
+#include <gameplay/playerControlSettings.h>
 #include <worldCatalog.h>
 
 #include <platformTools.h>
@@ -321,6 +322,7 @@ bool initGame() //main server and title screen stuff
 	AudioEngine::loadSettingsOrSetToDefaultIfFail();
 
 	loadShadingSettings();
+	loadPlayerControlSettings();
 	{
 		auto &s = programData.renderer.defaultShader.shadingSettings;
 		auto &loadedS = getShadingSettings();
