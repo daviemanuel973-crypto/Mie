@@ -1,6 +1,7 @@
 #include <gameplay/blocks/blocksWithData.h>
 #include <chunk.h>
 #include <iostream>
+#include <utility>
 
 BaseBlock *BlocksWithDataHolder::getBaseBlock
 (unsigned char x, unsigned char y, unsigned char z)
@@ -143,23 +144,26 @@ void BlocksWithDataHolder::formatBlockData
 
 }
 
-void BlocksWithDataHolder::loadBlockData(std::vector<unsigned char> &data,
+bool BlocksWithDataHolder::loadBlockData(const std::vector<unsigned char> &data,
 	int chunkXChunkSpace, int chunkZChunkSpace)
 {
+	BlocksWithDataHolder candidate;
+	size_t pointer = 0;
 
-	*this = BlocksWithDataHolder{};
-
-	int pointer = 0;
-
-	while (data.size() - pointer >= sizeof(BlockDataHeader))
+	while (pointer < data.size())
 	{
+		if (data.size() - pointer < sizeof(BlockDataHeader))
+		{
+			std::cout << "Error truncated header in loadBlockData!\n";
+			return false;
+		}
 
-		BlockDataHeader header;
+		BlockDataHeader header = {};
 		memcpy(&header, data.data() + pointer, sizeof(BlockDataHeader));
 		pointer += sizeof(BlockDataHeader);
 		
 		auto pos = header.pos;
-		auto size = header.dataSize;
+		auto size = static_cast<size_t>(header.dataSize);
 
 		glm::ivec3 posInChunk = pos;
 		posInChunk.x = modBlockToChunk(posInChunk.x);
@@ -168,77 +172,71 @@ void BlocksWithDataHolder::loadBlockData(std::vector<unsigned char> &data,
 		auto chunkPosX = divideChunk(pos.x);
 		auto chunkPosZ = divideChunk(pos.z);
 
-		if (chunkXChunkSpace != chunkPosX && chunkZChunkSpace != chunkPosZ)
+		// Both coordinates must belong to the chunk being reconstructed. The old
+		// AND check accepted a record that was wrong on just one axis.
+		if (chunkXChunkSpace != chunkPosX || chunkZChunkSpace != chunkPosZ)
 		{
-			std::cout << "Error chunk index size in loadBlockData!\n";
-			break;
+			std::cout << "Error chunk index in loadBlockData!\n";
+			return false;
 		}
 
 		if (size > data.size() - pointer)
 		{
 			std::cout << "Error size in loadBlockData!\n";
-			break;
+			return false;
 		}
 
 		if (header.blockType == BlockTypes::structureBase)
 		{
-			
 			BaseBlock b;
-			size_t _ = 0;
+			size_t bytesRead = 0;
 
-			if (!b.readFromBuffer(data.data() + pointer, size, _))
+			if (!b.readFromBuffer(data.data() + pointer, size, bytesRead))
 			{
 				std::cout << "Error read from buffer in loadBlockData!\n";
-				break;
+				return false;
 			}
 			
-			pointer += size;
-
 			if (!b.isDataValid())
 			{
 				std::cout << "Error is data valid in loadBlockData base block!\n";
-				break;
+				return false;
 			}
 
-			baseBlocks[fromBlockPosInChunkToHashValue(posInChunk.x, posInChunk.y, posInChunk.z)] =
-				b;
-
-
-		}else if (header.blockType == BlockTypes::woddenChest)
+			candidate.baseBlocks[fromBlockPosInChunkToHashValue(posInChunk.x,
+				posInChunk.y, posInChunk.z)] = std::move(b);
+		}
+		else if (header.blockType == BlockTypes::woddenChest)
 		{
 			ChestBlock c;
-			size_t _ = 0;
+			size_t bytesRead = 0;
 
-			if (!c.readFromBuffer(data.data() + pointer, size, _))
+			if (!c.readFromBuffer(data.data() + pointer, size, bytesRead))
 			{
 				std::cout << "Error read from buffer in loadBlockData!\n";
-				break;
+				return false;
 			}
-
-			pointer += size;
 
 			if (!c.isDataValid())
 			{
 				std::cout << "Error is data valid in loadBlockData chests!\n";
-				break;
+				return false;
 			}
 
-			chestBlocks[fromBlockPosInChunkToHashValue(posInChunk.x, posInChunk.y, posInChunk.z)] = 
-				c;
-
+			candidate.chestBlocks[fromBlockPosInChunkToHashValue(posInChunk.x,
+				posInChunk.y, posInChunk.z)] = std::move(c);
 		}
 		else
 		{
-			std::cout << "Error in loadBlockData!\n";
-			break;
+			std::cout << "Error unknown block type in loadBlockData!\n";
+			return false;
 		}
 
-
-
+		pointer += size;
 	}
 
-
-
+	*this = std::move(candidate);
+	return true;
 }
 
 std::uint16_t fromBlockPosInChunkToHashValue(unsigned char x, unsigned char y, unsigned char z)
