@@ -234,6 +234,7 @@ if (BUILD_TESTING)
 		src/gameLayer/native/contentRegistry.cpp
 		src/gameLayer/native/gameplayFoundation.cpp
 		src/gameLayer/native/gameplayScheduler.cpp
+		src/gameLayer/native/processingRecipe.cpp
 		src/gameLayer/native/prototypeMachine.cpp
 		src/gameLayer/native/worldSchema.cpp)
 	target_include_directories(nativeSystemsTests PRIVATE
