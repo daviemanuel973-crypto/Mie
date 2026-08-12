@@ -21,6 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
+set(OURCRAFT_VERSION "0.4.0" CACHE STRING "Mie Survival semantic version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -131,6 +132,8 @@ if (OURCRAFT_INSTALLABLE)
 		# code can safely resolve resources/ without baking a build-machine path.
 		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="resources/")
 		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC
+			INTERNAL_BUILD=0
+			MIE_VERSION="${OURCRAFT_VERSION}"
 			USER_CONTENT_PATH="resources/"
 			USER_SETTINGS_PATH="playerSettings/"
 			USER_ERROR_LOG_PATH="errorLogs.txt")
@@ -143,6 +146,8 @@ if (OURCRAFT_INSTALLABLE)
 		set(OURCRAFT_RESOURCE_DIR "${CMAKE_INSTALL_FULL_DATADIR}/ourcraft/resources/")
 		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="${OURCRAFT_RESOURCE_DIR}")
 		target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC
+			INTERNAL_BUILD=0
+			MIE_VERSION="${OURCRAFT_VERSION}"
 			USER_CONTENT_PATH="resources/"
 			USER_SETTINGS_PATH="playerSettings/"
 			USER_ERROR_LOG_PATH="errorLogs.txt")
@@ -180,6 +185,19 @@ target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE glm glfw glad stb_image st
 	magic_enum safeSave profilerLib
 	libzstd_static assimp)
 
+if (WIN32 AND OURCRAFT_INSTALLABLE)
+	add_executable(MieLauncher WIN32
+		windows/MieLauncher.cpp
+		src/gameLayer/updateProtocol.cpp)
+	target_include_directories(MieLauncher PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	target_compile_definitions(MieLauncher PRIVATE
+		UNICODE _UNICODE
+		MIE_VERSION="${OURCRAFT_VERSION}")
+	target_link_libraries(MieLauncher PRIVATE winhttp bcrypt)
+	set_target_properties(MieLauncher PROPERTIES OUTPUT_NAME "MieLauncher")
+	install(TARGETS MieLauncher RUNTIME DESTINATION ".")
+endif()
+
 if (BUILD_TESTING)
 	add_executable(playerPersistenceTests
 		tests/playerPersistenceTests.cpp
@@ -187,4 +205,24 @@ if (BUILD_TESTING)
 	target_include_directories(playerPersistenceTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME player-persistence-format COMMAND playerPersistenceTests)
+
+	add_executable(worldCatalogTests
+		tests/worldCatalogTests.cpp
+		src/gameLayer/worldCatalog.cpp)
+	target_include_directories(worldCatalogTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME world-catalog COMMAND worldCatalogTests)
+
+	add_executable(updateProtocolTests
+		tests/updateProtocolTests.cpp
+		src/gameLayer/updateProtocol.cpp)
+	target_include_directories(updateProtocolTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME update-protocol COMMAND updateProtocolTests)
+
+	set_tests_properties(
+		player-persistence-format
+		world-catalog
+		update-protocol
+		PROPERTIES TIMEOUT 60)
 endif()

@@ -1,7 +1,10 @@
 #define MyAppName "Mie Survival"
-#define MyAppVersion "0.1.0"
+#ifndef MyAppVersion
+#define MyAppVersion "0.4.0"
+#endif
 #define MyAppPublisher "Mie contributors"
 #define MyAppExeName "Mie.exe"
+#define MyAppLauncherName "MieLauncher.exe"
 
 [Setup]
 AppId={{7B31E8F2-920D-49B9-81D8-2C2CFE9237AF}
@@ -41,13 +44,14 @@ Name: "{app}\resources\worlds"
 Source: "..\stage\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Mie Survival"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
-Name: "{autodesktop}\Mie Survival"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\Mie Survival"; Filename: "{app}\{#MyAppLauncherName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\Mie Survival"; Filename: "{app}\{#MyAppLauncherName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Executar Mie Survival"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppLauncherName}"; Description: "Executar Mie Survival"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; Remove only transient logs. Player-created worlds and settings are intentionally
 ; not recursively deleted, so reinstall/update cycles do not destroy saves.
 Type: files; Name: "{app}\errorLogs.txt"
+Type: filesandordirs; Name: "{app}\updates"

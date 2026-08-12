@@ -45,9 +45,9 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release --parallel 2
 
-      - name: Test player persistence format
+      - name: Test Mie persistence, world catalog and update protocol
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure -R player-persistence-format
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol)$'
 
       - name: Stage portable Windows build
         shell: pwsh
@@ -59,12 +59,39 @@ jobs:
           if (-not (Test-Path $exe)) { throw "Release executable missing: $exe" }
           Copy-Item $exe "stage/Mie.exe"
 
+          $launcher = "build/Release/MieLauncher.exe"
+          if (-not (Test-Path $launcher)) { throw "Release launcher missing: $launcher" }
+          Copy-Item $launcher "stage/MieLauncher.exe"
+
           if (-not (Test-Path "resources")) { throw "resources directory missing" }
           Copy-Item "resources" "stage/resources" -Recurse -Force
 
           if (-not (Test-Path "stage/Mie.exe")) { throw "stage/Mie.exe missing" }
+          if (-not (Test-Path "stage/MieLauncher.exe")) { throw "stage/MieLauncher.exe missing" }
           if (-not (Test-Path "stage/resources/assets")) { throw "staged assets missing" }
           if (-not (Test-Path "stage/resources/shaders")) { throw "staged shaders missing" }
+
+      - name: Verify console-free Windows executables
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe was not found" }
+          $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+          if (-not $vsInstall) { throw "Visual Studio C++ tools were not found" }
+          $dumpbin = Get-ChildItem (Join-Path $vsInstall "VC/Tools/MSVC") -Filter dumpbin.exe -Recurse |
+            Where-Object { $_.FullName -match '[\\/]bin[\\/]Hostx64[\\/]x64[\\/]dumpbin\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $dumpbin) { throw "x64 dumpbin.exe was not found" }
+
+          $gameHeaders = (& $dumpbin.FullName /headers "stage/Mie.exe" 2>&1) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin failed for Mie.exe" }
+          $launcherHeaders = (& $dumpbin.FullName /headers "stage/MieLauncher.exe" 2>&1) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin failed for MieLauncher.exe" }
+          if ($gameHeaders -notmatch "Windows GUI") { throw "Mie.exe is not linked as a GUI application" }
+          if ($launcherHeaders -notmatch "Windows GUI") { throw "MieLauncher.exe is not linked as a GUI application" }
+          $launcherTest = Start-Process -FilePath "stage/MieLauncher.exe" -ArgumentList '--self-test' -Wait -PassThru
+          if ($launcherTest.ExitCode -ne 0) { throw "MieLauncher self-test failed: $($launcherTest.ExitCode)" }
 
       - name: Build portable ZIP
         shell: pwsh
@@ -94,7 +121,7 @@ jobs:
       - name: Build Windows setup executable
         shell: pwsh
         run: |
-          & "$env:ISCC" "windows/Mie.iss"
+          & "$env:ISCC" "/DMyAppVersion=0.4.0" "windows/Mie.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path "dist/Mie-Survival-Windows-x64-Setup.exe")) { throw "setup executable missing" }
 
@@ -108,6 +135,7 @@ jobs:
           $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$installDir") -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "fresh install failed: $($p.ExitCode)" }
           if (-not (Test-Path "$installDir/Mie.exe")) { throw "Mie.exe missing after install" }
+          if (-not (Test-Path "$installDir/MieLauncher.exe")) { throw "MieLauncher.exe missing after install" }
           if (-not (Test-Path "$installDir/resources/shaders")) { throw "shader resources missing after install" }
 
           New-Item -ItemType Directory -Force "$installDir/resources/worlds/ci-preserve" | Out-Null

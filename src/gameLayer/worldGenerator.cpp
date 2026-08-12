@@ -1793,62 +1793,50 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 
 				bool generatedSomethingElse = 0;
 
-				//random stones
+				// Small surface rocks. The old implementation placed multi-block
+				// "small stone" structures on ordinary forest grass, which produced
+				// flat stone plates and could bridge uneven ground. Keep rocks local to
+				// rocky/river terrain and use the dedicated single-block rock model.
 				if(!couldGenerateMediumStructures && !closeToStartingTavern)
 				{
-
-					float stonesChance = glm::mix(0.008, 0.04, stonePatchesVal);
+					const bool rockySurface = stonePatchesVal > 0.58f;
+					const bool riverBank = riverChanceValue > 0.25f && currentBiomeHeight == 2;
+					const bool hayField = currentBiomeIndex == BiomesManager::hayLand &&
+						surfaceBlock == BlockTypes::hayBalde;
+					float stonesChance = rockySurface ? glm::mix(0.004f, 0.018f, stonePatchesVal) : 0.f;
 
 					stonesChance *= randomStones[0];
-					stonesChance += 0.0002;
-
-
-					//more stones near rivers
-					if (riverChanceValue > 0.2 && currentBiomeHeight == 2)
+					if (riverBank)
 					{
-						stonesChance += 0.002;
+						stonesChance += 0.0015f;
 					}
 
-					if (currentBiomeIndex == BiomesManager::hayLand && surfaceBlock == BlockTypes::hayBalde)
+					if (hayField)
 					{
-						stonesChance += 0.002;
+						stonesChance += 0.001f;
 					}
 
-					//if()
-
-					if (getWhiteNoiseChance(x, z, stonesChance))
+					if ((rockySurface || riverBank || hayField) &&
+						c.unsafeGet(x, firstH + 1, z).air() &&
+						getWhiteNoiseChance(x, z, stonesChance))
 					{
-
 						generatedSomethingElse = true;
 
-						StructureToGenerate str;
-
-						if (currentBiomeIndex == BiomesManager::hayLand)
+						if (hayField && getWhiteNoise2Chance(x, z, 0.75))
 						{
-							if (getWhiteNoise2Chance(x, z, 0.75))
-							{
-								str.type = Structure_Hay;
-								str.pos = {x + xPadd, firstH, z + zPadd};
-							}
-							else
-							{
-								str.type = Structure_SmallStone;
-								str.pos = {x + xPadd, firstH + 1, z + zPadd};
-							}
+							StructureToGenerate str;
+							str.type = Structure_Hay;
+							str.pos = {x + xPadd, firstH, z + zPadd};
+							str.randomNumber1 = getWhiteNoise3Val(x, z);
+							str.randomNumber2 = getWhiteNoise3Val(x + 1, z);
+							str.randomNumber3 = getWhiteNoise3Val(x + 1, z + 1);
+							str.randomNumber4 = getWhiteNoise3Val(x, z + 1);
+							generateStructures.push_back(str);
 						}
 						else
 						{
-							str.type = Structure_SmallStone;
-							str.pos = {x + xPadd, firstH + 1, z + zPadd};
+							c.unsafeGet(x, firstH + 1, z).setType(BlockTypes::smallRock);
 						}
-
-
-						str.randomNumber1 = getWhiteNoise3Val(x, z);
-						str.randomNumber2 = getWhiteNoise3Val(x + 1, z);
-						str.randomNumber3 = getWhiteNoise3Val(x + 1, z + 1);
-						str.randomNumber4 = getWhiteNoise3Val(x, z + 1);
-
-						generateStructures.push_back(str);
 					}
 				}
 

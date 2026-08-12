@@ -9,6 +9,8 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <worldCatalog.h>
 
 void displayRenderSettingsMenuButton(ProgramData &programData)
 {
@@ -1206,6 +1208,25 @@ void displayWorldSelectorMenuButton(ProgramData &programData)
 void displayWorldSelectorMenu(ProgramData &programData)
 {
 	auto &renderer = programData.ui.renderer2d;
+	static std::string selected;
+	static std::vector<WorldCatalogEntry> allWorlds;
+	static std::string catalogError;
+	static auto lastCatalogRefresh = std::chrono::steady_clock::time_point{};
+	static bool forceCatalogRefresh = true;
+
+	auto refreshCatalog = [&]()
+	{
+		allWorlds = loadWorldCatalog(USER_CONTENT_PATH "worlds", &catalogError);
+		lastCatalogRefresh = std::chrono::steady_clock::now();
+		forceCatalogRefresh = false;
+
+		auto selectedEntry = std::find_if(allWorlds.begin(), allWorlds.end(),
+			[&](const auto &entry) { return entry.folderName == selected; });
+		if (selectedEntry == allWorlds.end())
+		{
+			selected = allWorlds.empty() ? std::string{} : allWorlds.front().folderName;
+		}
+	};
 
 
 
@@ -1240,8 +1261,6 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 	};
 
-	static std::string selected = "";
-
 	if (programData.ui.menuRenderer.internal.allMenuStacks
 		[programData.ui.menuRenderer.internal.currentId].size()
 		&& programData.ui.menuRenderer.internal.allMenuStacks
@@ -1251,20 +1270,12 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 		drawBackground();
 
-		//folder logic
-
-		if (!std::filesystem::exists(USER_CONTENT_PATH "worlds"))
+		// Refresh periodically so newly created/recovered worlds appear without
+		// rescanning the filesystem on every rendered frame.
+		const auto now = std::chrono::steady_clock::now();
+		if (forceCatalogRefresh || now - lastCatalogRefresh > std::chrono::seconds(2))
 		{
-			std::filesystem::create_directories(USER_CONTENT_PATH "worlds");
-		}
-			
-		std::vector<std::filesystem::path> allWorlds;
-		for (auto const &d : std::filesystem::directory_iterator{USER_CONTENT_PATH "worlds"})
-		{
-			if (d.is_directory())
-			{
-				allWorlds.push_back(d.path().filename());
-			}
+			refreshCatalog();
 		}
 
 
@@ -1281,7 +1292,7 @@ void displayWorldSelectorMenu(ProgramData &programData)
 				auto fullBox = glui::Box().xLeft().yTop().xDimensionPercentage(1.f).yDimensionPercentage(1.f)();
 
 				float buttonH = customWidgetTransform.w;
-				int maxElements = fullBox.w / buttonH;
+				int maxElements = std::max(1, static_cast<int>(fullBox.w / std::max(buttonH, 1.f)));
 
 				advance = std::max(advance, 0);
 				int overflow = allWorlds.size() - maxElements;
@@ -1313,7 +1324,7 @@ void displayWorldSelectorMenu(ProgramData &programData)
 				{
 					if (allWorlds.size() <= i + advance) { break; }
 
-					auto s = allWorlds[i + advance].string();
+					auto s = allWorlds[i + advance].folderName;
 
 					if (s == selected)
 					{
@@ -1328,6 +1339,14 @@ void displayWorldSelectorMenu(ProgramData &programData)
 					}
 
 					worldBox.y += buttonH;
+				}
+
+				if (allWorlds.empty())
+				{
+					programData.ui.renderer2d.renderText(
+						{fullBox.x + 24.f, fullBox.y + 24.f},
+						"No saved worlds yet. Create one below.",
+						programData.ui.font, Colors_White, 0.75f);
 				}
 
 				auto topButton = glui::Box().yTop().xRight().yDimensionPixels(buttonH).xDimensionPixels(buttonH)();
@@ -1367,11 +1386,9 @@ void displayWorldSelectorMenu(ProgramData &programData)
 					}
 
 					auto rightButton = glui::Box().xRight().yCenter().xDimensionPercentage(0.5).yDimensionPercentage(1)();
-					if (drawButton(shrinkPercentage(rightButton, {0.1,0.05}), Colors_Gray, "Settings"))
+					if (drawButton(shrinkPercentage(rightButton, {0.1,0.05}), Colors_Gray, "Refresh worlds"))
 					{
-						
-
-
+						forceCatalogRefresh = true;
 					}
 
 
@@ -1406,10 +1423,15 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 		}
 
+		if (!catalogError.empty())
+		{
+			programData.ui.menuRenderer.Text(catalogError.c_str(), glm::vec4(1, 0.35f, 0.35f, 1));
+		}
+
 	}
 
 	static char seed[12] = {};
-	static char name[20] = {};
+	static char name[49] = {};
 	static int currentIndex = 0; //0 normal, 1 super flat
 	static WorldGeneratorSettings settings;
 	static gl2d::Texture worldPreviewTexture;
@@ -1440,18 +1462,23 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 			if (programData.ui.menuRenderer.Button("Delete", Colors_Gray, programData.ui.buttonTexture))
 			{
-				std::string deletePath = USER_CONTENT_PATH "worlds/";
-				deletePath += selected;
+				const auto deletePath = std::filesystem::path(USER_CONTENT_PATH "worlds") / selected;
 
 				std::error_code error;
 				std::filesystem::remove_all(deletePath, error);
-
-				selected = {};
-
-				programData.ui.menuRenderer.ExitCurrentMenu();
+				if (error)
+				{
+					catalogError = "Could not delete the world: " + error.message();
+				}
+				else
+				{
+					selected = {};
+					forceCatalogRefresh = true;
+					programData.ui.menuRenderer.ExitCurrentMenu();
+				}
 			}
 
-			if (programData.ui.menuRenderer.Button("Cancle", Colors_Gray, programData.ui.buttonTexture))
+			if (programData.ui.menuRenderer.Button("Cancel", Colors_Gray, programData.ui.buttonTexture))
 			{
 				programData.ui.menuRenderer.ExitCurrentMenu();
 			}
@@ -1494,12 +1521,14 @@ void displayWorldSelectorMenu(ProgramData &programData)
 		
 		//programData.ui.menuRenderer.Toggle("Super Flat", Colors_Gray, &superFlatWorld, programData.ui.buttonTexture, programData.ui.buttonTexture);
 
-		std::string finalName = USER_CONTENT_PATH "worlds/";
-		finalName += name;
+		std::string normalizedName;
+		std::string nameError;
+		const bool validName = normalizeWorldName(name, normalizedName, &nameError);
+		std::filesystem::path finalName = std::filesystem::path(USER_CONTENT_PATH "worlds") / normalizedName;
 
-		if (name[0] == '\0')
+		if (!validName)
 		{
-			programData.ui.menuRenderer.Button("Please enter a name!", {0.6,0.4,0.4,1},
+			programData.ui.menuRenderer.Button(nameError.c_str(), {0.6,0.4,0.4,1},
 				programData.ui.buttonTexture);
 		}
 		else if (std::filesystem::exists(finalName))
@@ -1528,8 +1557,8 @@ void displayWorldSelectorMenu(ProgramData &programData)
 			if (create || createAndPlay)
 			{
 				std::error_code err;
-				bool err2 = 0;
-				std::filesystem::create_directory(finalName, err);
+				bool settingsError = false;
+				const bool createdDirectory = std::filesystem::create_directory(finalName, err);
 
 
 				{
@@ -1540,59 +1569,55 @@ void displayWorldSelectorMenu(ProgramData &programData)
 						buffer << f.rdbuf();
 						if (!settings.loadSettings(buffer.str().c_str()))
 						{
-							err2 = true;
+							settingsError = true;
 						}
+					}
+					else
+					{
+						settingsError = true;
 					}
 
 				}
 
-				if (!err && !err2)
+				if (createdDirectory && !err && !settingsError)
 				{
-					int finalSeed = 0;
-					{
-						//std::ofstream f(finalName + "/seed.txt");
-
-						long long computedSeed = 0;
-						long long pow = 1;
-						for (int i = sizeof(seed) - 1; i >= 0; i--)
-						{
-							if (seed[i] != 0)
-							{
-								computedSeed += (seed[i] - '0') * pow;
-								pow *= 10;
-							}
-						}
-
-						if (computedSeed == 0)
-						{
-							computedSeed = time(0);
-						}
-
-						finalSeed = computedSeed;
-						if (finalSeed < 0) { finalSeed = -finalSeed; }
-						if (finalSeed == 0) { finalSeed = 1; }
-
-						//f << (int)finalSeed;
-						//f.close();
-					};
+					const int finalSeed = worldSeedFromText(seed, static_cast<int>(time(nullptr)));
 
 					{
-						std::ofstream f(finalName + "/worldGenSettings.wgenerator");
+						std::ofstream f(finalName / "worldGenSettings.wgenerator");
 						settings.seed = finalSeed;
 						settings.isSuperFlat = (currentIndex == 1);
 
 						settings.sanitize();
 						f << settings.saveSettings();
-
+						settingsError = !f;
 					}
 
-					if (createAndPlay)
+					if (!settingsError && createAndPlay)
 					{
-						hostServer(name);
+						hostServer(normalizedName);
+					}
+					if (!settingsError)
+					{
+						selected = normalizedName;
+						forceCatalogRefresh = true;
+						name[0] = '\0';
+						seed[0] = '\0';
+						programData.ui.menuRenderer.ExitCurrentMenu();
 					}
 				}
 
-				programData.ui.menuRenderer.ExitCurrentMenu();
+				if (!createdDirectory || err || settingsError)
+				{
+					catalogError = err ? "Could not create the world: " + err.message() :
+						(!createdDirectory ? "A world with that name already exists." :
+							"Could not write the world settings.");
+					if (createdDirectory)
+					{
+						std::error_code cleanupError;
+						std::filesystem::remove_all(finalName, cleanupError);
+					}
+				}
 			}
 
 		}

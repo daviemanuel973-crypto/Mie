@@ -335,6 +335,11 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	glViewport(0, 0, w, h);
 
 	auto &player = gameData.entityManager.localPlayer;
+	auto localChunkGetter = [](glm::ivec2 pos) -> ChunkData*
+	{
+		auto *chunk = gameData.chunkSystem.getChunkSafeFromChunkPos(pos.x, pos.y);
+		return chunk ? &chunk->data : nullptr;
+	};
 
 
 #pragma region server stuff
@@ -720,6 +725,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				moveDir.x += 1;
 			}
 
+			const bool playerInWater = !player.entity.fly && player.entity.isInWater(localChunkGetter);
+
 			if (player.entity.fly)
 			{
 				if (platform::isKeyHeld(platform::Button::LeftShift)
@@ -733,6 +740,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 					)
 				{
 					moveDir.y += 1;
+				}
+			}
+			else if (playerInWater)
+			{
+				if (platform::isKeyHeld(platform::Button::Space)
+					|| platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held)
+				{
+					player.entity.swimUp(localChunkGetter);
 				}
 			}
 			else
@@ -759,7 +774,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 					moveDir.z /= l;
 				}
 
-				float speed = moveSpeed;
+				float speed = playerInWater ? moveSpeed * 0.68f : moveSpeed;
 				moveDir *= speed;
 			}
 
@@ -917,20 +932,6 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	{
 		auto playerPosLastFrame = player.entity.lastPosition;
 
-		auto chunkGetter = [](glm::ivec2 pos) -> ChunkData*
-		{
-			auto c = gameData.chunkSystem.getChunkSafeFromChunkPos(pos.x, pos.y);
-			if (c)
-			{
-				return &c->data;
-			}
-			else
-			{
-				return nullptr;
-			}
-		};
-
-		
 		if (gameData.killed)
 		{
 			gameData.entityManager.localPlayer.entity.forces = {};
@@ -943,7 +944,9 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			{
 				auto forcesBackup = gameData.entityManager.localPlayer.entity.forces.velocity;
 
-				gameData.entityManager.localPlayer.entity.update(deltaTime, chunkGetter);
+				gameData.entityManager.localPlayer.entity.update(deltaTime, localChunkGetter);
+				const bool landedInWater =
+					gameData.entityManager.localPlayer.entity.isInWater(localChunkGetter);
 
 				if (gameData.entityManager.localPlayer.entity.forces.colidesBottom())
 				{
@@ -955,7 +958,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				//todo no spawn damage!!!!
 				{
 					//fall damage
-					float rez = glm::length(forcesBackup) - glm::length(newForces);
+					float rez = landedInWater ? 0.f :
+						glm::length(forcesBackup) - glm::length(newForces);
 
 					//if (rez > 0.2)
 					//{
@@ -1035,7 +1039,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			+ glm::dvec3(0,1.5,0);
 
 
-		gameData.entityManager.doAllUpdates(deltaTime, chunkGetter, gameData.serverTimer);
+		gameData.entityManager.doAllUpdates(deltaTime, localChunkGetter, gameData.serverTimer);
 
 
 		gameData.cameraShaker.updateCameraShake(deltaTime, movementForCameraShake, 

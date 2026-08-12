@@ -7,6 +7,7 @@
 #include <structure.h>
 #include <rendering/model.h>
 #include <rendering/UiEngine.h>
+#include <config.h>
 
 struct ProgramData
 {
@@ -39,7 +40,7 @@ struct ProgramData
 	std::vector<gl2d::Texture> lensFlare;
 	float maxFlareSize = 0;
 	int currentFps = 0;
-	bool showImgui = 1;
+	bool showImgui = INTERNAL_BUILD != 0;
 
 
 };

@@ -30,6 +30,12 @@ The Mie branch adds the Survival v0.1 gameplay loop (hunger, food, crafting prog
 
 See [`docs/SURVIVAL_MODE.md`](docs/SURVIVAL_MODE.md) and [`docs/LINUX_FLATPAK.md`](docs/LINUX_FLATPAK.md).
 
+## v0.4 world/runtime update
+
+The current Windows work adds a reliable saved-world selector, water swimming/buoyancy, natural zombie and goblin spawning, cleaner small-rock terrain generation, console-free release startup and a checksum-verified background updater. Existing v0.3 worlds remain compatible, and terrain changes apply only to newly generated chunks.
+
+See [`docs/V0.4_WORLD_AND_RUNTIME.md`](docs/V0.4_WORLD_AND_RUNTIME.md) and [`docs/WINDOWS_UPDATES.md`](docs/WINDOWS_UPDATES.md).
+
 Features and todos:
 
 - [ ] Rendering system
