@@ -23,8 +23,9 @@ namespace mie::native
 	static_assert(BlockTypes::reinforcedBarricade == 210 && BlockTypes::woodenSpikeTrap == 211,
 		"v0.5 defence block IDs must remain stable");
 	static_assert(ItemTypes::stick == V05_FIRST_ITEM_ID &&
-		ItemTypes::lastItem == V05_LAST_ITEM_EXCLUSIVE,
-		"v0.5 item IDs changed; append without renumbering legacy content");
+		ItemTypes::fieldGuide == V07_FIRST_ITEM_ID &&
+		ItemTypes::lastItem == V07_LAST_ITEM_EXCLUSIVE,
+		"persisted v0.5/v0.7 item IDs changed; append without renumbering existing content");
 	static_assert(EntitiesTypesCount == V05_ENTITY_TYPE_COUNT,
 		"v0.5 entity type namespace changed without a migration");
 
