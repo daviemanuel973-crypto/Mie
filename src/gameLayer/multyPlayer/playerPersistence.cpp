@@ -10,9 +10,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
-#include <mutex>
 #include <random>
-#include <unordered_map>
 #include <utility>
 
 namespace
@@ -20,12 +18,6 @@ namespace
 	constexpr std::array<unsigned char, 8> identityMagic = {
 		'M', 'I', 'E', 'I', 'D', 'E', 'N', 0
 	};
-
-	// The recovered v0.6 source does not yet expose the v0.7 Field Guide runtime
-	// on PlayerServer. Retain its persisted extension by stable identity so a
-	// recovered/stabilized build never silently erases objective/reward progress.
-	std::mutex retainedGuideStateMutex;
-	std::unordered_map<std::string, PlayerGuideSaveState> retainedGuideState;
 
 	std::string getLocalIdentitySavePath()
 	{
@@ -53,8 +45,6 @@ namespace
 			value = static_cast<unsigned char>(distribution(generator));
 		}
 
-		// Mark it as an RFC 4122 version-4/variant-1 UUID while keeping the wire
-		// representation as the compact raw 128-bit value.
 		result.bytes[6] = static_cast<unsigned char>((result.bytes[6] & 0x0F) | 0x40);
 		result.bytes[8] = static_cast<unsigned char>((result.bytes[8] & 0x3F) | 0x80);
 		return result;
@@ -88,20 +78,6 @@ namespace
 		std::copy_n(reinterpret_cast<const unsigned char *>(data.data()) +
 			identityMagic.size() + sizeof(version), identity.bytes.size(), identity.bytes.begin());
 		return identity.isValid();
-	}
-
-	void retainGuideState(const PlayerIdentity &identity, PlayerGuideSaveState state)
-	{
-		state.sanitize();
-		std::lock_guard<std::mutex> lock(retainedGuideStateMutex);
-		retainedGuideState[identity.toString()] = state;
-	}
-
-	PlayerGuideSaveState getRetainedGuideState(const PlayerIdentity &identity)
-	{
-		std::lock_guard<std::mutex> lock(retainedGuideStateMutex);
-		const auto found = retainedGuideState.find(identity.toString());
-		return found == retainedGuideState.end() ? PlayerGuideSaveState{} : found->second;
 	}
 }
 
@@ -156,7 +132,6 @@ bool loadPlayerFromDisk(const std::string &worldSavePath,
 		return false;
 	}
 	inventory.sanitize();
-	retainGuideState(identity, snapshot.guideState);
 
 	player.entity.position = {snapshot.position[0], snapshot.position[1], snapshot.position[2]};
 	player.entity.lastPosition = player.entity.position;
@@ -174,6 +149,12 @@ bool loadPlayerFromDisk(const std::string &worldSavePath,
 		? OtherPlayerSettings::CREATIVE : OtherPlayerSettings::SURVIVAL;
 	player.lastHungerPosition = player.entity.position;
 	player.hungerPositionInitialized = true;
+
+	player.starterFieldGuideGranted = snapshot.guideState.starterFieldGuideGranted;
+	player.guideProgress.completedMask = snapshot.guideState.completedObjectives;
+	player.guideProgress.rewardedMask = snapshot.guideState.rewardedObjectives;
+	player.guideProgress.sanitize();
+	player.guideProgressDirty = true;
 	return true;
 }
 
@@ -192,7 +173,10 @@ bool savePlayerToDisk(const std::string &worldSavePath,
 	snapshot.hunger = player.survivalStats.hunger;
 	snapshot.maxHunger = player.survivalStats.maxHunger;
 	snapshot.gameMode = player.otherPlayerSettings.gameMode;
-	snapshot.guideState = getRetainedGuideState(identity);
+	snapshot.guideState.starterFieldGuideGranted = player.starterFieldGuideGranted;
+	snapshot.guideState.completedObjectives = player.guideProgress.completedMask;
+	snapshot.guideState.rewardedObjectives = player.guideProgress.rewardedMask;
+	snapshot.guideState.sanitize();
 	auto inventory = player.inventory;
 	inventory.formatIntoData(snapshot.inventory);
 
