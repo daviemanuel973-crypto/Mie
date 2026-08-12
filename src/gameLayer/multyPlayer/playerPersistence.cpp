@@ -10,7 +10,9 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <mutex>
 #include <random>
+#include <unordered_map>
 #include <utility>
 
 namespace
@@ -18,6 +20,12 @@ namespace
 	constexpr std::array<unsigned char, 8> identityMagic = {
 		'M', 'I', 'E', 'I', 'D', 'E', 'N', 0
 	};
+
+	// The recovered v0.6 source does not yet expose the v0.7 Field Guide runtime
+	// on PlayerServer. Retain its persisted extension by stable identity so a
+	// recovered/stabilized build never silently erases objective/reward progress.
+	std::mutex retainedGuideStateMutex;
+	std::unordered_map<std::string, PlayerGuideSaveState> retainedGuideState;
 
 	std::string getLocalIdentitySavePath()
 	{
@@ -81,6 +89,20 @@ namespace
 			identityMagic.size() + sizeof(version), identity.bytes.size(), identity.bytes.begin());
 		return identity.isValid();
 	}
+
+	void retainGuideState(const PlayerIdentity &identity, PlayerGuideSaveState state)
+	{
+		state.sanitize();
+		std::lock_guard<std::mutex> lock(retainedGuideStateMutex);
+		retainedGuideState[identity.toString()] = state;
+	}
+
+	PlayerGuideSaveState getRetainedGuideState(const PlayerIdentity &identity)
+	{
+		std::lock_guard<std::mutex> lock(retainedGuideStateMutex);
+		const auto found = retainedGuideState.find(identity.toString());
+		return found == retainedGuideState.end() ? PlayerGuideSaveState{} : found->second;
+	}
 }
 
 PlayerIdentity loadOrCreateLocalPlayerIdentity()
@@ -134,6 +156,7 @@ bool loadPlayerFromDisk(const std::string &worldSavePath,
 		return false;
 	}
 	inventory.sanitize();
+	retainGuideState(identity, snapshot.guideState);
 
 	player.entity.position = {snapshot.position[0], snapshot.position[1], snapshot.position[2]};
 	player.entity.lastPosition = player.entity.position;
@@ -169,6 +192,7 @@ bool savePlayerToDisk(const std::string &worldSavePath,
 	snapshot.hunger = player.survivalStats.hunger;
 	snapshot.maxHunger = player.survivalStats.maxHunger;
 	snapshot.gameMode = player.otherPlayerSettings.gameMode;
+	snapshot.guideState = getRetainedGuideState(identity);
 	auto inventory = player.inventory;
 	inventory.formatIntoData(snapshot.inventory);
 
