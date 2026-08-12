@@ -18,7 +18,7 @@ bool Item::isItemThatCanBeUsed()
 {
 	if (type == pigSpawnEgg || type == zombieSpawnEgg 
 		|| type == catSpawnEgg || type == goblinSpawnEgg || type == scareCrowSpawnEgg
-		|| isEatable() || isPaint() 
+		|| type == fieldGuide || isEatable() || isPaint() 
 		)
 	{
 		return true;
@@ -159,28 +159,12 @@ int Item::readFromData(void *data, size_t size)
 		metaData.resize(metaDataSize);
 		readDataIntoVectorUnsafeUnresized((unsigned char *)data + 6, 0, metaDataSize, metaData);
 
-		//if (hasDurability())
-		//{
-		//	if (size < 5)
-		//	{
-		//		return -1;
-		//	}
-		//	unsigned short durability = 0;
-		//	readDataUnsafe((unsigned char *)data + 3, durability);
-		//	writeData(metaData, durability);
-		//
-		//	return 5;
-		//}
-		//else
-
 		{
-			return 6 + metaDataSize; //one short + one char + one short
+			return 6 + metaDataSize;
 		}
 
 	}
 
-
-	//unreachable
 	assert(0);
 }
 
@@ -208,6 +192,10 @@ void Item::sanitize()
 
 unsigned short Item::getStackSize()
 {
+	if (type == fieldGuide)
+	{
+		return 1;
+	}
 	if (isAmmo())
 	{
 		return 999;
@@ -260,6 +248,7 @@ float Item::isAxe()
 		case ironAxe: return 70;
 		case silverAxe: return 80;
 		case goldAxe: return 100;
+		case bronzeAxe: return 40;
 
 	}
 
@@ -275,6 +264,7 @@ float Item::isPickaxe()
 		case ironPickaxe: return 70;
 		case silverPickaxe: return 80;
 		case goldPickaxe: return 100;
+		case bronzePickaxe: return 40;
 	}
 
 	return 0;
@@ -289,6 +279,7 @@ float Item::isShovel()
 		case ironShovel: return 70;
 		case silverShovel: return 80;
 		case goldShovel: return 100;
+		case bronzeShovel: return 40;
 
 	}
 
@@ -315,16 +306,7 @@ bool Item::isWeapon()
 {
 
 	return
-		type >= copperSword && type <= goldBattleAxe;
-
-	//return 
-	//	isBattleAxe() ||
-	//	isSword() ||
-	//	isHammer() ||
-	//	isDagger() ||
-	//	isScythe() ||
-	//	isFlail() ||
-	//	isSpear();
+		(type >= copperSword && type <= goldBattleAxe) || type == bronzeSword;
 }
 
 bool Item::isCoin() const
@@ -345,53 +327,6 @@ int Item::getCoinValue() const
 
 	return 0;
 }
-
-//higher armour penetration, basically a less extreme version of the hammer
-//bool Item::isBattleAxe()
-//{
-//	return type == trainingBattleAxe;
-//}
-
-//well balanced in general
-//bool Item::isSword()
-//{
-//	return type == trainingSword ||
-//		type == copperSword ||
-//		type == leadSword ||
-//		type == ironSword ||
-//		type == silverSword ||
-//		type == goldSword;
-//
-//}
-
-//extra slow, heavy, extremely good armour penetration and knock back
-//bool Item::isHammer()
-//{
-//	return type == trainingWarHammer;
-//}
-
-//extra fast, very high crit and surprize damage
-//bool Item::isDagger()
-//{
-//	return type == trainingKnife;
-//}
-
-//high damage high crit, low armour penetration, so good for like "flesh" enemies
-//bool Item::isScythe()
-//{
-//	return type == trainingScythe;
-//}
-
-//bool Item::isFlail()
-//{
-//	return 0;
-//}
-
-//high range
-//bool Item::isSpear()
-//{
-//	return type == trainingSpear;
-//}
 
 bool Item::isHelmet()
 {
@@ -495,36 +430,32 @@ EntityStats Item::getItemStats()
 	{
 
 		case leatherBoots: ret.armour = 1; break;
-		case leatherChestPlate: ret.armour = 1; break;		//1 + 1 defence set bonus
+		case leatherChestPlate: ret.armour = 1; break;
 		case leatherHelmet: ret.armour = 1; break;
 
 		case copperBoots: ret.armour = 1; break;
-		case copperChestPlate: ret.armour = 2; break;		//2		+ 2 defence set bonus
+		case copperChestPlate: ret.armour = 2; break;
 		case copperHelmet: ret.armour = 1; break;
 
 		case leadBoots: ret.armour = 2; break;
-		case leadChestPlate: ret.armour = 4; break;			//3		+ 1 defence 
+		case leadChestPlate: ret.armour = 4; break;
 		case leadHelmet: ret.armour = 2; break;
 
 		case ironBoots: ret.armour = 3; break;
-		case ironChestPlate: ret.armour = 5; break;			//4		+ 5% mele attack speed
+		case ironChestPlate: ret.armour = 5; break;
 		case ironHelmet: ret.armour = 2; ret.meleAttackSpeed = 3; break;
 
 		case silverBoots: ret.armour = 5; break;
-		case silverChestPlate: ret.armour = 6; break;		//5		
+		case silverChestPlate: ret.armour = 6; break;
 		case silverHelmet: ret.armour = 5; break;
 
 		case goldBoots: ret.armour = 7; break;
-		case goldChestPlate: ret.armour = 11; break;			//6
+		case goldChestPlate: ret.armour = 11; break;
 		case goldHelmet: ret.armour = 7; break;
-
-
 
 		case pawKeychain: ret.stealthSound = 15; break;
 
-
 	};
-
 
 	return ret;
 }
@@ -567,7 +498,7 @@ Item *PlayerInventory::getItemFromIndex(int index, ChestBlock *chestBlock)
 void PlayerInventory::formatIntoData(std::vector<unsigned char> &data)
 {
 
-	data.reserve(data.size() + (INVENTORY_CAPACITY + 4) * sizeof(Item)); //rough estimate
+	data.reserve(data.size() + (INVENTORY_CAPACITY + 4) * sizeof(Item));
 
 	data.push_back(revisionNumber);
 
@@ -608,7 +539,6 @@ bool PlayerInventory::readFromData(void *data, size_t size, size_t *bytesRead)
 	
 	if (size < 1) { return 0; }
 
-	//we first read the revision number
 	revisionNumber = ((unsigned char *)data)[0];
 	currentAdvance++;
 
@@ -619,8 +549,6 @@ bool PlayerInventory::readFromData(void *data, size_t size, size_t *bytesRead)
 
 	if (!readOne(heldInMouse)) { return 0; }
 
-	// Armour was not part of the old wire format. Read it only when present so
-	// old inventory snapshots remain valid.
 	if (currentAdvance < size && !readOne(headArmour)) { return 0; }
 	if (currentAdvance < size && !readOne(chestArmour)) { return 0; }
 	if (currentAdvance < size && !readOne(bootsArmour)) { return 0; }
@@ -636,13 +564,6 @@ void PlayerInventory::sanitize()
 	{
 		getItemFromIndex(i, nullptr)->sanitize();
 	}
-
-	//for (int i = 0; i < INVENTORY_CAPACITY; i++)
-	//{
-	//	items[i].sanitize();
-	//}
-	//
-	//heldInMouse.sanitize();
 
 }
 
@@ -670,12 +591,9 @@ int PlayerInventory::tryPickupItem(const Item &item)
 			std::int64_t oneItemValue = itemValue/ item.counter;
 			if (currentMoney + oneItemValue > maxCoinCapacity)
 			{
-				//we can't do anything
 			}
 			else
 			{
-				//try pick it up....
-				//TODO
 				std::int64_t remainingSlots = maxCoinCapacity - currentMoney;
 				std::int64_t canPickUpCount = remainingSlots / oneItemValue;
 
@@ -685,8 +603,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 				{
 					currentMoney += canPickUpCount * oneItemValue;
 
-					//we redistribute the money
-					//if (currentMoney >= 100'00'00)
 					{
 						int diamondValue = currentMoney / 100'00'00; diamondValue = std::min(diamondValue, 100);
 						items[COINS_START_INDEX + 3].type = ItemTypes::diamondCoin;
@@ -695,7 +611,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 						currentMoney -= diamondValue * 100'00'00;
 					}
 
-					//if (currentMoney >= 100'00)
 					{
 						int goldValue = currentMoney / 100'00; goldValue = std::min(goldValue, 100);
 						items[COINS_START_INDEX + 2].type = ItemTypes::goldCoin;
@@ -704,7 +619,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 						currentMoney -= goldValue * 100'00;
 					}
 
-					//if (currentMoney >= 100)
 					{
 						int silverValue = currentMoney / 100; silverValue = std::min(silverValue, 100);
 						items[COINS_START_INDEX + 1].type = ItemTypes::silverCoin;
@@ -713,7 +627,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 						currentMoney -= silverValue * 100;
 					}
 
-					//if (currentMoney > 0)
 					{
 						items[COINS_START_INDEX].type = ItemTypes::copperCoin;
 						items[COINS_START_INDEX].counter = currentMoney;
@@ -727,8 +640,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 		{
 			currentMoney += itemValue;
 
-			//we redistribute the money
-			//if (currentMoney >= 100'00'00)
 			{
 				int diamondValue = currentMoney / 100'00'00; diamondValue = std::min(diamondValue, 100);
 				items[COINS_START_INDEX + 3].type = ItemTypes::diamondCoin;
@@ -737,7 +648,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 				currentMoney -= diamondValue * 100'00'00;
 			}
 
-			//if (currentMoney >= 100'00)
 			{
 				int goldValue = currentMoney / 100'00; goldValue = std::min(goldValue, 100);
 				items[COINS_START_INDEX + 2].type = ItemTypes::goldCoin;
@@ -746,7 +656,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 				currentMoney -= goldValue * 100'00;
 			}
 
-			//if (currentMoney >= 100)
 			{
 				int silverValue = currentMoney / 100; silverValue = std::min(silverValue, 100);
 				items[COINS_START_INDEX + 1].type = ItemTypes::silverCoin;
@@ -755,7 +664,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 				currentMoney -= silverValue * 100;
 			}
 
-			//if (currentMoney > 0)
 			{
 				items[COINS_START_INDEX].type = ItemTypes::copperCoin;
 				items[COINS_START_INDEX].counter = currentMoney;
@@ -792,7 +700,6 @@ int PlayerInventory::tryPickupItem(const Item &item)
 					currentCounter += taken;
 					items[i].counter = items[i].getStackSize();
 					itemCounter -= taken;
-					//take as much as possible and continue
 				}
 
 			}
@@ -839,7 +746,6 @@ bool PlayerInventory::canItemFit(Item &item, int slot)
 
 
 
-//for textures
 const char *itemsNamesTextures[] = 
 {
 	"stick.png",
@@ -868,7 +774,6 @@ const char *itemsNamesTextures[] =
 	"tools/goldPickaxe.png",
 	"tools/goldAxe.png",
 	"tools/goldShovel.png",
-
 
 	"weapons/copperSword.png",
 	"weapons/leadSword.png",
@@ -904,8 +809,7 @@ const char *itemsNamesTextures[] =
 	"weapons/goldKnife.png",
 	"weapons/goldBattleAxe.png",
 
-
-	"", //eggs
+	"",
 	"",
 	"",
 	"spawnEggs/goblin.png",
@@ -927,7 +831,6 @@ const char *itemsNamesTextures[] =
 	"armour/leatherBoots.png",
 	"armour/leatherChestplate.png",
 	"armour/leatherHelmet.png",
-
 	"armour/copperBoots.png",
 	"armour/copperChestPlate.png",
 	"armour/copperHelmet.png",
@@ -995,6 +898,16 @@ const char *itemsNamesTextures[] =
 	"equipement/pawKeychain.png",
 	"equipement/vitamins.png",
 
+	// v0.7 shipped mappings recovered from Mie.exe.
+	"../blocks/models/books.png",
+	"coal.png",
+	"coal.png",
+	"silverIngot.png",
+	"copperIngot.png",
+	"tools/copperPickaxe.png",
+	"tools/copperAxe.png",
+	"tools/copperShovel.png",
+	"weapons/copperSword.png",
 };
 
 const char *itemsNames[] =
@@ -1047,13 +960,10 @@ const char *itemsNames[] =
 	"Lead Spear",
 	"Lead Knife",
 	"Lead BattleAxe",
-
 	"Iron War Hammer",
 	"Iron Spear",
 	"Iron Knife",
 	"Iron Battle Axe",
-
-
 	"silver WarHammer",
 	"silver Spear",
 	"silver Knife",
@@ -1063,9 +973,7 @@ const char *itemsNames[] =
 	"gold Knife",
 	"gold BattleAxe",
 
-
-
-	"zombie spawn egg", //eggs
+	"zombie spawn egg",
 	"pig spawn egg",
 	"cat spawn egg",
 	"goblin spawn egg",
@@ -1082,9 +990,7 @@ const char *itemsNames[] =
 	"peach",
 	"pinapple",
 	"strawberry",	
-
 	"Apple Pie",
-
 
 	"leather boots",
 	"leather ChestPlate",
@@ -1136,7 +1042,6 @@ const char *itemsNames[] =
 
 	"Healing Potion",
 	"Mana Potion",
-
 	"Fire Resistance Potion",
 	"JumpBoost Potion",
 	"Luck Potion",
@@ -1156,6 +1061,16 @@ const char *itemsNames[] =
 	"Fruit Peeler",
 	"Paw Keychain",
 	"Vitamins",
+
+	"Mie Field Guide",
+	"Charcoal",
+	"Cassiterite Concentrate",
+	"Tin Ingot",
+	"Bronze Ingot",
+	"Bronze Pickaxe",
+	"Bronze Axe",
+	"Bronze Shovel",
+	"Bronze Sword",
 };
 
 const char *getItemTextureName(int itemId)
@@ -1166,7 +1081,6 @@ const char *getItemTextureName(int itemId)
 	return itemsNamesTextures[itemId-ItemsStartPoint];
 }
 
-//doesn't compare size
 bool areItemsTheSame(Item &a, Item &b)
 {
 	if (a.type != b.type)
@@ -1220,7 +1134,6 @@ bool canItemBeMovedToAndMoveIt(Item &from, Item &to)
 }
 
 
-//create item createItem
 Item itemCreator(unsigned short type, unsigned short counter)
 {
 	if (!counter) { return {}; }
@@ -1250,7 +1163,6 @@ float computeMineDurationTime(BlockType type, Item &item)
 	{
 		if (canBeMinedByPickaxe(type))
 		{
-			//todo add speed here;
 			timer /= pickaxe;
 		}
 		else if (!canBeMinedHand)
@@ -1262,7 +1174,6 @@ float computeMineDurationTime(BlockType type, Item &item)
 	{
 		if (canBeMinedByShovel(type))
 		{
-			//todo add speed here;
 			timer /= shovel;
 		}
 		else if (!canBeMinedHand)
@@ -1274,7 +1185,6 @@ float computeMineDurationTime(BlockType type, Item &item)
 	{
 		if (canBeMinedByAxe(type))
 		{
-			//todo add speed here;
 			timer /= axe;
 		}
 		else if (!canBeMinedHand)
@@ -1282,7 +1192,7 @@ float computeMineDurationTime(BlockType type, Item &item)
 			timer *= PENALTY;
 		}
 	}
-	else //hand or no tool
+	else
 	{
 		if (!canBeMinedHand)
 		{
@@ -1493,7 +1403,6 @@ const char *blockNames[] = {
 	"Small Crate",
 	"Lamp",
 	"Wood Torch",
-
 	"Mossy Cobblestone Stairs",
 	"Mossy Cobblestone Slab",
 	"Mossy Cobblestone Wall",
@@ -1501,9 +1410,7 @@ const char *blockNames[] = {
 	"Hay balde",
 	"Training dummy",
 	"Target",
-
 	"Furnace",
-
 	"Goblin Workbench",
 	"Goblin chair",
 	"Goblin table",
@@ -1511,7 +1418,6 @@ const char *blockNames[] = {
 	"Goblin stitching station",
 	"Reinforced Barricade",
 	"Wooden Spike Trap",
-
 };
 
 std::string Item::getItemName()
@@ -1524,7 +1430,6 @@ std::string Item::getItemName()
 	}
 	else
 	{
-		//return std::string(magic_enum::enum_name((BlockTypes)type));
 		return blockNames[type];
 	}
 }
