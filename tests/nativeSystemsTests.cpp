@@ -1,6 +1,7 @@
 #include <native/contentRegistry.h>
 #include <native/gameplayFoundation.h>
 #include <native/gameplayScheduler.h>
+#include <native/processingRecipe.h>
 #include <native/prototypeMachine.h>
 #include <native/worldSchema.h>
 
@@ -46,6 +47,65 @@ namespace
 			&error), "duplicate runtime IDs are rejected");
 		check(!registry.registerContent({ContentKind::Block, 4000, "mie:block/overflow", false},
 			&error), "persisted block ID overflow is rejected");
+
+		ContentRegistry v07 = createV07ContentRegistry();
+		check(v07.size(ContentKind::Item) ==
+			(V05_LAST_ITEM_EXCLUSIVE - V05_FIRST_ITEM_ID) + 9,
+			"v0.7 appends nine survival progression items without renumbering v0.5");
+		check(v07.resolve(ContentKind::Item, "mie:item/field_guide") == 2184,
+			"v0.7 Field Guide keeps its shipped runtime ID");
+		check(v07.resolve(ContentKind::Item, "mie:item/bronze_sword") == 2192,
+			"v0.7 bronze sword keeps its shipped runtime ID");
+		check(v07.resolve(ContentKind::Recipe, "mie:recipe/process_copper_ore") == 2 &&
+			v07.resolve(ContentKind::Recipe, "mie:recipe/alloy_bronze") == 8,
+			"v0.7 processing recipe IDs match the shipped executable");
+	}
+
+	void testProcessingRecipes()
+	{
+		using namespace mie::native;
+		const ContentRegistry content = createV07ContentRegistry();
+		ProcessingRecipeRegistry recipes = createV07ProcessingRecipeRegistry(content);
+		check(recipes.size() == 7, "all seven shipped v0.7 processing recipes are restored");
+
+		const ProcessingRecipe *copper = recipes.find("mie:recipe/process_copper_ore");
+		check(copper && copper->inputs.size() == 1 && copper->outputs.size() == 1 &&
+			copper->inputs[0].kind == ContentKind::Block &&
+			copper->inputs[0].stableKey == "mie:block/v0.5/15" && copper->inputs[0].count == 2 &&
+			copper->outputs[0].stableKey == "mie:item/v0.5/2052" && copper->outputs[0].count == 1 &&
+			copper->durationTicks == 160,
+			"copper ore processing contract matches v0.7");
+
+		const ProcessingRecipe *tin = recipes.find("mie:recipe/refine_tin");
+		check(tin && tin->inputs.size() == 2 && tin->outputs.size() == 1 &&
+			tin->inputs[0].stableKey == "mie:item/tin_concentrate" && tin->inputs[0].count == 2 &&
+			tin->inputs[1].stableKey == "mie:item/charcoal" && tin->inputs[1].count == 1 &&
+			tin->outputs[0].stableKey == "mie:item/tin_ingot" && tin->durationTicks == 120,
+			"tin refining contract matches v0.7");
+
+		const ProcessingRecipe *bronze = recipes.find("mie:recipe/alloy_bronze");
+		check(bronze && bronze->inputs.size() == 3 && bronze->outputs.size() == 1 &&
+			bronze->inputs[0].stableKey == "mie:item/v0.5/2052" && bronze->inputs[0].count == 3 &&
+			bronze->inputs[1].stableKey == "mie:item/tin_ingot" && bronze->inputs[1].count == 1 &&
+			bronze->inputs[2].stableKey == "mie:item/charcoal" && bronze->inputs[2].count == 1 &&
+			bronze->outputs[0].stableKey == "mie:item/bronze_ingot" && bronze->outputs[0].count == 4 &&
+			bronze->durationTicks == 200,
+			"bronze alloy contract matches v0.7");
+
+		std::string error;
+		ProcessingRecipe invalid;
+		invalid.stableKey = "mie:recipe/alloy_bronze";
+		invalid.machineKey = "mie:machine/prototype_processor";
+		invalid.inputs = {{ContentKind::Item, "mie:item/charcoal", 1000}};
+		invalid.outputs = {{ContentKind::Item, "mie:item/bronze_ingot", 1}};
+		invalid.durationTicks = 1;
+		ProcessingRecipeRegistry validation;
+		check(!validation.registerRecipe(invalid, content, &error),
+			"v0.7 rejects processing stacks above 999 units");
+		invalid.inputs[0].count = 1;
+		invalid.durationTicks = 72001;
+		check(!validation.registerRecipe(invalid, content, &error),
+			"v0.7 rejects processing durations above 72000 ticks");
 	}
 
 	void testSchemaAndMigrations()
@@ -227,6 +287,7 @@ namespace
 int main()
 {
 	testContentRegistry();
+	testProcessingRecipes();
 	testSchemaAndMigrations();
 	testScheduler();
 	testDirtyEventsAndInterest();
