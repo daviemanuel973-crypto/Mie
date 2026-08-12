@@ -136,7 +136,7 @@ jobs:
             -Iinclude/gameLayer \
             tests/siegeDirectorTests.cpp \
             src/gameLayer/gameplay/siege.cpp \
-			src/gameLayer/gameplay/worldTime.cpp \
+            src/gameLayer/gameplay/worldTime.cpp \
             -o siegeDirectorTests
           ./siegeDirectorTests
 
