@@ -46,7 +46,7 @@ namespace
 
 		bool readBytes(void *value, std::size_t count)
 		{
-			if ((!data && count) || count > size - std::min(position, size)) { return false; }
+			if ((!data && count) || position > size || count > size - position) { return false; }
 			if (count) { std::memcpy(value, data + position, count); }
 			position += count;
 			return true;
@@ -89,8 +89,11 @@ std::vector<unsigned char> formatPlayerSaveSnapshot(const PlayerSaveSnapshot &sn
 		return {};
 	}
 
+	PlayerGuideSaveState guideState = snapshot.guideState;
+	guideState.sanitize();
+
 	std::vector<unsigned char> data;
-	data.reserve(64 + snapshot.inventory.size());
+	data.reserve(80 + snapshot.inventory.size());
 	appendBytes(data, playerSaveMagic.data(), playerSaveMagic.size());
 	appendValue(data, PLAYER_SAVE_FORMAT_VERSION);
 	appendBytes(data, snapshot.identity.bytes.data(), snapshot.identity.bytes.size());
@@ -100,6 +103,14 @@ std::vector<unsigned char> formatPlayerSaveSnapshot(const PlayerSaveSnapshot &sn
 	appendValue(data, snapshot.hunger);
 	appendValue(data, snapshot.maxHunger);
 	appendValue(data, snapshot.gameMode);
+
+	// v0.7 extension. Keep this byte-plus-two-mask layout stable: it is the
+	// layout used by the shipped Mie Survival 0.7.0 portable build.
+	const std::uint8_t starterGuide = guideState.starterFieldGuideGranted ? 1u : 0u;
+	appendValue(data, starterGuide);
+	appendValue(data, guideState.completedObjectives);
+	appendValue(data, guideState.rewardedObjectives);
+
 	const auto inventorySize = static_cast<std::uint32_t>(snapshot.inventory.size());
 	appendValue(data, inventorySize);
 	appendBytes(data, snapshot.inventory.data(), snapshot.inventory.size());
@@ -115,7 +126,8 @@ bool parsePlayerSaveSnapshot(const void *data, std::size_t size, PlayerSaveSnaps
 	std::uint32_t inventorySize = 0;
 
 	if (!reader.readBytes(magic.data(), magic.size()) || magic != playerSaveMagic ||
-		!reader.read(version) || version != PLAYER_SAVE_FORMAT_VERSION ||
+		!reader.read(version) ||
+		(version != PLAYER_SAVE_LEGACY_FORMAT_VERSION && version != PLAYER_SAVE_FORMAT_VERSION) ||
 		!reader.readBytes(snapshot.identity.bytes.data(), snapshot.identity.bytes.size()) ||
 		!snapshot.identity.isValid())
 	{
@@ -133,7 +145,25 @@ bool parsePlayerSaveSnapshot(const void *data, std::size_t size, PlayerSaveSnaps
 
 	if (!reader.read(snapshot.life) || !reader.read(snapshot.maxLife) ||
 		!reader.read(snapshot.hunger) || !reader.read(snapshot.maxHunger) ||
-		!reader.read(snapshot.gameMode) || !reader.read(inventorySize) ||
+		!reader.read(snapshot.gameMode))
+	{
+		return false;
+	}
+
+	if (version == PLAYER_SAVE_FORMAT_VERSION)
+	{
+		std::uint8_t starterGuide = 0;
+		if (!reader.read(starterGuide) || starterGuide > 1u ||
+			!reader.read(snapshot.guideState.completedObjectives) ||
+			!reader.read(snapshot.guideState.rewardedObjectives))
+		{
+			return false;
+		}
+		snapshot.guideState.starterFieldGuideGranted = starterGuide != 0;
+		snapshot.guideState.sanitize();
+	}
+
+	if (!reader.read(inventorySize) ||
 		inventorySize > MAX_PLAYER_INVENTORY_SAVE_SIZE || inventorySize != reader.remaining())
 	{
 		return false;
