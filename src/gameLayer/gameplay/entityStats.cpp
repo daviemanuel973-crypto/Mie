@@ -68,8 +68,10 @@ void EntityStats::add(EntityStats &other)
 
 void EntityStats::normalize()
 {
-
-	runningSpeed = glm::clamp(runningSpeed, 0.f, 0.f);
+	// runningSpeed is a percentage modifier just like the other offensive/player
+	// stats. The previous 0..0 clamp silently erased every movement-speed bonus.
+	// Keep the same bounded modifier contract used by the neighboring stats.
+	runningSpeed = glm::clamp(runningSpeed, -300.f, 300.f);
 	armour = glm::clamp(armour, (short)0, (short)300);
 	knockBackResistance = glm::clamp(knockBackResistance, (short)-300, (short)100);
 	thorns = glm::clamp(thorns, (short)0, (short)300);
