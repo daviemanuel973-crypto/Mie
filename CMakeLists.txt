@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.6.0" CACHE STRING "Mie Survival semantic version")
+set(OURCRAFT_VERSION "0.7.1" CACHE STRING "Mie Survival semantic version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -56,7 +56,7 @@ set(ASSIMP_BUILD_GLTFB_IMPORTER ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_GLTFB_EXPORTER OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
 add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
-option(ASSIMP_BUILD_STATIC_LIB "If the library shall be built as static library." ON)
+option(ASSIMP_BUILD_STATIC_LIB "If the library shall be build as static library." ON)
 set(ASSIMP_BUILD_ZLIB "1" CACHE STRING "If zlib is used, static linking. Specify Zlib < 1.3")
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
@@ -160,6 +160,7 @@ else()
 	# Developer build: load assets directly from the checkout.
 	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC RESOURCES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/resources/")
 	target_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC
+		MIE_VERSION="${OURCRAFT_VERSION}"
 		USER_CONTENT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/resources/"
 		USER_SETTINGS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/playerSettings/"
 		USER_ERROR_LOG_PATH="${CMAKE_CURRENT_SOURCE_DIR}/errorLogs.txt")
@@ -250,6 +251,14 @@ if (BUILD_TESTING)
 	target_link_libraries(playerControlSettingsTests PRIVATE safeSave)
 	add_test(NAME player-control-settings COMMAND playerControlSettingsTests)
 
+	add_executable(entityStatsTests
+		tests/entityStatsTests.cpp
+		src/gameLayer/gameplay/entityStats.cpp)
+	target_include_directories(entityStatsTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	target_link_libraries(entityStatsTests PRIVATE glm)
+	add_test(NAME entity-stats COMMAND entityStatsTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -257,5 +266,6 @@ if (BUILD_TESTING)
 		siege-director
 		native-systems
 		player-control-settings
+		entity-stats
 		PROPERTIES TIMEOUT 60)
 endif()
