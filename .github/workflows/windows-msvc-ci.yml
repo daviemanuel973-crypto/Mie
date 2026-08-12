@@ -47,7 +47,7 @@ jobs:
 
       - name: Test all Mie gameplay contracts
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings)$'
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings|entity-stats)$'
 
       - name: Stage portable Windows build
         shell: pwsh
@@ -121,7 +121,7 @@ jobs:
       - name: Build Windows setup executable
         shell: pwsh
         run: |
-          & "$env:ISCC" "/DMyAppVersion=0.6.0" "windows/Mie.iss"
+          & "$env:ISCC" "/DMyAppVersion=0.7.1" "windows/Mie.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path "dist/Mie-Survival-Windows-x64-Setup.exe")) { throw "setup executable missing" }
 
