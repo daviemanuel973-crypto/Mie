@@ -9,7 +9,7 @@ const char *itemsDescriptions[] =
 	"Brittle. Still has some fight left in it.",                   // bone
 
 	"Shiny and slightly warm.",                                    // copperIngot
-	"Heavy. Don’t lick it.",                                       // leadIngot
+	"Heavy. Donâ€™t lick it.",                                       // leadIngot
 	"Reliable. For serious crafting.",                             // ironIngot
 	"Classy and conductive.",                                      // silverIngot
 	"Fancy and overpriced.",                                       // goldIngot
@@ -20,7 +20,7 @@ const char *itemsDescriptions[] =
 	"Heavy hitter.",                                               // lead pickaxe
 	"Trees tremble.",                                              // lead axe
 	"Might dig more than holes.",                                  // lead shovel
-	"Classic miner’s choice.",                                     // iron pickaxe
+	"Classic minerâ€™s choice.",                                     // iron pickaxe
 	"Cuts like a dream.",                                          // iron axe
 	"Efficient and stylish.",                                      // iron shovel
 	"Almost too pretty to use.",                                   // silver pickaxe
@@ -30,7 +30,7 @@ const char *itemsDescriptions[] =
 	"Swing with style.",                                           // gold axe
 	"For luxurious holes.",                                        // gold shovel
 
-	"Won’t impress goblins.",                                      // copper sword
+	"Wonâ€™t impress goblins.",                                      // copper sword
 	"Packs a punch.",                                              // lead sword
 	"Trusty and true.",                                            // iron sword
 	"Elegant and sharp.",                                          // silver sword
@@ -40,140 +40,83 @@ const char *itemsDescriptions[] =
 	"For practice, not pride.",                                    // trainingSword
 	"Massive but harmless.",                                       // trainingWarHammer
 	"Pointy, but padded.",                                         // trainingSpear
-	"Won’t cut deep—hopefully.",                                   // trainingKnife
+	"Wonâ€™t cut deepâ€”hopefully.",                                   // trainingKnife
 	"All bark, no bite.",                                          // trainingBattleAxe
 
-	"" ,														//"copperWarHammer" ,
-	"" ,															//"copperSpear" ,
-	"" ,															//"copperKnife" ,
-	"" ,														//"copperBattleAxe" ,
-	"" ,														//"leadWarHammer" ,
-	"" ,															//"leadSpear" ,
-	"" ,															//"leadKnife" ,
-	"" ,														//"leadBattleAxe" ,
-	"",																//	ironWarHammer,
-	"",																//ironSpear,
-	"",																//ironKnife,
-	"",																//ironBattleAxe,
-	"" ,														//"silverWarHammer" ,
-	"" ,															//"silverSpear" ,
-	"" ,															//"silverKnife" ,
-	"" ,														//"silverBattleAxe" ,
-	"" ,														//"goldWarHammer" ,
-	"" ,															//"goldSpear" ,
-	"" ,															//"goldKnife" ,
-	"" ,														//"goldBattleAxe" ,
-
+	"", "", "", "", // copper weapons
+	"", "", "", "", // lead weapons
+	"", "", "", "", // iron weapons
+	"", "", "", "", // silver weapons
+	"", "", "", "", // gold weapons
 
 	"Hope you brought a sword.",                                   // zombie spawn egg
 	"Oinks included.",                                             // pig spawn egg
 	"May ignore you.",                                             // cat spawn egg
 	"Good luck.",                                                  // goblin spawn egg
-	"",																//scare crow
+	"",                                                            // scare crow
 
 	"Keeps you going.",                                            // apple
 	"A bit tart.",                                                 // blackBerrie
-	"Nature’s candy.",                                             // blueBerrie
+	"Natureâ€™s candy.",                                             // blueBerrie
 	"Double the fun.",                                             // cherries
 	"Why did you eat that?",                                       // chilliPepper
 	"Shake it first.",                                             // cocconut
-	"Don’t slip on them.",                                         // grapes
+	"Donâ€™t slip on them.",                                         // grapes
 	"Pucker up.",                                                  // lime
 	"Soft and sweet.",                                             // peach
 	"Spiky outside, sweet inside.",                                // pinapple
-	"Smells like summer",						                   // strawberry
-	"Restores decent health",									   // apple pie
+	"Smells like summer",                                         // strawberry
+	"Restores decent health",                                      // apple pie
 
-	"Better than barefoot.",                                       // leather boots
-	"Not just for looks.",                                         // leather ChestPlate
-	"Keeps your head warm.",                                       // leather cap
-	"Clink with every step.",                                      // copper boots
-	"Slightly protective, very loud.",                             // copper ChestPlate
-	"Stylish head protection.",                                    // copper cap
-	"Don’t try to swim.",                                          // lead boots
-	"Heavy-duty defense.",                                         // lead ChestPlate
-	"Thicc hat energy.",                                           // lead cap
-	"For the serious adventurer.",                                 // iron boots
-	"Reliable bodyguard.",                                         // iron ChestPlate
-	"Keeps brain safe-ish.",                                       // iron cap
-	"Fashion meets function.",                                     // silver boots
-	"Gleams in sunlight.",                                         // silver ChestPlate
-	"Shiny and snug.",                                             // silver cap
-	"Impractical, but fabulous.",                                  // gold boots
-	"Flex with protection.",                                       // gold ChestPlate
-	"Crown-adjacent.",                                             // gold cap
+	"Better than barefoot.", "Not just for looks.", "Keeps your head warm.",
+	"Clink with every step.", "Slightly protective, very loud.", "Stylish head protection.",
+	"Donâ€™t try to swim.", "Heavy-duty defense.", "Thicc hat energy.",
+	"For the serious adventurer.", "Reliable bodyguard.", "Keeps brain safe-ish.",
+	"Fashion meets function.", "Gleams in sunlight.", "Shiny and snug.",
+	"Impractical, but fabulous.", "Flex with protection.", "Crown-adjacent.",
 
-	"Used to wash paint away from blocks.",                     // soap
-	"Blank canvas starter.",                                       // white paint
-	"Moody but soft.",                                             // lightGray paint
-	"Serious and stormy.",                                         // darkGray paint
-	"Embrace the void.",                                           // black paint
-	"Dirt, but artsy.",                                            // brown paint
-	"Danger? Passion? You decide.",                                // red paint
-	"Zesty and bold.",                                             // orange paint
-	"Sunshine in a can.",                                          // yellow paint
-	"Loud and proud.",                                             // lime paint
-	"Nature vibes.",                                               // green paint
-	"Somewhere between cool and cooler.",                          // turqoise paint
-	"Fresh like ocean breeze.",                                    // cyan paint
-	"Classic and calming.",                                        // blue paint
-	"Royal pick.",                                                 // purple paint
-	"Hot and dramatic.",                                           // magenta paint
-	"Loudly lovely.",                                              // pink paint
+	"Used to wash paint away from blocks.",
+	"Blank canvas starter.", "Moody but soft.", "Serious and stormy.", "Embrace the void.",
+	"Dirt, but artsy.", "Danger? Passion? You decide.", "Zesty and bold.", "Sunshine in a can.",
+	"Loud and proud.", "Nature vibes.", "Somewhere between cool and cooler.",
+	"Fresh like ocean breeze.", "Classic and calming.", "Royal pick.", "Hot and dramatic.",
+	"Loudly lovely.",
 
-	"Don’t spend it all at once.",                                 // copper coin
-	"Feels richer already.",                                       // silver coin
-	"Now you're getting somewhere.",                               // gold coin
-	"You're filthy rich.",                                         // diamond coin
+	"Donâ€™t spend it all at once.", "Feels richer already.", "Now you're getting somewhere.",
+	"You're filthy rich.",
 
-	"Basic but useful",                                           // wooden arrow
-	"What could go wrong?",                                        // flaming arrow
-	"Pointy and petty",                                           // goblin arrow
-	"Creepy but effective",                                       // bone arrow
+	"Basic but useful", "What could go wrong?", "Pointy and petty", "Creepy but effective",
 	"Used for baking stuff",
 
-	"heals you",
-	"restores your mana",
-
-	"", //fireResistancePotion,
-	"", //jumpBoostPotion,
-	"", //luckPotion,
-	"", //manaRegenerationPotion,
-	"Don't drink it lol", //poisonPotion,
-	"", //recallPotion,
-	"", //regenerationPotion,
-	"", //shieldingPotion,
-	"", //speedPotion,
-	"", //stealthPotion,
-	"", //strengthPotion,
-	"Mele damage inflics poison on enemies", //venomusPotion,
-	"Don't drink it lol", //bad luck,
+	"heals you", "restores your mana",
+	"", "", "", "", "Don't drink it lol", "", "", "", "", "", "",
+	"Mele damage inflics poison on enemies", "Don't drink it lol",
 
 	"Reduces the satiety effect by 5 secconds",
 	"Starts healing faster",
 	"All fruit good effects are longer",
 	"Stealthy like a cat",
-	"ALl healing items will heal a little more"
+	"ALl healing items will heal a little more",
 
+	// v0.7 survival progression. Keep these aligned with IDs 2184-2192.
+	"A practical guide to survival, sieges, charcoal, bronze and village life.",
+	"Fuel made from wood. Used for smelting and early metallurgy.",
+	"Tin-bearing concentrate prepared from cassiterite for refining.",
+	"Refined tin used with copper to make bronze.",
+	"The first durable alloy of Mie's early metal age.",
+	"A bronze pickaxe with 40% mining power.",
+	"A bronze axe with 40% chopping power.",
+	"A bronze shovel with 40% digging power.",
+	"A balanced early-metal sword dealing 10 base damage."
 };
 
-
-	
 std::string Item::getItemDescription()
 {
-
-
-	static_assert(sizeof(itemsDescriptions) / sizeof(itemsDescriptions[0]) == lastItem - ItemsStartPoint, "");
+	static_assert(sizeof(itemsDescriptions) / sizeof(itemsDescriptions[0]) == lastItem - ItemsStartPoint, "item descriptions must match the persisted item range");
 
 	if (isItem(type))
 	{
 		return itemsDescriptions[type - ItemsStartPoint];
 	}
-	else
-	{
-		return "";
-	}
-
 	return "";
 }
-
