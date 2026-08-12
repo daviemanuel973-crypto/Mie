@@ -146,6 +146,7 @@ jobs:
             src/gameLayer/native/contentRegistry.cpp \
             src/gameLayer/native/gameplayFoundation.cpp \
             src/gameLayer/native/gameplayScheduler.cpp \
+            src/gameLayer/native/processingRecipe.cpp \
             src/gameLayer/native/prototypeMachine.cpp \
             src/gameLayer/native/worldSchema.cpp \
             -o nativeSystemsTests
@@ -160,6 +161,13 @@ jobs:
             thirdparty/safeSave/src/safeSave.cpp \
             -o playerControlSettingsTests
           ./playerControlSettingsTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/entityStatsTests.cpp \
+            src/gameLayer/gameplay/entityStats.cpp \
+            -o entityStatsTests
+          ./entityStatsTests
 
       - name: Build Flatpak repository
         shell: bash
@@ -181,7 +189,7 @@ jobs:
       - name: Create installable bundle
         run: |
           flatpak build-bundle flatpak-repo Mie-Survival-Linux-x86_64.flatpak \
-            io.github.daviemanuel973.Mie stable \
+            io.github.davieman973.Mie stable \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - name: Smoke-test install and writable user data
