@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include <native/processingRecipe.h>
 #include <native/prototypeMachine.h>
 #include <native/worldSchema.h>
 
@@ -24,4 +25,5 @@ namespace mie::native
 	void updateServerNativeSystems(float deltaTime);
 	ServerNativeSystemsMetrics getServerNativeSystemsMetrics();
 	PrototypeMachineRuntime &getPrototypeMachineRuntime();
+	const ProcessingRecipeRegistry &getProcessingRecipeRegistry();
 }
