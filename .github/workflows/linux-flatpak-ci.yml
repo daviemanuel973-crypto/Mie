@@ -189,7 +189,7 @@ jobs:
       - name: Create installable bundle
         run: |
           flatpak build-bundle flatpak-repo Mie-Survival-Linux-x86_64.flatpak \
-            io.github.davieman973.Mie stable \
+            io.github.daviemanuel973.Mie stable \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - name: Smoke-test install and writable user data
