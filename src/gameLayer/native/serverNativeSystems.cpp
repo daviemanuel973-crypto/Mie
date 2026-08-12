@@ -32,7 +32,9 @@ namespace mie::native
 	{
 		struct ServerNativeState
 		{
-			ContentRegistry contentRegistry = createV06ContentRegistry();
+			ContentRegistry contentRegistry = createV07ContentRegistry();
+			ProcessingRecipeRegistry processingRecipes =
+				createV07ProcessingRecipeRegistry(contentRegistry);
 			WorldSchemaManifest manifest = makeV06WorldSchemaManifest();
 			PrototypeMachineRuntime machines;
 			ServerNativeSystemsMetrics metrics;
@@ -205,5 +207,10 @@ namespace mie::native
 	PrototypeMachineRuntime &getPrototypeMachineRuntime()
 	{
 		return state.machines;
+	}
+
+	const ProcessingRecipeRegistry &getProcessingRecipeRegistry()
+	{
+		return state.processingRecipes;
 	}
 }
