@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
