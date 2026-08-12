@@ -53,5 +53,12 @@ namespace mie::native
 	constexpr std::uint32_t V05_LAST_ITEM_EXCLUSIVE = 2184;
 	constexpr std::uint32_t V05_ENTITY_TYPE_COUNT = 8;
 
+	// The shipped v0.7.0 binary appended nine survival-progression items after
+	// the frozen v0.5 item range. Keep these IDs stable so old inventories and
+	// recovered worlds do not reinterpret an item after an update.
+	constexpr std::uint32_t V07_FIRST_ITEM_ID = V05_LAST_ITEM_EXCLUSIVE;
+	constexpr std::uint32_t V07_LAST_ITEM_EXCLUSIVE = V07_FIRST_ITEM_ID + 9;
+
 	ContentRegistry createV06ContentRegistry();
+	ContentRegistry createV07ContentRegistry();
 }
