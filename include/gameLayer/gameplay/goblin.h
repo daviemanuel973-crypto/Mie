@@ -16,7 +16,7 @@ struct Goblin: public PhysicalEntity, public CanPushOthers
 
 	glm::vec3 getMaxColliderSize();
 
-	Life life{55};
+	Life life{30};
 
 	Armour getArmour() { return {1}; };
 };
