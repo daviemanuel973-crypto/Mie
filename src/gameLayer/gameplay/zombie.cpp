@@ -6,6 +6,7 @@
 #include <glm/gtx/transform.hpp>
 #include <gameplay/zombie.h>
 #include <gameplay/basicEnemyBehaviour.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <multyPlayer/serverChunkStorer.h>
 #include <iostream>
 #include <glm/gtx/quaternion.hpp>
@@ -145,6 +146,12 @@ bool ZombieServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 	std::unordered_map<std::uint64_t, glm::dvec3> &playersPosition,
 	std::unordered_map < std::uint64_t, Client *> &allClients)
 {
+	// v0.7.1 ecology migration: zombies are deliberate siege enemies rather than
+	// ambient wildlife. Returning false makes the server remove legacy zombies
+	// left in saves by the old surprise-spawn loop. During a siege the normal AI
+	// remains fully active.
+	if (!isServerSiegeWaveActive()) { return false; }
+
 	configureVariant(yourEID);
 
 	BasicEnemyBehaviourOtherSettings settings;
