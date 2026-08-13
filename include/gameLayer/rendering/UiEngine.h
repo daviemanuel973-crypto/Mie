@@ -24,6 +24,7 @@ const int INVENTORY_TAB_CRAFTING = 1;
 const int INVENTORY_TAB_CHEST = 2;
 const int INVENTORY_TAB_BLOCKS = 3;
 const int INVENTORY_TAB_ITEMS = 4;
+const int INVENTORY_TAB_FIELD_GUIDE = 5;
 
 
 struct UiENgine
@@ -112,8 +113,8 @@ struct UiENgine
 struct Oscilator
 {
 
-	Oscilator() {};
-	Oscilator(float t, int fazes = 2): maxFazeTime(t), maxFazes(fazes) {};
+	Oscilator() {}
+	Oscilator(float t, int fazes = 2): maxFazeTime(t), maxFazes(fazes) {}
 
 
 	float maxFazeTime  = 0;
