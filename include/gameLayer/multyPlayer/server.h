@@ -1,4 +1,11 @@
 #pragma once
+
+// server.cpp includes this header before tick.h. tick.h uses this marker to
+// redirect only the server's automatic ambient spawn calls through the
+// ecology policy, while gameplay systems that include tick.h directly keep
+// the normal explicit/siege spawn functions.
+#define MIE_SERVER_API_INCLUDED 1
+
 #include <chrono>
 #include <unordered_map>
 #include <glm/vec2.hpp>
