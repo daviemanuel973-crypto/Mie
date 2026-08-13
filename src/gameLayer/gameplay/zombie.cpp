@@ -149,19 +149,19 @@ bool ZombieServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 
 	BasicEnemyBehaviourOtherSettings settings;
 	settings.runSpeed = 2.f * moveSpeedMultiplier;
-	settings.searchDistance = 40.f;
-	settings.hearBonus = 0.08f;
-	settings.sightBonus = 0.08f;
+	settings.searchDistance = 16.f;
+	settings.hearBonus = 0.02f;
+	settings.sightBonus = 0.05f;
 
 	if (variant == Runner)
 	{
-		settings.searchDistance = 46.f;
-		settings.hearBonus = 0.16f;
+		settings.searchDistance = 18.f;
+		settings.hearBonus = 0.06f;
 	}
 	else if (variant == Brute)
 	{
-		settings.searchDistance = 34.f;
-		settings.hearBonus = 0.12f;
+		settings.searchDistance = 14.f;
+		settings.hearBonus = 0.03f;
 		settings.sightBonus = 0.02f;
 	}
 
