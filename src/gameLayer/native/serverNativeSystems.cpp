@@ -10,6 +10,7 @@
 
 #include <blocks.h>
 #include <gameplay/allentities.h>
+#include <gameplay/fieldGuide.h>
 #include <gameplay/items.h>
 #include <multyPlayer/chunkSaver.h>
 #include <multyPlayer/enetServerFunction.h>
@@ -55,6 +56,82 @@ namespace mie::native
 		std::string machinesPath(const WorldSaver &worldSaver)
 		{
 			return (std::filesystem::path(worldSaver.savePath) / "prototypeMachines").string();
+		}
+
+		bool inventoryContainsType(const PlayerInventory &inventory, std::uint16_t type)
+		{
+			for (const Item &item : inventory.items)
+			{
+				if (item.type == type && item.counter > 0) { return true; }
+			}
+			return inventory.heldInMouse.type == type && inventory.heldInMouse.counter > 0;
+		}
+
+		bool ensureStarterFieldGuide(PlayerServer &player)
+		{
+			if (player.starterFieldGuideGranted) { return false; }
+
+			const Item guide = itemCreator(ItemTypes::fieldGuide, 1);
+			if (guide.type != ItemTypes::fieldGuide || player.inventory.tryPickupItem(guide) != 1)
+			{
+				// A full inventory should not permanently lose the starter guide. Retry on
+				// later ticks until a slot is available, then persist the granted flag.
+				return false;
+			}
+
+			player.starterFieldGuideGranted = true;
+			player.guideProgressDirty = true;
+			return true;
+		}
+
+		bool refreshGuideObjectives(PlayerServer &player)
+		{
+			bool changed = false;
+			if (inventoryContainsGuideWoodLog(player.inventory))
+			{
+				changed |= completeGuideObjective(player.guideProgress, GuideObjective::GatherWood);
+			}
+			if (inventoryContainsType(player.inventory, 144))
+			{
+				changed |= completeGuideObjective(player.guideProgress, GuideObjective::BuildWorkbench);
+			}
+			if (inventoryContainsType(player.inventory, 204))
+			{
+				changed |= completeGuideObjective(player.guideProgress, GuideObjective::BuildFurnace);
+			}
+			if (inventoryContainsType(player.inventory, ItemTypes::charcoal))
+			{
+				changed |= completeGuideObjective(player.guideProgress, GuideObjective::MakeCharcoal);
+			}
+			if (inventoryContainsType(player.inventory, ItemTypes::bronzeIngot))
+			{
+				changed |= completeGuideObjective(player.guideProgress, GuideObjective::EnterBronzeAge);
+			}
+			if (changed) { player.guideProgressDirty = true; }
+			return changed;
+		}
+
+		void updatePlayerFieldGuides()
+		{
+			for (auto &entry : getAllClientsReff())
+			{
+				Client &client = entry.second;
+				PlayerServer &player = client.playerData;
+				bool inventoryChanged = ensureStarterFieldGuide(player);
+				refreshGuideObjectives(player);
+				if (deliverPendingGuideRewards(player.guideProgress, player.inventory))
+				{
+					player.guideProgressDirty = true;
+					inventoryChanged = true;
+				}
+
+				if (inventoryChanged)
+				{
+					// Keep the client inventory authoritative immediately after first-time
+					// rewards instead of waiting for another unrelated inventory action.
+					sendPlayerInventoryAndIncrementRevision(client);
+				}
+			}
 		}
 
 		void refreshMachineSimulationLevels()
@@ -183,6 +260,7 @@ namespace mie::native
 	void updateServerNativeSystems(float deltaTime)
 	{
 		const auto start = std::chrono::steady_clock::now();
+		updatePlayerFieldGuides();
 		state.interestRefreshTimer -= deltaTime;
 		if (state.interestRefreshTimer <= 0.f)
 		{
