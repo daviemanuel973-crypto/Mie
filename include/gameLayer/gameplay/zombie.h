@@ -20,7 +20,7 @@ struct Zombie: public PhysicalEntity, public CanPushOthers
 
 	glm::vec3 getMaxColliderSize();
 
-	Life life{200};
+	Life life{40};
 	
 	Armour getArmour() { return {1}; };
 };
@@ -29,7 +29,6 @@ struct Zombie: public PhysicalEntity, public CanPushOthers
 struct ZombieClient: public ClientEntity<Zombie, ZombieClient>
 {
 	float currentHandsAngle = 0;
-
 	void update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter);
 	void setEntityMatrix(glm::mat4 *skinningMatrix);
 
