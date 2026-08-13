@@ -193,11 +193,11 @@ WeaponStats Item::getWeaponStats()
 	case trainingScythe: { basicScythe(7); } break;
 
 	case trainingKnife: { basicKnife(3); } break;
-	case copperKnife: { basicKnife(5); } break;
-	case leadKnife: { basicKnife(8); } break;
-	case ironKnife: { basicKnife(11); } break;
-	case silverKnife: { basicKnife(14); } break;
-	case goldKnife: { basicKnife(17); } break;
+	case copperKnife: { basicKnife(8); } break;
+	case leadKnife: { basicKnife(11); } break;
+	case ironKnife: { basicKnife(14); } break;
+	case silverKnife: { basicKnife(17); } break;
+	case goldKnife: { basicKnife(20); } break;
 
 	case trainingSword: { basicSword(5); } break;
 	case copperSword: { basicSword(7); } break;
