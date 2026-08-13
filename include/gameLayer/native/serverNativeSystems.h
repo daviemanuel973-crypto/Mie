@@ -4,6 +4,7 @@
 
 #include <native/processingRecipe.h>
 #include <native/prototypeMachine.h>
+#include <native/villagerSociety.h>
 #include <native/worldSchema.h>
 
 struct WorldSaver;
@@ -13,6 +14,7 @@ namespace mie::native
 	struct ServerNativeSystemsMetrics
 	{
 		PrototypeMachineMetrics machines;
+		VillagerSocietyMetrics villagers;
 		std::uint64_t accumulatedCpuMicroseconds = 0;
 		std::uint64_t peakCpuMicroseconds = 0;
 		std::uint64_t manifestFallbacks = 0;
@@ -25,5 +27,6 @@ namespace mie::native
 	void updateServerNativeSystems(float deltaTime);
 	ServerNativeSystemsMetrics getServerNativeSystemsMetrics();
 	PrototypeMachineRuntime &getPrototypeMachineRuntime();
+	VillagerSocietyRuntime &getVillagerSocietyRuntime();
 	const ProcessingRecipeRegistry &getProcessingRecipeRegistry();
 }
