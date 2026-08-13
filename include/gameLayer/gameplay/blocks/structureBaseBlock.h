@@ -16,7 +16,7 @@ struct BaseBlock
 
 	size_t formatIntoData(std::vector<unsigned char> &appendTo);
 
-	bool readFromBuffer(unsigned char *data, size_t s, size_t &outReadSize);
+	bool readFromBuffer(const unsigned char *data, size_t s, size_t &outReadSize);
 
 	bool isDataValid();
 };
