@@ -169,3 +169,18 @@ void renderFieldGuideUi(UiENgine &ui, int w, int h, bool insideInventory,
 		}
 	}
 }
+
+void UiENgine::renderGameUIWithFieldGuide(float deltaTime,
+	int w, int h, int itemSelected, PlayerInventory &inventory,
+	BlocksLoader &blocksLoader, bool insideInventory, int &cursorItemIndex,
+	int &currentInventoryTab, bool isCreative,
+	unsigned short &selectedItem, Life &playerHealth, ProgramData &programData,
+	LocalPlayer &player, int &craftingSlider, int &outCraftingRecepieGlobalIndex,
+	bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock)
+{
+	renderGameUI(deltaTime, w, h, itemSelected, inventory, blocksLoader,
+		insideInventory, cursorItemIndex, currentInventoryTab, isCreative,
+		selectedItem, playerHealth, programData, player, craftingSlider,
+		outCraftingRecepieGlobalIndex, showUI, interactingBlock, chestBlock);
+	renderFieldGuideUi(*this, w, h, insideInventory, currentInventoryTab);
+}
