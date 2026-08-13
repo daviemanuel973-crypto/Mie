@@ -242,7 +242,7 @@ LootTable &GoblinServer::getLootTable()
 	switch (variant)
 	{
 	case Warrior: return goblinWarriorLootTable;
-	case Chief: return goblinWarriorLootTable;
+	case Chief: return goblinChiefLootTable;
 	case Common:
 	default: return goblinLootTable;
 	}
