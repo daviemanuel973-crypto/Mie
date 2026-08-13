@@ -1,4 +1,9 @@
 #pragma once
+
+#ifndef MIE_UIENGINE_HEADER_INCLUDED
+#define MIE_GAMEPLAY_HEADER_OWNS_UI_INCLUDE 1
+#endif
+
 #include <gl2d/gl2d.h>
 #include <glui/glui.h>
 #include <profiler.h>
@@ -8,6 +13,10 @@
 #include <rendering/model.h>
 #include <rendering/UiEngine.h>
 #include <config.h>
+
+#ifdef MIE_GAMEPLAY_HEADER_OWNS_UI_INCLUDE
+#define renderGameUI renderGameUIWithFieldGuide
+#endif
 
 struct ProgramData
 {
