@@ -6,11 +6,13 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <blocks.h>
 #include <gameplay/allentities.h>
 #include <gameplay/fieldGuide.h>
+#include <gameplay/fieldGuideProtocol.h>
 #include <gameplay/items.h>
 #include <multyPlayer/chunkSaver.h>
 #include <multyPlayer/enetServerFunction.h>
@@ -41,6 +43,7 @@ namespace mie::native
 			PrototypeMachineRuntime machines;
 			VillagerSocietyRuntime villagers;
 			ServerNativeSystemsMetrics metrics;
+			std::unordered_map<std::uint64_t, GuideProgress> sentGuideProgress;
 			std::uint64_t currentTick = 0;
 			float interestRefreshTimer = 0.f;
 			bool manifestDirty = false;
@@ -115,9 +118,30 @@ namespace mie::native
 			return changed;
 		}
 
+		void synchronizeGuideProgress(std::uint64_t cid, Client &client)
+		{
+			const GuideProgress progress = client.playerData.guideProgress;
+			auto previous = state.sentGuideProgress.find(cid);
+			if (previous != state.sentGuideProgress.end() &&
+				previous->second.completedMask == progress.completedMask &&
+				previous->second.rewardedMask == progress.rewardedMask)
+			{
+				return;
+			}
+
+			if (client.peer)
+			{
+				GuideProgress payload = progress;
+				sendPacket(client.peer, headerUpdateGuideProgress, &payload, sizeof(payload),
+					true, channelEffects);
+				state.sentGuideProgress[cid] = progress;
+			}
+		}
+
 		void updatePlayerFieldGuides()
 		{
-			for (auto &entry : getAllClientsReff())
+			auto &clients = getAllClientsReff();
+			for (auto &entry : clients)
 			{
 				Client &client = entry.second;
 				PlayerServer &player = client.playerData;
@@ -133,6 +157,13 @@ namespace mie::native
 				{
 					sendPlayerInventoryAndIncrementRevision(client);
 				}
+				synchronizeGuideProgress(entry.first, client);
+			}
+
+			for (auto it = state.sentGuideProgress.begin(); it != state.sentGuideProgress.end();)
+			{
+				if (clients.find(it->first) == clients.end()) { it = state.sentGuideProgress.erase(it); }
+				else { ++it; }
 			}
 		}
 
