@@ -122,7 +122,7 @@ WeaponStats Item::getWeaponStats()
 		stats.damage = damage;
 		stats.critDamage = damage * 2.f;
 		stats.surprizeDamage = std::max(damage * 4, 20);
-		stats.range = 1;
+		stats.range = 1.45f;
 		stats.knockBack = 1;
 		stats.speed = 15;
 		stats.drawSpeed = 15;
