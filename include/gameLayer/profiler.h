@@ -46,6 +46,10 @@ struct Profiler
 	GPUProfiler gpuProfiler[5] = {};
 
 	bool gpuProfilingEnabeled = 0;
+	// GL_TIME_ELAPSED queries cannot be nested. Track the currently open
+	// subprofile so an accidental duplicate/missing end cannot leave the OpenGL
+	// query/debug-group stacks unbalanced across the frame boundary.
+	std::string activeGpuSubProfile;
 	void initGPUProfiler();
 
 	bool pause = 0;
