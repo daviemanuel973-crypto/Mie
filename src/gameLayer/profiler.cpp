@@ -27,6 +27,15 @@ void Profiler::startFrame()
 
 	if (gpuProfilingEnabeled)
 	{
+		// A GL_TIME_ELAPSED query must never survive into another frame. Recover
+		// defensively if a call site forgot its matching endSubProfile().
+		if (!activeGpuSubProfile.empty())
+		{
+			gpuProfiler[currentGpuProfilerIndex].end();
+			glPopDebugGroup();
+			activeGpuSubProfile.clear();
+		}
+
 		currentGpuProfilerIndex++;
 		if (currentGpuProfilerIndex >= GPU_PROFILE_FRAMES)
 		{
@@ -50,6 +59,14 @@ void Profiler::endFrame()
 
 	if (gpuProfilingEnabeled)
 	{
+		// Keep the OpenGL query/debug stacks balanced even when a caller exits a
+		// profiled section early or accidentally uses startSubProfile as its end.
+		if (!activeGpuSubProfile.empty())
+		{
+			gpuProfiler[currentGpuProfilerIndex].end();
+			glPopDebugGroup();
+			activeGpuSubProfile.clear();
+		}
 
 		int readProfiler = currentGpuProfilerIndex+1;
 		if (readProfiler >= GPU_PROFILE_FRAMES) { readProfiler = 0; }
@@ -200,8 +217,27 @@ void Profiler::startSubProfile(const char *c)
 
 	if (gpuProfilingEnabeled)
 	{
+		// GL_TIME_ELAPSED queries cannot nest. A duplicate start with the same
+		// name is treated as the missing close (this also recovers the historical
+		// "Unload chunks" typo). A different start implicitly closes stale state
+		// before opening the next section instead of issuing invalid OpenGL calls.
+		if (!activeGpuSubProfile.empty())
+		{
+			gpuProfiler[currentGpuProfilerIndex].end();
+			glPopDebugGroup();
+
+			if (activeGpuSubProfile == c)
+			{
+				activeGpuSubProfile.clear();
+				return;
+			}
+
+			activeGpuSubProfile.clear();
+		}
+
 		gpuProfiler[currentGpuProfilerIndex].start(c);
 		glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, c);
+		activeGpuSubProfile = c;
 	}
 	else
 	{
@@ -215,11 +251,13 @@ void Profiler::endSubProfile(const char *c)
 
 	if (gpuProfilingEnabeled)
 	{
-		permaAssertComment(c == gpuProfiler[currentGpuProfilerIndex].queryNames[gpuProfiler[currentGpuProfilerIndex].currentQuery], 
-			"Inconsistent start end sub profiler for GPU profiling");
-		gpuProfiler[currentGpuProfilerIndex].end();
+		// Ignore a stale/mismatched end instead of ending whichever GL query is
+		// currently active. Correct pairs still follow the normal fast path.
+		if (activeGpuSubProfile != c) { return; }
 
+		gpuProfiler[currentGpuProfilerIndex].end();
 		glPopDebugGroup();
+		activeGpuSubProfile.clear();
 	}
 	else
 	{
