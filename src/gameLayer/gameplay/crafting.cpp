@@ -1,4 +1,5 @@
 #include <gameplay/crafting.h>
+#include <gameplay/fieldGuide.h>
 
 
 template<long long I>
@@ -41,6 +42,8 @@ static CraftingRecepie recepies[] =
 	recepie<2>(Item(BlockTypes::cookingPot, 1),{Item(ItemTypes::ironIngot, 5), Item(BlockTypes::wooden_plank, 2)}).setAnyWood().setRequiresWorkBench(),
 	recepie<1>(Item(BlockTypes::woddenChest, 1), {Item(BlockTypes::wooden_plank, 8)}).setAnyWood().setRequiresWorkBench(),
 	recepie<1>(Item(ItemTypes::bandage, 1), {Item(ItemTypes::cloth, 3)}),
+	// Shipped v0.7: the guide is also craftable, even though new players receive one automatically.
+	recepie<2>(Item(ItemTypes::fieldGuide, 1), {Item(ItemTypes::cloth, 2), Item(ItemTypes::wheat, 1)}),
 	recepie<2>(Item(BlockTypes::reinforcedBarricade, 2), {Item(BlockTypes::wooden_plank, 6), Item(ItemTypes::stick, 2)}).setAnyWood().setRequiresWorkBench(),
 	recepie<2>(Item(BlockTypes::woodenSpikeTrap, 2), {Item(BlockTypes::wooden_plank, 4), Item(ItemTypes::stick, 4)}).setAnyWood().setRequiresWorkBench(),
 
@@ -80,6 +83,8 @@ static CraftingRecepie recepies[] =
 	recepie<1>(Item(ItemTypes::copperCoin, 100), {Item(ItemTypes::silverCoin, 1)}),
 
 	recepie<2>(Item(BlockTypes::torchWood, 4), {Item(BlockTypes::wooden_plank, 1), Item(ItemTypes::cloth, 1)}).setAnyWood(),
+	// Shipped v0.7 guide recipe: 1 charcoal + 1 stick -> 4 torches.
+	recepie<2>(Item(BlockTypes::torchWood, 4), {Item(ItemTypes::charcoal, 1), Item(ItemTypes::stick, 1)}),
 
 	//arrows
 	recepie<2>(Item(ItemTypes::arrow, 10), {Item(BlockTypes::wooden_plank, 1), Item(BlockTypes::cobblestone, 1)}).setAnyWood(),
@@ -87,12 +92,17 @@ static CraftingRecepie recepies[] =
 	recepie<2>(Item(ItemTypes::goblinArrow, 5), {Item(ItemTypes::arrow, 5), Item(ItemTypes::fang, 1)}),
 	recepie<2>(Item(ItemTypes::boneArrow, 5), {Item(ItemTypes::arrow, 5), Item(ItemTypes::bone, 1)}),
 
-	//bars
+	//bars and v0.7 bronze-age progression
 	recepie<1>(Item(ItemTypes::copperIngot, 1), {Item(BlockTypes::copperOre, 2)}).setRequiresFurnace(),
 	recepie<1>(Item(ItemTypes::leadIngot, 1), {Item(BlockTypes::leadOre, 2)}).setRequiresFurnace(),
 	recepie<1>(Item(ItemTypes::ironIngot, 1), {Item(BlockTypes::ironOre, 3)}).setRequiresFurnace(),
 	recepie<1>(Item(ItemTypes::silverIngot, 1), {Item(BlockTypes::silverOre, 3)}).setRequiresFurnace(),
 	recepie<1>(Item(ItemTypes::goldIngot, 1), {Item(BlockTypes::goldOre, 4)}).setRequiresFurnace(),
+	// Exact contracts recovered from the shipped v0.7 executable.
+	recepie<1>(Item(ItemTypes::charcoal, 2), {Item(BlockTypes::woodLog, 1)}).setAnyWood().setRequiresFurnace(),
+	recepie<1>(Item(ItemTypes::tinConcentrate, 1), {Item(BlockTypes::gravel, 8)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::tinIngot, 1), {Item(ItemTypes::tinConcentrate, 2), Item(ItemTypes::charcoal, 1)}).setRequiresFurnace(),
+	recepie<3>(Item(ItemTypes::bronzeIngot, 4), {Item(ItemTypes::copperIngot, 3), Item(ItemTypes::tinIngot, 1), Item(ItemTypes::charcoal, 1)}).setRequiresFurnace(),
 
 	//tools
 	recepie<2>(Item(ItemTypes::copperPickaxe, 1), {Item(ItemTypes::copperIngot, 4), Item(BlockTypes::wooden_plank, 3)}).setAnyWood().setRequiresWorkBench(),
@@ -110,6 +120,9 @@ static CraftingRecepie recepies[] =
 	recepie<2>(Item(ItemTypes::goldPickaxe, 1), {Item(ItemTypes::goldIngot, 4), Item(BlockTypes::wooden_plank, 3)}).setAnyWood().setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::goldAxe, 1), {Item(ItemTypes::goldIngot, 3), Item(BlockTypes::wooden_plank, 3)}).setAnyWood().setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::goldShovel, 1), {Item(ItemTypes::goldIngot, 3), Item(BlockTypes::wooden_plank, 3)}).setAnyWood().setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::bronzePickaxe, 1), {Item(ItemTypes::bronzeIngot, 4), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::bronzeAxe, 1), {Item(ItemTypes::bronzeIngot, 3), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::bronzeShovel, 1), {Item(ItemTypes::bronzeIngot, 2), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
 
 	//weapons
 	recepie<2>(Item(ItemTypes::copperSword, 1), {Item(ItemTypes::copperIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
@@ -117,6 +130,7 @@ static CraftingRecepie recepies[] =
 	recepie<2>(Item(ItemTypes::ironSword, 1), {Item(ItemTypes::ironIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::silverSword, 1), {Item(ItemTypes::silverIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::goldSword, 1), {Item(ItemTypes::goldIngot, 4), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::bronzeSword, 1), {Item(ItemTypes::bronzeIngot, 3), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::copperWarHammer, 1), {Item(ItemTypes::copperIngot, 5), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::copperSpear, 1), {Item(ItemTypes::copperIngot, 3), Item(ItemTypes::stick, 2)}).setRequiresWorkBench(),
 	recepie<2>(Item(ItemTypes::copperKnife, 1), {Item(ItemTypes::copperIngot, 2), Item(ItemTypes::stick, 1)}).setRequiresWorkBench(),
@@ -143,6 +157,9 @@ static CraftingRecepie recepies[] =
 	recepie<1>(Item(ItemTypes::goldChestPlate, 1), {Item(ItemTypes::goldIngot, 8)}).setRequiresWorkBench(),
 	recepie<1>(Item(ItemTypes::goldBoots, 1), {Item(ItemTypes::goldIngot, 5)}).setRequiresWorkBench(),
 };
+
+static_assert(sizeof(recepies) / sizeof(recepies[0]) == 103,
+	"The shipped v0.7 executable contains exactly 103 crafting recipes");
 
 
 std::vector<CraftingRecepieIndex> getAllPossibleRecepies(PlayerInventory &playerInventory, int craftingStation)
@@ -182,6 +199,18 @@ CraftingRecepie getRecepieFromIndexUnsafe(int recepieIndex)
 }
 
 
+namespace
+{
+	bool matchesAnyWoodRule(const CraftingRecepie &recepie, const Item &needed, const Item &available)
+	{
+		if (!recepie.anyWood) { return false; }
+		if (isWoodPlank(needed.type) && isWoodPlank(available.type)) { return true; }
+		if (isGuideWoodLogType(needed.type) && isGuideWoodLogType(available.type)) { return true; }
+		return false;
+	}
+}
+
+
 bool canItemBeCrafted(CraftingRecepie &recepie, PlayerInventory &inventory)
 {
 	Item neededItems[sizeof(recepie.items) / sizeof(recepie.items[0])];
@@ -192,11 +221,7 @@ bool canItemBeCrafted(CraftingRecepie &recepie, PlayerInventory &inventory)
 		if (neededItems[i].type == 0) { break; }
 		for (int j = 0; j < PlayerInventory::INVENTORY_CAPACITY; j++)
 		{
-			bool allowedFromOtherRules = 0;
-			if (recepie.anyWood && neededItems[i].isBlock() && inventory.items[j].isBlock())
-			{
-				if (isWoodPlank(neededItems[i].type) && isWoodPlank(inventory.items[j].type)) { allowedFromOtherRules = true; }
-			}
+			const bool allowedFromOtherRules = matchesAnyWoodRule(recepie, neededItems[i], inventory.items[j]);
 			if (areItemsTheSame(inventory.items[j], neededItems[i]) || allowedFromOtherRules)
 			{
 				if (neededItems[i].counter <= inventory.items[j].counter)
@@ -227,11 +252,7 @@ void craftItemUnsafe(CraftingRecepie &recepie, PlayerInventory &inventory)
 		if (neededItems[i].type == 0) { break; }
 		for (int j = 0; j < PlayerInventory::INVENTORY_CAPACITY; j++)
 		{
-			bool allowedFromOtherRules = 0;
-			if (recepie.anyWood && neededItems[i].isBlock() && inventory.items[j].isBlock())
-			{
-				if (isWoodPlank(neededItems[i].type) && isWoodPlank(inventory.items[j].type)) { allowedFromOtherRules = true; }
-			}
+			const bool allowedFromOtherRules = matchesAnyWoodRule(recepie, neededItems[i], inventory.items[j]);
 			if (areItemsTheSame(inventory.items[j], neededItems[i]) || allowedFromOtherRules)
 			{
 				if (neededItems[i].counter == inventory.items[j].counter)
