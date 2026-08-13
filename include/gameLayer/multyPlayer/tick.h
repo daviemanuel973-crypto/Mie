@@ -9,6 +9,10 @@
 bool spawnZombie(ServerChunkStorer &chunkManager, Zombie zombie, std::uint64_t newId);
 bool spawnGoblin(ServerChunkStorer &chunkManager, Goblin goblin,
 	WorldSaver &worldSaver, std::minstd_rand &rng, std::uint64_t *spawnedId = nullptr);
+bool spawnPig(ServerChunkStorer &chunkManager, Pig pig,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
+bool spawnCat(ServerChunkStorer &chunkManager, Cat cat,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
 
 void killEntity(WorldSaver &worldSaver, std::uint64_t entity, ServerChunkStorer &chunkCache);
 
