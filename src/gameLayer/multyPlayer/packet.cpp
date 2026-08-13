@@ -7,6 +7,9 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <multyPlayer/createConnection.h>
+#include <gameplay/fieldGuide.h>
+#include <gameplay/fieldGuideProtocol.h>
 
 namespace
 {
@@ -99,6 +102,8 @@ void *unCompressData(const char *data, size_t compressedSize, size_t &originalSi
 	}
 
 	// Decompress data
+	// First, we need to create a ZSTD decompression context.
+	// Decompress the data.
 	size_t result = ZSTD_decompress(decompressedData, originalSize, data, compressedSize);
 	if (ZSTD_isError(result) || result != originalSize)
 	{
@@ -207,7 +212,22 @@ void sendPacket(ENetPeer *to, uint32_t header, std::uint64_t cid, void *data, si
 
 char *parsePacket(ENetEvent &event, Packet &p, size_t &dataSize)
 {
-	return parsePacket(*event.packet, p, dataSize);
+	char *data = parsePacket(*event.packet, p, dataSize);
+
+	// Field Guide progress is authoritative on the server. The v0.7 protocol
+	// uses header 51 with a raw 8-byte GuideProgress payload. Only accept this
+	// client mirror update from the peer that this process connected to as its
+	// server, so packets received by an integrated/dedicated server cannot
+	// mutate client UI state.
+	if (data && event.peer == getServer() && p.header == headerUpdateGuideProgress &&
+		dataSize == sizeof(GuideProgress))
+	{
+		GuideProgress progress = {};
+		std::memcpy(&progress, data, sizeof(progress));
+		setClientGuideProgress(progress);
+	}
+
+	return data;
 }
 
 char *parsePacket(ENetPacket &packet, Packet &p, size_t &dataSize)
