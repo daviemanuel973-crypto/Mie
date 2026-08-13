@@ -96,6 +96,31 @@ void GoblinServer::forceTarget(std::uint64_t playerId)
 	basicEnemyBehaviour.worriedTimer = 60.f;
 }
 
+static bool hasNearbyGoblinChief(ServerChunkStorer &serverChunkStorer,
+	const glm::dvec3 &position, std::uint64_t selfId)
+{
+	constexpr double packRadius = 16.0;
+	constexpr double packRadiusSquared = packRadius * packRadius;
+
+	for (auto &chunkEntry : serverChunkStorer.savedChunks)
+	{
+		if (!chunkEntry.second || !chunkEntry.second->otherData.withinSimulationDistance) { continue; }
+
+		for (auto &goblinEntry : chunkEntry.second->entityData.goblins)
+		{
+			if (goblinEntry.first == selfId) { continue; }
+			auto &other = goblinEntry.second;
+			other.configureVariant(goblinEntry.first);
+			if (other.variant != GoblinServer::Chief) { continue; }
+
+			const glm::dvec3 delta = other.getPosition() - position;
+			if (glm::dot(delta, delta) <= packRadiusSquared) { return true; }
+		}
+	}
+
+	return false;
+}
+
 bool GoblinServer::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter,
 	ServerChunkStorer &serverChunkStorer, std::minstd_rand &rng, std::uint64_t yourEID,
 	std::unordered_set<std::uint64_t> &othersDeleted,
@@ -110,7 +135,23 @@ bool GoblinServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 	settings.runSpeed = 2.f * moveSpeedMultiplier;
 	settings.searchDistance = 38.f;
 
-	if (variant == Warrior)
+	if (variant == Common && !hasNearbyGoblinChief(serverChunkStorer, getPosition(), yourEID))
+	{
+		// Common goblins are neutral ambient creatures. They keep their idle/wander
+		// behaviour, but cannot acquire or retain a player target unless a Chief is
+		// physically close enough to form a hostile pack.
+		basicEnemyBehaviour.playerLockedOn = 0;
+		basicEnemyBehaviour.worriedTimer = 0.f;
+		if (basicEnemyBehaviour.currentState == BasicEnemyBehaviour::stateTargetedPlayer)
+		{
+			basicEnemyBehaviour.currentState = BasicEnemyBehaviour::stateStaying;
+		}
+		settings.searchDistance = 0.001f;
+		settings.hearBonus = -1.f;
+		settings.sightBonus = -1.f;
+		settings.runSpeed = 1.2f;
+	}
+	else if (variant == Warrior)
 	{
 		settings.hearBonus = 0.f;
 		settings.searchDistance = 44.f;
@@ -201,7 +242,7 @@ LootTable &GoblinServer::getLootTable()
 	switch (variant)
 	{
 	case Warrior: return goblinWarriorLootTable;
-	case Chief: return goblinChiefLootTable;
+	case Chief: return goblinWarriorLootTable;
 	case Common:
 	default: return goblinLootTable;
 	}
