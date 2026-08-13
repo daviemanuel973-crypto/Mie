@@ -111,7 +111,7 @@ static bool hasNearbyGoblinChief(ServerChunkStorer &serverChunkStorer,
 			const GoblinServer &other = goblinEntry.second;
 			if (!other.variantConfigured || other.variant != GoblinServer::Chief) { continue; }
 
-			const glm::dvec3 delta = other.getPosition() - position;
+			const glm::dvec3 delta = other.entity.position - position;
 			if (glm::dot(delta, delta) <= chiefProtectionRadiusSquared) { return true; }
 		}
 	}
