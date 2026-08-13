@@ -44,6 +44,13 @@ bool guideObjectiveForCraftedType(std::uint16_t type, GuideObjective &objective)
 bool isGuideWoodLogType(std::uint16_t type);
 bool inventoryContainsGuideWoodLog(const PlayerInventory &inventory);
 
+// Client-side mirror of the authoritative server progress. The shipped v0.7
+// executable exposes these symbols and synchronizes the 8-byte GuideProgress
+// payload over packet header 51.
+GuideProgress getClientGuideProgress();
+void setClientGuideProgress(GuideProgress progress);
+void resetClientGuideProgress();
+
 // Attempts every completed, unclaimed reward transactionally. A reward is only
 // marked claimed when its entire stack fits, matching the shipped v0.7 behavior.
 bool deliverPendingGuideRewards(GuideProgress &progress, PlayerInventory &inventory);
