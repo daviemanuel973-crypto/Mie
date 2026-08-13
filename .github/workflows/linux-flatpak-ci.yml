@@ -89,9 +89,6 @@ jobs:
       - name: Validate Flatpak compatibility GLSL
         shell: bash
         run: |
-          # The runtime prepends these four defines through
-          # ShadingSettings::formatIntoGLSLcode(). Mirror a conservative Low preset
-          # here so offline validation matches the real shader source seen by OpenGL.
           GLSL_DEFINES=(
             -DMIE_COMPAT_TEXTURES=1
             -Dc_shadows=0
@@ -164,6 +161,7 @@ jobs:
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \
+            -Ithirdparty/glm \
             tests/entityStatsTests.cpp \
             src/gameLayer/gameplay/entityStats.cpp \
             -o entityStatsTests
