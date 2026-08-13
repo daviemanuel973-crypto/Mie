@@ -61,27 +61,27 @@ void GoblinServer::configureVariant(std::uint64_t eId)
 	if (variantConfigured) { return; }
 
 	const unsigned int roll = getGoblinVariantRoll(eId);
-	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 55.f;
+	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 30.f;
 	const float lifePercent = glm::clamp(entity.life.life / oldMaxLife, 0.f, 1.f);
-	float newMaxLife = 55.f;
+	float newMaxLife = 30.f;
 
 	if (roll < 75)
 	{
 		variant = Common;
 		moveSpeedMultiplier = 1.f;
-		newMaxLife = 55.f;
+		newMaxLife = 30.f;
 	}
 	else if (roll < 97)
 	{
 		variant = Warrior;
 		moveSpeedMultiplier = 1.08f;
-		newMaxLife = 105.f;
+		newMaxLife = 48.f;
 	}
 	else
 	{
 		variant = Chief;
 		moveSpeedMultiplier = 0.92f;
-		newMaxLife = 260.f;
+		newMaxLife = 90.f;
 	}
 
 	entity.life.maxLife = newMaxLife;
@@ -142,30 +142,30 @@ WeaponStats GoblinServer::getWeaponStats()
 	switch (variant)
 	{
 	case Warrior:
-		weaponStats.damage = 30.f;
-		weaponStats.critDamage = 42.f;
-		weaponStats.surprizeDamage = 38.f;
+		weaponStats.damage = 8.f;
+		weaponStats.critDamage = 12.f;
+		weaponStats.surprizeDamage = 11.f;
 		weaponStats.speed = 1.8f;
-		weaponStats.knockBack = 5.f;
+		weaponStats.knockBack = 3.f;
 		weaponStats.armourPenetration = 2.f;
 		break;
 	case Chief:
-		weaponStats.damage = 44.f;
-		weaponStats.critDamage = 62.f;
-		weaponStats.surprizeDamage = 55.f;
+		weaponStats.damage = 12.f;
+		weaponStats.critDamage = 18.f;
+		weaponStats.surprizeDamage = 16.f;
 		weaponStats.speed = 1.2f;
 		weaponStats.range = 1.8f;
-		weaponStats.knockBack = 9.f;
+		weaponStats.knockBack = 5.f;
 		weaponStats.armourPenetration = 3.f;
 		weaponStats.accuracy = 9.f;
 		break;
 	case Common:
 	default:
-		weaponStats.damage = 20.f;
-		weaponStats.critDamage = 30.f;
-		weaponStats.surprizeDamage = 30.f;
+		weaponStats.damage = 6.f;
+		weaponStats.critDamage = 9.f;
+		weaponStats.surprizeDamage = 9.f;
 		weaponStats.speed = 1.f;
-		weaponStats.knockBack = 3.f;
+		weaponStats.knockBack = 2.f;
 		break;
 	}
 
