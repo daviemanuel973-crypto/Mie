@@ -4,6 +4,7 @@
 #include <cstdint>
 
 struct PlayerInventory;
+struct UiENgine;
 
 enum class GuideObjective : std::uint8_t
 {
@@ -50,6 +51,11 @@ bool inventoryContainsGuideWoodLog(const PlayerInventory &inventory);
 GuideProgress getClientGuideProgress();
 void setClientGuideProgress(GuideProgress progress);
 void resetClientGuideProgress();
+
+// Draws the client-side book on top of the normal inventory renderer. The
+// objective state always comes from the synchronized authoritative progress.
+void renderFieldGuideUi(UiENgine &ui, int w, int h, bool insideInventory,
+	int &currentInventoryTab);
 
 // Attempts every completed, unclaimed reward transactionally. A reward is only
 // marked claimed when its entire stack fits, matching the shipped v0.7 behavior.
