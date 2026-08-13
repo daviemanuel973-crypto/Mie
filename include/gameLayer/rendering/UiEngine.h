@@ -1,4 +1,6 @@
 #pragma once
+#define MIE_UIENGINE_HEADER_INCLUDED 1
+
 #include "glm/vec4.hpp"
 #include "glm/vec2.hpp"
 #include <glui/glui.h>
@@ -24,6 +26,7 @@ const int INVENTORY_TAB_CRAFTING = 1;
 const int INVENTORY_TAB_CHEST = 2;
 const int INVENTORY_TAB_BLOCKS = 3;
 const int INVENTORY_TAB_ITEMS = 4;
+const int INVENTORY_TAB_FIELD_GUIDE = 5;
 
 
 struct UiENgine
@@ -100,6 +103,15 @@ struct UiENgine
 		bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock
 		);
 
+	void renderGameUIWithFieldGuide(float deltaTime,
+		int w, int h, int itemSelected, PlayerInventory &inventory,
+		BlocksLoader &blocksLoader, bool insideInventory, int &cursorItemIndex,
+		int &currentInventoryTab, bool isCreative,
+		unsigned short &selectedItem, Life &playerHealth, ProgramData &programData,
+		LocalPlayer &player, int &craftingSlider, int &outCraftingRecepieGlobalIndex,
+		bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock
+		);
+
 	bool renderBaseBlockUI(float deltaTime,
 		int w, int h, ProgramData &programData, 
 		BaseBlock &baseBlock, glm::ivec3 blockPos, ChunkSystem &chunkSystem,
@@ -112,8 +124,8 @@ struct UiENgine
 struct Oscilator
 {
 
-	Oscilator() {};
-	Oscilator(float t, int fazes = 2): maxFazeTime(t), maxFazes(fazes) {};
+	Oscilator() {}
+	Oscilator(float t, int fazes = 2): maxFazeTime(t), maxFazes(fazes) {}
 
 
 	float maxFazeTime  = 0;
