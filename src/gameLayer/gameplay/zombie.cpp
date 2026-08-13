@@ -102,27 +102,27 @@ void ZombieServer::configureVariant(std::uint64_t eId)
 	if (variantConfigured) { return; }
 
 	const unsigned int roll = getZombieVariantRoll(eId);
-	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 200.f;
+	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 40.f;
 	const float lifePercent = glm::clamp(entity.life.life / oldMaxLife, 0.f, 1.f);
-	float newMaxLife = 200.f;
+	float newMaxLife = 40.f;
 
 	if (roll < 70)
 	{
 		variant = Walker;
 		moveSpeedMultiplier = 1.f;
-		newMaxLife = 200.f;
+		newMaxLife = 40.f;
 	}
 	else if (roll < 90)
 	{
 		variant = Runner;
 		moveSpeedMultiplier = 1.45f;
-		newMaxLife = 125.f;
+		newMaxLife = 32.f;
 	}
 	else
 	{
 		variant = Brute;
 		moveSpeedMultiplier = 0.72f;
-		newMaxLife = 320.f;
+		newMaxLife = 80.f;
 	}
 
 	entity.life.maxLife = newMaxLife;
@@ -185,30 +185,30 @@ WeaponStats ZombieServer::getWeaponStats()
 	switch (variant)
 	{
 	case Runner:
-		weaponStats.damage = 12.f;
-		weaponStats.critDamage = 20.f;
-		weaponStats.surprizeDamage = 18.f;
+		weaponStats.damage = 5.f;
+		weaponStats.critDamage = 8.f;
+		weaponStats.surprizeDamage = 8.f;
 		weaponStats.speed = 4.f;
 		weaponStats.range = 1.45f;
-		weaponStats.knockBack = 2.f;
+		weaponStats.knockBack = 1.5f;
 		weaponStats.accuracy = 8.f;
 		break;
 	case Brute:
-		weaponStats.damage = 32.f;
-		weaponStats.critDamage = 48.f;
-		weaponStats.surprizeDamage = 42.f;
+		weaponStats.damage = 11.f;
+		weaponStats.critDamage = 16.f;
+		weaponStats.surprizeDamage = 14.f;
 		weaponStats.speed = 0.f;
 		weaponStats.range = 1.8f;
-		weaponStats.knockBack = 8.f;
+		weaponStats.knockBack = 5.f;
 		weaponStats.accuracy = 6.f;
 		break;
 	case Walker:
 	default:
-		weaponStats.damage = 16.f;
-		weaponStats.critDamage = 25.f;
-		weaponStats.surprizeDamage = 24.f;
+		weaponStats.damage = 6.f;
+		weaponStats.critDamage = 9.f;
+		weaponStats.surprizeDamage = 9.f;
 		weaponStats.speed = 1.5f;
-		weaponStats.knockBack = 3.f;
+		weaponStats.knockBack = 2.f;
 		break;
 	}
 
