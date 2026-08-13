@@ -12,7 +12,7 @@ size_t BaseBlock::formatIntoData
 	return sizeof(BaseBlock);
 }
 
-bool BaseBlock::readFromBuffer(unsigned char *data, size_t s, size_t &outReadSize)
+bool BaseBlock::readFromBuffer(const unsigned char *data, size_t s, size_t &outReadSize)
 {
 	outReadSize = 0;
 	if (s < sizeof(BaseBlock)) { return 0; };
