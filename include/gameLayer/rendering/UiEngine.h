@@ -1,4 +1,6 @@
 #pragma once
+#define MIE_UIENGINE_HEADER_INCLUDED 1
+
 #include "glm/vec4.hpp"
 #include "glm/vec2.hpp"
 #include <glui/glui.h>
@@ -93,6 +95,15 @@ struct UiENgine
 	//cursorItemIndex returns -1 if outside the menu to throw items, and -2 if it is nowhere 
 	//if inside crafting, supply craftingTableInventory
 	void renderGameUI(float deltaTime, 
+		int w, int h, int itemSelected, PlayerInventory &inventory,
+		BlocksLoader &blocksLoader, bool insideInventory, int &cursorItemIndex,
+		int &currentInventoryTab, bool isCreative,
+		unsigned short &selectedItem, Life &playerHealth, ProgramData &programData,
+		LocalPlayer &player, int &craftingSlider, int &outCraftingRecepieGlobalIndex,
+		bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock
+		);
+
+	void renderGameUIWithFieldGuide(float deltaTime,
 		int w, int h, int itemSelected, PlayerInventory &inventory,
 		BlocksLoader &blocksLoader, bool insideInventory, int &cursorItemIndex,
 		int &currentInventoryTab, bool isCreative,
