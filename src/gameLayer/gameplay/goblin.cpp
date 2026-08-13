@@ -96,6 +96,28 @@ void GoblinServer::forceTarget(std::uint64_t playerId)
 	basicEnemyBehaviour.worriedTimer = 60.f;
 }
 
+static bool hasNearbyGoblinChief(ServerChunkStorer &serverChunkStorer,
+	const glm::dvec3 &position, std::uint64_t yourEID)
+{
+	constexpr double chiefProtectionRadiusSquared = 18.0 * 18.0;
+	for (const auto &chunkEntry : serverChunkStorer.savedChunks)
+	{
+		const SavedChunk *chunk = chunkEntry.second;
+		if (!chunk || !chunk->otherData.withinSimulationDistance) { continue; }
+
+		for (const auto &goblinEntry : chunk->entityData.goblins)
+		{
+			if (goblinEntry.first == yourEID) { continue; }
+			const GoblinServer &other = goblinEntry.second;
+			if (!other.variantConfigured || other.variant != GoblinServer::Chief) { continue; }
+
+			const glm::dvec3 delta = other.getPosition() - position;
+			if (glm::dot(delta, delta) <= chiefProtectionRadiusSquared) { return true; }
+		}
+	}
+	return false;
+}
+
 bool GoblinServer::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter,
 	ServerChunkStorer &serverChunkStorer, std::minstd_rand &rng, std::uint64_t yourEID,
 	std::unordered_set<std::uint64_t> &othersDeleted,
@@ -105,25 +127,44 @@ bool GoblinServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 {
 	configureVariant(yourEID);
 
-	BasicEnemyBehaviourOtherSettings settings;
-	settings.hearBonus = -0.1f;
-	settings.runSpeed = 2.f * moveSpeedMultiplier;
-	settings.searchDistance = 38.f;
+	const bool commonProtectedByChief = variant == Common &&
+		hasNearbyGoblinChief(serverChunkStorer, getPosition(), yourEID);
+	const bool aggressive = variant != Common || commonProtectedByChief;
 
-	if (variant == Warrior)
+	if (!aggressive)
 	{
-		settings.hearBonus = 0.f;
-		settings.searchDistance = 44.f;
+		// Common goblins are neutral society members when they are not accompanying a Chief.
+		// Clear any stale target so a Chief leaving the group immediately restores neutrality.
+		basicEnemyBehaviour.playerLockedOn = 0;
+		basicEnemyBehaviour.worriedTimer = 0.f;
+		basicEnemyBehaviour.hitTimer = 0.f;
+		basicEnemyBehaviour.currentState = BasicEnemyBehaviour::stateStaying;
+		entity.animationStateServer.runningTime = 0;
+		entity.animationStateServer.attacked = 0;
+		wantToLookDirection = entity.getLookDirection();
 	}
-	else if (variant == Chief)
+	else
 	{
-		settings.hearBonus = 0.12f;
-		settings.sightBonus = 0.18f;
-		settings.searchDistance = 52.f;
-	}
+		BasicEnemyBehaviourOtherSettings settings;
+		settings.hearBonus = -0.1f;
+		settings.runSpeed = 2.f * moveSpeedMultiplier;
+		settings.searchDistance = commonProtectedByChief ? 14.f : 16.f;
 
-	basicEnemyBehaviour.update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID,
-		othersDeleted, pathFindingSurvival, playersPositionSurvival, getPosition(), allClients, settings);
+		if (variant == Warrior)
+		{
+			settings.hearBonus = 0.f;
+			settings.searchDistance = 16.f;
+		}
+		else if (variant == Chief)
+		{
+			settings.hearBonus = 0.06f;
+			settings.sightBonus = 0.1f;
+			settings.searchDistance = 20.f;
+		}
+
+		basicEnemyBehaviour.update(this, deltaTime, chunkGetter, serverChunkStorer, rng, yourEID,
+			othersDeleted, pathFindingSurvival, playersPositionSurvival, getPosition(), allClients, settings);
+	}
 
 	doCollisionWithOthers(getPosition(), entity.getMaxColliderSize(), entity.forces,
 		serverChunkStorer, yourEID);
