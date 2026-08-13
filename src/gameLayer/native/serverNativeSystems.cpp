@@ -39,6 +39,7 @@ namespace mie::native
 				createV07ProcessingRecipeRegistry(contentRegistry);
 			WorldSchemaManifest manifest = makeV06WorldSchemaManifest();
 			PrototypeMachineRuntime machines;
+			VillagerSocietyRuntime villagers;
 			ServerNativeSystemsMetrics metrics;
 			std::uint64_t currentTick = 0;
 			float interestRefreshTimer = 0.f;
@@ -58,6 +59,11 @@ namespace mie::native
 			return (std::filesystem::path(worldSaver.savePath) / "prototypeMachines").string();
 		}
 
+		std::string villagersPath(const WorldSaver &worldSaver)
+		{
+			return (std::filesystem::path(worldSaver.savePath) / "villagerSociety").string();
+		}
+
 		bool inventoryContainsType(const PlayerInventory &inventory, std::uint16_t type)
 		{
 			for (const Item &item : inventory.items)
@@ -74,8 +80,6 @@ namespace mie::native
 			const Item guide = itemCreator(ItemTypes::fieldGuide, 1);
 			if (guide.type != ItemTypes::fieldGuide || player.inventory.tryPickupItem(guide) != 1)
 			{
-				// A full inventory should not permanently lose the starter guide. Retry on
-				// later ticks until a slot is available, then persist the granted flag.
 				return false;
 			}
 
@@ -127,8 +131,6 @@ namespace mie::native
 
 				if (inventoryChanged)
 				{
-					// Keep the client inventory authoritative immediately after first-time
-					// rewards instead of waiting for another unrelated inventory action.
 					sendPlayerInventoryAndIncrementRevision(client);
 				}
 			}
@@ -221,6 +223,18 @@ namespace mie::native
 				return false;
 			}
 		}
+
+		std::vector<char> villagerData;
+		const sfs::Errors villagerLoad = sfs::safeLoad(villagerData,
+			villagersPath(worldSaver).c_str(), false);
+		if (villagerLoad == sfs::noError)
+		{
+			if (!state.villagers.restoreSnapshot(villagerData.data(), villagerData.size()))
+			{
+				std::cerr << "Warning: invalid villager society data; keeping the safe empty runtime.\n";
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -254,6 +268,18 @@ namespace mie::native
 			}
 			else { state.machines.acknowledgePersisted(); }
 		}
+
+		if (force || state.villagers.hasPersistenceChanges())
+		{
+			const std::vector<unsigned char> data = state.villagers.formatSnapshot();
+			if (data.empty() || sfs::safeSave(data.data(), data.size(),
+				villagersPath(worldSaver).c_str(), true) != sfs::noError)
+			{
+				++state.metrics.saveFailures;
+				success = false;
+			}
+			else { state.villagers.acknowledgePersisted(); }
+		}
 		return success;
 	}
 
@@ -267,7 +293,9 @@ namespace mie::native
 			state.interestRefreshTimer = 1.f;
 			refreshMachineSimulationLevels();
 		}
-		state.machines.update(++state.currentTick, 64);
+		++state.currentTick;
+		state.machines.update(state.currentTick, 64);
+		state.villagers.update(state.currentTick, 128);
 		const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
 			std::chrono::steady_clock::now() - start).count();
 		const std::uint64_t elapsedMicros = elapsed < 0 ? 0u : static_cast<std::uint64_t>(elapsed);
@@ -280,12 +308,18 @@ namespace mie::native
 	{
 		ServerNativeSystemsMetrics result = state.metrics;
 		result.machines = state.machines.metrics();
+		result.villagers = state.villagers.metrics();
 		return result;
 	}
 
 	PrototypeMachineRuntime &getPrototypeMachineRuntime()
 	{
 		return state.machines;
+	}
+
+	VillagerSocietyRuntime &getVillagerSocietyRuntime()
+	{
+		return state.villagers;
 	}
 
 	const ProcessingRecipeRegistry &getProcessingRecipeRegistry()
