@@ -1,5 +1,5 @@
 #include <gameplay/entityStats.h>
-#include <glm/glm.hpp>
+#include <algorithm>
 
 
 std::string EntityStats::formatDataToString()
@@ -71,17 +71,17 @@ void EntityStats::normalize()
 	// runningSpeed is a percentage modifier just like the other offensive/player
 	// stats. The previous 0..0 clamp silently erased every movement-speed bonus.
 	// Keep the same bounded modifier contract used by the neighboring stats.
-	runningSpeed = glm::clamp(runningSpeed, -300.f, 300.f);
-	armour = glm::clamp(armour, (short)0, (short)300);
-	knockBackResistance = glm::clamp(knockBackResistance, (short)-300, (short)100);
-	thorns = glm::clamp(thorns, (short)0, (short)300);
-	meleDamage = glm::clamp(meleDamage, (short)-300, (short)300);
-	meleAttackSpeed = glm::clamp(meleAttackSpeed, (short)-300, (short)300);
-	critChance = glm::clamp(critChance, (short)-300, (short)300);
-	stealthSound = glm::clamp(stealthSound, (short)-300, (short)300);
-	stealthVisibility = glm::clamp(stealthVisibility, (short)-300, (short)300);
-	luck = glm::clamp(luck, (short)-100, (short)100);
-	improvedMiningPower = glm::clamp(improvedMiningPower, (short)-300, (short)300);
+	runningSpeed = std::clamp(runningSpeed, -300.f, 300.f);
+	armour = std::clamp(armour, (short)0, (short)300);
+	knockBackResistance = std::clamp(knockBackResistance, (short)-300, (short)100);
+	thorns = std::clamp(thorns, (short)0, (short)300);
+	meleDamage = std::clamp(meleDamage, (short)-300, (short)300);
+	meleAttackSpeed = std::clamp(meleAttackSpeed, (short)-300, (short)300);
+	critChance = std::clamp(critChance, (short)-300, (short)300);
+	stealthSound = std::clamp(stealthSound, (short)-300, (short)300);
+	stealthVisibility = std::clamp(stealthVisibility, (short)-300, (short)300);
+	luck = std::clamp(luck, (short)-100, (short)100);
+	improvedMiningPower = std::clamp(improvedMiningPower, (short)-300, (short)300);
 
 
 }
