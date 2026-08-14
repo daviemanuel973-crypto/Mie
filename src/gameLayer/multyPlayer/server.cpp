@@ -29,6 +29,7 @@
 #include <gameplay/gameplayRules.h>
 #include <gameplay/food.h>
 #include <gameplay/serverSiegeRuntime.h>
+#include <gameplay/worldDifficulty.h>
 #include <native/serverNativeSystems.h>
 #include <profiler.h>
 #include <magic_enum.hpp>
@@ -384,6 +385,7 @@ bool serverStartupStuff(const std::string &path)
 	//reset data
 	sd = ServerData{};
 	resetServerSiegeRuntime();
+	resetServerWorldDifficultySettings();
 	mie::native::resetServerNativeSystems();
 
 
@@ -1306,6 +1308,14 @@ std::string executeServerCommand(std::uint64_t cid, const char *command)
 			}
 
 			return "Invalid command!";
+		}
+
+		if (consumeStringToken("difficulty"))
+		{
+			const auto &difficulty = getServerWorldDifficultySettings();
+			return std::string("Difficulty: ") +
+				getWorldDifficultyName(difficulty.difficulty) +
+				(difficulty.hardcore ? " (Hardcore)" : "");
 		}
 
 		if (consumeStringToken("siege"))

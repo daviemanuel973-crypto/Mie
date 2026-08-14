@@ -17,6 +17,7 @@
 #include <gameplay/battleUI.h>
 #include <multyPlayer/playerPersistence.h>
 #include <gameplay/siege.h>
+#include <gameplay/worldDifficulty.h>
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
@@ -100,6 +101,7 @@ enum : std::uint32_t
 	headerClientIdentity,
 	headerUpdateSiegeStatus,
 	headerUpdateWorldTime,
+	headerUpdateWorldDifficulty,
 
 };
 
@@ -248,6 +250,12 @@ struct Packet_UpdateWorldTime
 	float dayPhase = 0.25f;
 	std::uint64_t completedCycles = 0;
 	std::uint8_t advancing = 0;
+};
+
+struct Packet_UpdateWorldDifficulty
+{
+	std::uint8_t difficulty = static_cast<std::uint8_t>(WorldDifficulty::Normal);
+	std::uint8_t hardcore = 0;
 };
 
 struct Packet_UpdateGenericEntity

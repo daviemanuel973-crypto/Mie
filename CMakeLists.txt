@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.7.2" CACHE STRING "Mie Survival semantic version")
+set(OURCRAFT_VERSION "0.8.0" CACHE STRING "Mie Survival semantic version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -211,7 +211,8 @@ if (BUILD_TESTING)
 
 	add_executable(worldCatalogTests
 		tests/worldCatalogTests.cpp
-		src/gameLayer/worldCatalog.cpp)
+		src/gameLayer/worldCatalog.cpp
+		src/gameLayer/gameplay/worldDifficulty.cpp)
 	target_include_directories(worldCatalogTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME world-catalog COMMAND worldCatalogTests)
@@ -230,6 +231,13 @@ if (BUILD_TESTING)
 	target_include_directories(siegeDirectorTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME siege-director COMMAND siegeDirectorTests)
+
+	add_executable(worldDifficultyTests
+		tests/worldDifficultyTests.cpp
+		src/gameLayer/gameplay/worldDifficulty.cpp)
+	target_include_directories(worldDifficultyTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME world-difficulty COMMAND worldDifficultyTests)
 
 	add_executable(nativeSystemsTests
 		tests/nativeSystemsTests.cpp
@@ -279,6 +287,7 @@ if (BUILD_TESTING)
 		world-catalog
 		update-protocol
 		siege-director
+		world-difficulty
 		native-systems
 		player-control-settings
 		entity-stats

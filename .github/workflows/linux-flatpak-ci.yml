@@ -133,6 +133,7 @@ jobs:
             -Iinclude/gameLayer \
             tests/worldCatalogTests.cpp \
             src/gameLayer/worldCatalog.cpp \
+            src/gameLayer/gameplay/worldDifficulty.cpp \
             -o worldCatalogTests
           ./worldCatalogTests
 
@@ -150,6 +151,13 @@ jobs:
             src/gameLayer/gameplay/worldTime.cpp \
             -o siegeDirectorTests
           ./siegeDirectorTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/worldDifficultyTests.cpp \
+            src/gameLayer/gameplay/worldDifficulty.cpp \
+            -o worldDifficultyTests
+          ./worldDifficultyTests
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \

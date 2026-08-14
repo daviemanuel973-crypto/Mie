@@ -31,9 +31,9 @@ This branch turns the existing survival scaffolding into the default playable pr
 - A server rejects simultaneous sessions using the same identity to prevent save rollback.
 - Existing worlds remain compatible; their first reconnect simply creates the first player snapshot.
 
-## Next survival milestones
+## Survival milestone status
 
-- difficulty selection and hardcore rules;
+- difficulty selection and hardcore rules — implemented for v0.8.0;
 - day/night spawn pressure;
 - tool durability;
 - dedicated furnace fuel/progress UI;

@@ -53,6 +53,7 @@ namespace
 		bool hasBroadcastStatus = false;
 		bool naturalSiegeActive = false;
 		std::uint64_t naturalSiegeDay = 0;
+		bool naturalSiegesEnabled = true;
 	};
 
 	ServerSiegeState state;
@@ -359,6 +360,13 @@ void resetServerSiegeRuntime()
 	state = ServerSiegeState();
 }
 
+void configureServerSiegeDifficulty(float enemyCountMultiplier,
+	bool naturalSiegesEnabled)
+{
+	state.director.setEnemyCountMultiplier(enemyCountMultiplier);
+	state.naturalSiegesEnabled = naturalSiegesEnabled;
+}
+
 bool loadServerSiegeRuntime(const WorldSaver &worldSaver)
 {
 	std::vector<char> savedData;
@@ -406,7 +414,7 @@ void updateServerSiegeRuntime(float deltaTime, ServerChunkStorer &chunkStorer,
 	const float dayPhase = state.worldClock.getDayPhase();
 	state.director.update(deltaTime, static_cast<unsigned int>(players.size()),
 		static_cast<unsigned int>(state.activeEnemyIds.size()),
-		visibleDay, state.worldClock.isNight());
+		visibleDay, state.naturalSiegesEnabled && state.worldClock.isNight());
 	const SiegePhase updatedPhase = state.director.getStatus(
 		static_cast<unsigned int>(state.activeEnemyIds.size())).phase;
 	if (previousPhase == SiegePhase::Peace && updatedPhase == SiegePhase::Warning &&
@@ -477,7 +485,13 @@ void updateServerSiegeRuntime(float deltaTime, ServerChunkStorer &chunkStorer,
 
 SiegeStatus getServerSiegeStatus()
 {
-	return state.director.getStatus(static_cast<unsigned int>(state.activeEnemyIds.size()));
+	SiegeStatus status = state.director.getStatus(
+		static_cast<unsigned int>(state.activeEnemyIds.size()));
+	if (!state.naturalSiegesEnabled && status.phase == SiegePhase::Peace)
+	{
+		status.cyclesUntilSiege = 255;
+	}
+	return status;
 }
 
 bool isServerSiegeWaveActive()

@@ -11,6 +11,7 @@
 #include <gameplay/gameplayRules.h>
 #include <gameplay/crafting.h>
 #include <gameplay/food.h>
+#include <gameplay/worldDifficulty.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
@@ -1868,7 +1869,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 					if (client)
 					{
 
-						if (client->playerData.killed)
+						if (client->playerData.killed &&
+							!getServerWorldDifficultySettings().hardcore)
 						{
 
 							client->playerData.effects = {};
@@ -2155,10 +2157,13 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 			if (playerData.starvationTimer >= 4.f)
 			{
 				playerData.starvationTimer -= 4.f;
-				// Normal-difficulty style starvation: it cannot take the player below 10 HP.
-				if (playerData.newLife.life > 10)
+				const int healthFloor = getStarvationHealthFloor(
+					getServerWorldDifficultySettings());
+				if (playerData.newLife.life > healthFloor)
 				{
-					playerData.applyDamageOrLife(-5);
+					const int damage = std::min(5,
+						playerData.newLife.life - healthFloor);
+					playerData.applyDamageOrLife(static_cast<short>(-damage));
 				}
 			}
 		}

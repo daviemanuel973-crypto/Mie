@@ -37,6 +37,7 @@
 #include <gameplay/playerControlSettings.h>
 #include <gameplay/fieldGuide.h>
 #include <gameplay/worldTime.h>
+#include <gameplay/worldDifficulty.h>
 #include <cameraShaker.h>
 #include <cmath>
 #include <cstdint>
@@ -3283,6 +3284,10 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 
 		programData.ui.menuRenderer.Text("Game Menu", Colors_White);
+		const auto &difficulty = getClientWorldDifficultySettings();
+		programData.ui.menuRenderer.Text(std::string("Difficulty: ") +
+			getWorldDifficultyName(difficulty.difficulty) +
+			(difficulty.hardcore ? " (Hardcore)" : ""), Colors_White);
 
 		if (programData.ui.menuRenderer.Button("Back to Game", Colors_Gray, programData.ui.buttonTexture))
 		{
@@ -3312,9 +3317,12 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		programData.ui.menuRenderer.Begin(3);
 		programData.ui.menuRenderer.SetAlignModeFixedSizeWidgets({0,150});
 
-		programData.ui.menuRenderer.Text("You died :(", Colors_White);
+		const bool hardcore = getClientWorldDifficultySettings().hardcore;
+		programData.ui.menuRenderer.Text(hardcore ?
+			"Hardcore death - this character cannot respawn." : "You died :(", Colors_White);
 
-		if (programData.ui.menuRenderer.Button("Respawn", Colors_Gray, programData.ui.buttonTexture))
+		if (!hardcore && programData.ui.menuRenderer.Button("Respawn", Colors_Gray,
+			programData.ui.buttonTexture))
 		{
 			sendPacket(getServer(), headerClientWantsToRespawn, player.entityId,
 				0, 0, true, channelChunksAndBlocks);

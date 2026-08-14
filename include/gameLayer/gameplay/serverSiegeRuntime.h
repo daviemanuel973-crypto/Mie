@@ -9,6 +9,8 @@ struct ServerChunkStorer;
 struct WorldSaver;
 
 void resetServerSiegeRuntime();
+void configureServerSiegeDifficulty(float enemyCountMultiplier,
+	bool naturalSiegesEnabled);
 bool loadServerSiegeRuntime(const WorldSaver &worldSaver);
 bool saveServerSiegeRuntime(const WorldSaver &worldSaver);
 void updateServerSiegeRuntime(float deltaTime, ServerChunkStorer &chunkStorer,

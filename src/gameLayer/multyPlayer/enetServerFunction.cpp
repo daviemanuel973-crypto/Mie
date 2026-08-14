@@ -25,6 +25,7 @@
 #include <profiler.h>
 #include <multyPlayer/playerPersistence.h>
 #include <gameplay/serverSiegeRuntime.h>
+#include <gameplay/worldDifficulty.h>
 #include <native/serverNativeSystems.h>
 #include <unordered_set>
 #include <cmath>
@@ -304,6 +305,15 @@ void finishAddingConnection(ENetEvent &event, WorldSaver &worldSaver,
 			sizeof(packetToSend), true, channelHandleConnections);
 
 
+	}
+
+	{
+		const auto &settings = getServerWorldDifficultySettings();
+		Packet_UpdateWorldDifficulty packetData;
+		packetData.difficulty = static_cast<std::uint8_t>(settings.difficulty);
+		packetData.hardcore = settings.hardcore ? 1u : 0u;
+		sendPacket(event.peer, headerUpdateWorldDifficulty, &packetData,
+			sizeof(packetData), true, channelHandleConnections);
 	}
 
 	//todo maybe send entities to this new connection?
@@ -1033,6 +1043,18 @@ void enetServerFunction(std::string path)
 
 	worldSaver.savePath = USER_CONTENT_PATH "worlds/"; //"saves/";
 	worldSaver.savePath += path + "/world";
+	WorldDifficultySettings difficultySettings;
+	const auto worldRoot = std::filesystem::path(USER_CONTENT_PATH "worlds/") / path;
+	const auto difficultyPath = worldRoot / "worldDifficulty";
+	if (!loadWorldDifficultySettings(worldRoot, difficultySettings) &&
+		std::filesystem::exists(difficultyPath))
+	{
+		std::cerr << "Warning: invalid world difficulty data; using Normal.\n";
+		difficultySettings = {};
+	}
+	setServerWorldDifficultySettings(difficultySettings);
+	configureServerSiegeDifficulty(getSiegeEnemyMultiplier(difficultySettings),
+		areNaturalSiegesEnabled(difficultySettings));
 
 
 	{

@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current version: v0.7.2**
+**Current development version: v0.8.0**
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -19,6 +19,19 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.8.0 planned-feature development
+
+v0.8.0 begins the planned Survival milestones without changing the stable v0.7.2 package.
+
+- New worlds offer Peaceful, Easy, Normal and Hard difficulty during creation.
+- Hardcore locks the world to Hard and permanently disables character respawning.
+- Difficulty is persisted per world, synchronized by the authoritative server and shown in the world list and pause/death menus.
+- Incoming damage, starvation limits and siege wave size scale with difficulty.
+- Peaceful worlds keep manual administrator sieges available but disable scheduled natural sieges.
+- Existing worlds without difficulty metadata remain compatible and load as Normal, non-Hardcore worlds.
+
+See [`docs/V0.8_DIFFICULTY_AND_HARDCORE.md`](docs/V0.8_DIFFICULTY_AND_HARDCORE.md).
 
 ## v0.7.2 stabilization
 

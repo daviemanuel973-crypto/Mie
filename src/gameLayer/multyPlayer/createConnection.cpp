@@ -12,6 +12,7 @@
 #include <gameplay/blocks/blocksWithData.h>
 #include <gameplay/siege.h>
 #include <gameplay/worldTime.h>
+#include <gameplay/worldDifficulty.h>
 #include <lightSystem.h>
 
 static ConnectionData clientData;
@@ -811,6 +812,18 @@ void recieveDataClient(ENetEvent &event,
 		}
 		break;
 
+		case headerUpdateWorldDifficulty:
+		{
+			if (size != sizeof(Packet_UpdateWorldDifficulty)) { break; }
+			const auto *packetData = reinterpret_cast<const Packet_UpdateWorldDifficulty *>(data);
+			WorldDifficultySettings settings;
+			settings.difficulty = static_cast<WorldDifficulty>(packetData->difficulty);
+			settings.hardcore = packetData->hardcore != 0;
+			settings.sanitize();
+			setClientWorldDifficultySettings(settings);
+		}
+		break;
+
 		case headerRecieveDamage:
 		{
 			if (sizeof(Packet_UpdateLife) != size) { break; }
@@ -1030,6 +1043,7 @@ void closeConnection()
 	{
 		resetClientSiegeStatus();
 		resetClientWorldTime();
+		resetClientWorldDifficultySettings();
 		return;
 	}
 	
@@ -1062,6 +1076,7 @@ void closeConnection()
 	clientData = {};
 	resetClientSiegeStatus();
 	resetClientWorldTime();
+	resetClientWorldDifficultySettings();
 
 }
 
@@ -1070,6 +1085,7 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 	if (clientData.conected) { return false; }
 	resetClientSiegeStatus();
 	resetClientWorldTime();
+	resetClientWorldDifficultySettings();
 
 	clientData = ConnectionData{};
 
