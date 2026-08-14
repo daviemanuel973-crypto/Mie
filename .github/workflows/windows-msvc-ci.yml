@@ -47,7 +47,7 @@ jobs:
 
       - name: Test all Mie gameplay contracts
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings|entity-stats)$'
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings|entity-stats|survival-rules)$'
 
       - name: Stage portable Windows build
         shell: pwsh
@@ -65,6 +65,10 @@ jobs:
 
           if (-not (Test-Path "resources")) { throw "resources directory missing" }
           Copy-Item "resources" "stage/resources" -Recurse -Force
+          Remove-Item "stage/resources/worlds" -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "stage/resources/worlds" | Out-Null
+          if (Test-Path "stage/playerSettings") { throw "portable package contains player settings" }
+          if (Get-ChildItem "stage/resources/worlds" -Force) { throw "portable package contains world saves" }
 
           if (-not (Test-Path "stage/Mie.exe")) { throw "stage/Mie.exe missing" }
           if (-not (Test-Path "stage/MieLauncher.exe")) { throw "stage/MieLauncher.exe missing" }

@@ -35,6 +35,7 @@
 #include <gameplay/battleUI.h>
 #include <gameplay/food.h>
 #include <gameplay/playerControlSettings.h>
+#include <gameplay/fieldGuide.h>
 #include <gameplay/worldTime.h>
 #include <cameraShaker.h>
 #include <cmath>
@@ -1392,7 +1393,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 
 							}else
-							if (actionType)
+							if (actionType && item.type != ItemTypes::fieldGuide)
 							{
 								didAction = true;
 
@@ -1445,7 +1446,13 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 							//TODO
 							//also send the time so the server can know from when to simulate that.
-							if (item.isEatable())
+							if (item.type == ItemTypes::fieldGuide)
+							{
+								gameData.interaction = {};
+								gameData.insideInventoryMenu = true;
+								gameData.currentInventoryTab = INVENTORY_TAB_FIELD_GUIDE;
+							}
+							else if (item.isEatable())
 							{
 
 								bool allowed = true;
@@ -2738,7 +2745,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		}
 		else
 		{
-			programData.ui.renderGameUI(deltaTime, w, h, gameData.currentItemSelected,
+			programData.ui.renderGameUIWithFieldGuide(deltaTime, w, h, gameData.currentItemSelected,
 				player.inventory, programData.blocksLoader, gameData.insideInventoryMenu,
 				cursorSelected,  gameData.currentInventoryTab, 
 				player.otherPlayerSettings.gameMode == OtherPlayerSettings::CREATIVE,

@@ -46,13 +46,14 @@ public:
 	explicit SiegeDirector(SiegeTuning tuning = {});
 
 	void reset();
-	void restoreSchedule(std::uint64_t completedWorldCycles,
+	void restoreSchedule(std::uint64_t currentWorldDay,
 		std::uint64_t nextSiegeCycle, unsigned int restoredCompletedSieges);
 	void update(float deltaTime, unsigned int survivalPlayers, unsigned int activeSiegeEnemies,
-		std::uint64_t completedWorldCycles);
+		std::uint64_t currentWorldDay, bool scheduledNight);
 	unsigned int takeSpawnRequest(unsigned int maxCount);
 	void returnSpawnRequest(unsigned int count);
 	void forceWarning();
+	void cancelCurrentSiege();
 
 	SiegeStatus getStatus(unsigned int activeSiegeEnemies) const;
 	unsigned int getPendingSpawns() const { return pendingSpawns; }

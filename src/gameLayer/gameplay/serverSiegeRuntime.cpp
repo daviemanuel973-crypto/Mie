@@ -51,6 +51,8 @@ namespace
 		float worldTimeBroadcastTimer = 0.f;
 		SiegeStatus lastBroadcastStatus{};
 		bool hasBroadcastStatus = false;
+		bool naturalSiegeActive = false;
+		std::uint64_t naturalSiegeDay = 0;
 	};
 
 	ServerSiegeState state;
@@ -187,6 +189,28 @@ namespace
 			if (!chunkStorer.getEntityPosition(*it).has_value()) { it = state.activeEnemyIds.erase(it); }
 			else { ++it; }
 		}
+	}
+
+	void removeRemainingNaturalSiegeEnemies(ServerChunkStorer &chunkStorer,
+		WorldSaver &worldSaver)
+	{
+		const auto ids = state.activeEnemyIds;
+		for (const std::uint64_t entityId : ids)
+		{
+			if (chunkStorer.removeEntity(worldSaver, entityId))
+			{
+				Packet packet;
+				packet.header = headerRemoveEntity;
+				Packet_RemoveEntity data;
+				data.EID = entityId;
+				broadCast(packet, &data, sizeof(data), nullptr, true, channelEntityPositions);
+			}
+		}
+		state.activeEnemyIds.clear();
+		state.defenseDamage.clear();
+		state.director.cancelCurrentSiege();
+		state.naturalSiegeActive = false;
+		state.naturalSiegeDay = 0;
 	}
 
 	bool isDefenseBlock(BlockType type)
@@ -351,7 +375,7 @@ bool loadServerSiegeRuntime(const WorldSaver &worldSaver)
 	}
 
 	state.worldClock.restore(snapshot.cycleProgressSeconds, snapshot.completedCycles);
-	state.director.restoreSchedule(snapshot.completedCycles, snapshot.nextSiegeCycle,
+	state.director.restoreSchedule(state.worldClock.getVisibleDayNumber(), snapshot.nextSiegeCycle,
 		snapshot.completedSieges);
 	return true;
 }
@@ -376,9 +400,28 @@ void updateServerSiegeRuntime(float deltaTime, ServerChunkStorer &chunkStorer,
 	const bool worldTimeAdvancing = !players.empty();
 	const std::uint64_t advancedCycles = state.worldClock.update(deltaTime, worldTimeAdvancing);
 	const std::uint64_t previousNextSiegeCycle = state.director.getNextSiegeCycle();
+	const SiegePhase previousPhase = state.director.getStatus(
+		static_cast<unsigned int>(state.activeEnemyIds.size())).phase;
+	const std::uint64_t visibleDay = state.worldClock.getVisibleDayNumber();
+	const float dayPhase = state.worldClock.getDayPhase();
 	state.director.update(deltaTime, static_cast<unsigned int>(players.size()),
 		static_cast<unsigned int>(state.activeEnemyIds.size()),
-		state.worldClock.getCompletedCycles());
+		visibleDay, state.worldClock.isNight());
+	const SiegePhase updatedPhase = state.director.getStatus(
+		static_cast<unsigned int>(state.activeEnemyIds.size())).phase;
+	if (previousPhase == SiegePhase::Peace && updatedPhase == SiegePhase::Warning &&
+		previousNextSiegeCycle != state.director.getNextSiegeCycle())
+	{
+		state.naturalSiegeActive = true;
+		state.naturalSiegeDay = visibleDay;
+	}
+
+	const bool reachedFollowingSunrise = state.naturalSiegeActive &&
+		visibleDay > state.naturalSiegeDay && dayPhase < 0.25f;
+	if (reachedFollowingSunrise)
+	{
+		removeRemainingNaturalSiegeEnemies(chunkStorer, worldSaver);
+	}
 	if (advancedCycles != 0 || previousNextSiegeCycle != state.director.getNextSiegeCycle())
 	{
 		if (!saveServerSiegeRuntime(worldSaver))
@@ -442,9 +485,20 @@ bool isServerSiegeWaveActive()
 	return getServerSiegeStatus().phase == SiegePhase::Wave;
 }
 
+bool isServerSiegeEnemy(std::uint64_t entityId)
+{
+	return state.activeEnemyIds.find(entityId) != state.activeEnemyIds.end();
+}
+
 bool forceServerSiegeWarning()
 {
 	const SiegePhase before = getServerSiegeStatus().phase;
 	state.director.forceWarning();
-	return before != getServerSiegeStatus().phase;
+	const bool started = before != getServerSiegeStatus().phase;
+	if (started)
+	{
+		state.naturalSiegeActive = false;
+		state.naturalSiegeDay = 0;
+	}
+	return started;
 }

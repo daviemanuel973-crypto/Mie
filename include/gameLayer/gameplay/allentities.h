@@ -7,6 +7,7 @@
 #include <gameplay/goblin.h>
 #include <gameplay/trainingDummy.h>
 #include <gameplay/scareCrow.h>
+#include <gameplay/entityId.h>
 #include "repeat.h"
 
 
@@ -35,16 +36,6 @@ namespace EntityType
 		scareCrow,
 	};
 };
-
-inline unsigned char getEntityTypeFromEID(std::uint64_t eid)
-{
-	return (eid >> 56);
-}
-
-inline unsigned char getOnlyIdFromEID(std::uint64_t eid)
-{
-	return ((eid << 6) >> 6);
-}
 
 template<typename B>
 struct EntityGetter

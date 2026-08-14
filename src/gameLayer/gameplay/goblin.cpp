@@ -5,6 +5,7 @@
 #include <glm/mat3x3.hpp>
 #include <glm/gtx/transform.hpp>
 #include <gameplay/goblin.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <multyPlayer/serverChunkStorer.h>
 #include <iostream>
 #include <glm/gtx/quaternion.hpp>
@@ -43,8 +44,14 @@ int GoblinClient::getTextureIndex()
 
 void GoblinServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
-	(void)f;
-	(void)eId;
+	static_assert(std::is_trivially_copyable_v<GoblinServer>);
+	basicEntitySave(f, Markers::goblin, eId, this, sizeof(*this));
+}
+
+bool GoblinServer::loadFromDisk(std::ifstream &f)
+{
+	static_assert(std::is_trivially_copyable_v<GoblinServer>);
+	return readData(f, this, sizeof(*this));
 }
 
 static unsigned int getGoblinVariantRoll(std::uint64_t eId)
@@ -86,6 +93,17 @@ void GoblinServer::configureVariant(std::uint64_t eId)
 
 	entity.life.maxLife = newMaxLife;
 	entity.life.life = glm::clamp(newMaxLife * lifePercent, 0.f, newMaxLife);
+	variantConfigured = true;
+}
+
+void GoblinServer::configureAmbientNeutral()
+{
+	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 30.f;
+	const float lifePercent = glm::clamp(entity.life.life / oldMaxLife, 0.f, 1.f);
+	variant = Common;
+	moveSpeedMultiplier = 1.f;
+	entity.life.maxLife = 30;
+	entity.life.life = static_cast<short>(glm::clamp(30.f * lifePercent, 0.f, 30.f));
 	variantConfigured = true;
 }
 
@@ -135,7 +153,8 @@ bool GoblinServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 	settings.runSpeed = 2.f * moveSpeedMultiplier;
 	settings.searchDistance = 38.f;
 
-	if (variant == Common && !hasNearbyGoblinChief(serverChunkStorer, getPosition(), yourEID))
+	if (variant == Common && !isServerSiegeEnemy(yourEID) &&
+		!hasNearbyGoblinChief(serverChunkStorer, getPosition(), yourEID))
 	{
 		// Common goblins are neutral ambient creatures. They keep their idle/wander
 		// behaviour, but cannot acquire or retain a player target unless a Chief is

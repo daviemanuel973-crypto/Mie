@@ -824,4 +824,5 @@ namespace InteractionTypes
 
 };
 
+bool isFragileContainer(BlockType type);
 float getBlockBaseMineDuration(BlockType type);

@@ -93,6 +93,24 @@ float WorldCycleClock::getDayPhase() const
 	return static_cast<float>(phase - std::floor(phase));
 }
 
+std::uint64_t WorldCycleClock::getVisibleDayNumber() const
+{
+	// The stored cycle runs noon-to-noon, while the day shown to the player
+	// changes at sunrise. Between sunrise and noon we are already on the next
+	// visible day even though completedCycles has not advanced yet.
+	const std::uint64_t offset = getDayPhase() < 0.25f ? 2u : 1u;
+	if (completedCycles > std::numeric_limits<std::uint64_t>::max() - offset)
+	{
+		return std::numeric_limits<std::uint64_t>::max();
+	}
+	return completedCycles + offset;
+}
+
+bool WorldCycleClock::isNight() const
+{
+	return getDayPhase() >= 0.5f;
+}
+
 std::vector<unsigned char> formatWorldProgressSnapshot(const WorldProgressSnapshot &snapshot)
 {
 	std::vector<unsigned char> result;

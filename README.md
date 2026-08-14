@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current version: v0.7.1**
+**Current version: v0.7.2**
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -20,9 +20,21 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
 
+## v0.7.2 stabilization
+
+v0.7.2 preserves the v0.7 survival progression and concentrates on correcting the systems recovered in v0.7.1.
+
+- Peace-time ecology spawns pigs, cats and neutral common goblins instead of surprise zombies.
+- Scheduled sieges begin on every seventh night, contain three waves and remove only surviving wave enemies at the following sunrise.
+- Manual spawn eggs and the administrator siege command remain independent from scheduled cleanup.
+- Respawn is server-authoritative and searches for solid ground with two clear blocks.
+- The Field Guide is reachable from the inventory and opens directly when used.
+- Cobwebs slow players, creatures and dropped items; fragile containers break quickly.
+- Entity persistence reserves restored IDs, and release packages explicitly exclude saved worlds and player settings.
+
 ## v0.7.1 recovery and survival progression
 
-v0.7.1 is the current repository baseline. This recovery release reconciles the source tree with systems that were present in the shipped v0.7 Windows executable and hardens the game after the reported runtime crash.
+v0.7.1 is the recovery baseline. This release reconciled the source tree with systems that were present in the shipped v0.7 Windows executable and hardened the game after the reported runtime crash.
 
 - Package, installer and runtime version are `0.7.1`.
 - v0.7 item IDs are preserved for existing saves: Field Guide, charcoal, cassiterite concentrate, tin, bronze and bronze tools/weapons.

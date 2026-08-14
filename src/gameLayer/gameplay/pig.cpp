@@ -72,6 +72,14 @@ bool PigServer::update(float deltaTime, decltype(chunkGetterSignature) *chunkGet
 
 void PigServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
+	static_assert(std::is_trivially_copyable_v<PigServer>);
+	basicEntitySave(f, Markers::pig, eId, this, sizeof(*this));
+}
+
+bool PigServer::loadFromDisk(std::ifstream &f)
+{
+	static_assert(std::is_trivially_copyable_v<PigServer>);
+	return readData(f, this, sizeof(*this));
 }
 
 void PigServer::configureSpawnSettings(std::minstd_rand &rng)

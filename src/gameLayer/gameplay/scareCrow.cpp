@@ -50,6 +50,14 @@ int ScareCrowClient::getTextureIndex()
 
 void ScareCrowServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
+	static_assert(std::is_trivially_copyable_v<ScareCrowServer>);
+	basicEntitySave(f, Markers::scareCrow, eId, this, sizeof(*this));
+}
+
+bool ScareCrowServer::loadFromDisk(std::ifstream &f)
+{
+	static_assert(std::is_trivially_copyable_v<ScareCrowServer>);
+	return readData(f, this, sizeof(*this));
 }
 
 //todo temporary allocator
@@ -94,4 +102,3 @@ WeaponStats ScareCrowServer::getWeaponStats()
 
 	return weaponStats;
 }
-

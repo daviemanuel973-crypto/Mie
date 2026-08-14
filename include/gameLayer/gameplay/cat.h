@@ -45,6 +45,7 @@ struct CatServer: public ServerEntity<Cat>,
 	);
 
 	void appendDataToDisk(std::ofstream &f, std::uint64_t eId);
+	bool loadFromDisk(std::ifstream &f);
 
 	void configureSpawnSettings(std::minstd_rand &rng);
 
@@ -55,7 +56,6 @@ struct CatServer: public ServerEntity<Cat>,
 	LootTable &getLootTable() { return getEmptyLootTable(); }
 
 };
-
 
 
 

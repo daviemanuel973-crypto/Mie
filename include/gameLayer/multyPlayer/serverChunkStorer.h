@@ -123,6 +123,7 @@ struct ServerChunkStorer
 	std::unordered_map<std::uint64_t, glm::ivec2> entityChunkPositions;
 
 	void removeEntityChunkPositionsForChunk(SavedChunk &chunk);
+	void indexEntityChunkPositionsForChunk(SavedChunk &chunk);
 		
 	//uses chunk coorodonates
 	SavedChunk *getChunkOrGetNull(int posX, int posZ);

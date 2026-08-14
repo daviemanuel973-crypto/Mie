@@ -45,8 +45,11 @@ namespace Markers
 	{
 		none = 0,
 		droppedItem,
-
-
+		zombie,
+		pig,
+		cat,
+		goblin,
+		scareCrow,
 	};
 };
 
@@ -1485,4 +1488,3 @@ struct ServerChunkStorer;
 
 void doCollisionWithOthers(glm::dvec3 &positiom, glm::vec3 colider, 
 	MotionState &forces, ServerChunkStorer &serverChunkStorer, std::uint64_t &yourEID);
-

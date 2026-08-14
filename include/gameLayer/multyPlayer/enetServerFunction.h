@@ -65,5 +65,5 @@ bool checkIfPlayerShouldGetChunk(glm::ivec2 playerPos2D,
 std::uint64_t getEntityIdAndIncrement(WorldSaver &worldSaver, int entityType);
 
 std::uint64_t getCurrentEntityId(int entityType);
-
+void reserveEntityId(std::uint64_t entityId);
 

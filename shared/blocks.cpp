@@ -748,11 +748,17 @@ int isCraftingStation(unsigned short type)
 
 
 
+bool isFragileContainer(BlockType type)
+{
+	return type == crate || type == smallCrate || type == pot || type == jar;
+}
+
 float getBlockBaseMineDuration(BlockType type)
 {
 
 	if (!isBlock(type)) { return 0; }
 	if (type == water) { return 0; }
+	if (isFragileContainer(type)) { return 0.12f; }
 
 	if (isAnyWoddenBlock(type))
 	{

@@ -74,6 +74,14 @@ bool CatServer::update(float deltaTime, decltype(chunkGetterSignature) *chunkGet
 
 void CatServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
+	static_assert(std::is_trivially_copyable_v<CatServer>);
+	basicEntitySave(f, Markers::cat, eId, this, sizeof(*this));
+}
+
+bool CatServer::loadFromDisk(std::ifstream &f)
+{
+	static_assert(std::is_trivially_copyable_v<CatServer>);
+	return readData(f, this, sizeof(*this));
 }
 
 void CatServer::configureSpawnSettings(std::minstd_rand &rng)

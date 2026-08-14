@@ -83,6 +83,9 @@ void updateForces(glm::dvec3 &pos, MotionState &forces, float deltaTime, bool ap
 
 void updateForces(glm::dvec3 &pos, glm::vec3 &velocity, glm::vec3 &acceleration, float deltaTime, bool applyGravity, PhysicalSettings physicalSettings = {});
 
+bool isTouchingCobweb(const glm::dvec3 &position, const glm::vec3 &colliderSize,
+	decltype(chunkGetterSignature) *chunkGetter);
+
 void applyImpulse(MotionState &force, glm::vec3 impulse, float mass = 1.f);
 
 

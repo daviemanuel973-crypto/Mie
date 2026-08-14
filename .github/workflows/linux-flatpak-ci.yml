@@ -167,6 +167,19 @@ jobs:
             -o entityStatsTests
           ./entityStatsTests
 
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Iinclude/platform \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/survivalRulesTests.cpp \
+            shared/blocks.cpp \
+            src/gameLayer/gameplay/environmentMotion.cpp \
+            -o survivalRulesTests
+          ./survivalRulesTests
+
       - name: Build Flatpak repository
         shell: bash
         run: |
