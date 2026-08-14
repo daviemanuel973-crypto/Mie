@@ -34,7 +34,7 @@ This branch turns the existing survival scaffolding into the default playable pr
 ## Survival milestone status
 
 - difficulty selection and hardcore rules — implemented for v0.8.0;
-- day/night spawn pressure;
+- day/night spawn pressure — implemented for v0.8.0;
 - tool durability;
 - dedicated furnace fuel/progress UI;
 - recipe discovery/book;

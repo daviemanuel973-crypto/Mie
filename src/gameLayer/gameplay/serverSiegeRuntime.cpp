@@ -494,6 +494,16 @@ SiegeStatus getServerSiegeStatus()
 	return status;
 }
 
+float getServerWorldDayPhase()
+{
+	return state.worldClock.getDayPhase();
+}
+
+std::uint64_t getServerVisibleWorldDay()
+{
+	return state.worldClock.getVisibleDayNumber();
+}
+
 bool isServerSiegeWaveActive()
 {
 	return getServerSiegeStatus().phase == SiegePhase::Wave;

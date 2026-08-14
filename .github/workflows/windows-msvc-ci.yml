@@ -70,7 +70,7 @@ jobs:
 
       - name: Test all Mie gameplay contracts
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|native-systems|player-control-settings|entity-stats|survival-rules)$'
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|native-systems|player-control-settings|entity-stats|survival-rules)$'
 
       - name: Stage portable Windows build
         shell: pwsh

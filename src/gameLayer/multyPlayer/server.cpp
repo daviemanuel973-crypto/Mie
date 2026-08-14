@@ -26,15 +26,18 @@
 #include <gameplay/crafting.h>
 #include <gameplay/cat.h>
 #include <gameplay/pig.h>
+#include <gameplay/zombie.h>
 #include <gameplay/gameplayRules.h>
 #include <gameplay/food.h>
 #include <gameplay/serverSiegeRuntime.h>
+#include <gameplay/spawnPressure.h>
 #include <gameplay/worldDifficulty.h>
 #include <native/serverNativeSystems.h>
 #include <profiler.h>
 #include <magic_enum.hpp>
 #include <cmath>
 #include <iterator>
+#include <vector>
 
 static std::atomic<bool> serverRunning = false;
 
@@ -90,7 +93,8 @@ struct ServerData
 	float seccondsTimer = 0;
 
 	float saveEntitiesTimer = 5;
-	float ambientSpawnTimer = 4;
+	float passiveSpawnTimer = 4;
+	float naturalHostileSpawnTimer = 8;
 	std::uint64_t lastTimer = 0;
 
 	//this is used as an unique id for chunk packets
@@ -116,31 +120,50 @@ namespace
 		return count;
 	}
 
+	std::size_t countNaturalHostiles()
+	{
+		std::size_t count = 0;
+		for (const auto &entry : sd.chunkCache.savedChunks)
+		{
+			if (!entry.second || !entry.second->otherData.withinSimulationDistance) { continue; }
+			for (const auto &zombie : entry.second->entityData.zombies)
+			{
+				if (!isServerSiegeEnemy(zombie.first)) { ++count; }
+			}
+		}
+		return count;
+	}
+
 	bool unsuitableAmbientGround(BlockType type)
 	{
 		return type == BlockTypes::water || type == BlockTypes::ice ||
 			isAnyLeaves(type) || isAnyWoddenLOG(type) || isDecorativeFurniture(type);
 	}
 
-	bool farEnoughFromPlayersForPassiveSpawn(const glm::dvec3 &position,
-		const std::unordered_map<std::uint64_t, Client> &clients)
+	bool farEnoughFromPlayersForAmbientSpawn(const glm::dvec3 &position,
+		const std::unordered_map<std::uint64_t, Client> &clients,
+		double minimumDistance)
 	{
+		const double minimumDistanceSquared = minimumDistance * minimumDistance;
 		for (const auto &entry : clients)
 		{
 			glm::dvec2 delta(position.x - entry.second.playerData.entity.position.x,
 				position.z - entry.second.playerData.entity.position.z);
-			if (glm::dot(delta, delta) < 14.0 * 14.0) { return false; }
+			if (glm::dot(delta, delta) < minimumDistanceSquared) { return false; }
 		}
 		return true;
 	}
 	bool findAmbientSpawn(const glm::dvec3 &playerPosition,
-		std::minstd_rand &rng, glm::dvec3 &spawnPosition)
+		std::minstd_rand &rng, glm::dvec3 &spawnPosition,
+		float minimumSpawnDistance, float maximumSpawnDistance,
+		double minimumPlayerDistance)
 	{
 		constexpr float pi = 3.14159265358979323846f;
 		for (int attempt = 0; attempt < 16; ++attempt)
 		{
 			const float angle = getRandomNumberFloat(rng, 0.f, pi * 2.f);
-			const float distance = getRandomNumberFloat(rng, 18.f, 42.f);
+			const float distance = getRandomNumberFloat(rng,
+				minimumSpawnDistance, maximumSpawnDistance);
 			const int worldX = static_cast<int>(std::floor(playerPosition.x + std::cos(angle) * distance));
 			const int worldZ = static_cast<int>(std::floor(playerPosition.z + std::sin(angle) * distance));
 
@@ -159,28 +182,45 @@ namespace
 				if (!feet->air() || !head->air()) { continue; }
 
 				spawnPosition = glm::dvec3(worldX, y + 0.51, worldZ);
-				if (farEnoughFromPlayersForPassiveSpawn(spawnPosition, getAllClientsReff())) { return true; }
+				if (farEnoughFromPlayersForAmbientSpawn(spawnPosition,
+					getAllClientsReff(), minimumPlayerDistance)) { return true; }
 				break;
 			}
 		}
 		return false;
 	}
-	void updateAmbientEcologySpawning(float deltaTime, WorldSaver &worldSaver,
-		std::minstd_rand &rng)
+	std::vector<std::uint64_t> livingSurvivalPlayers()
 	{
-		sd.ambientSpawnTimer -= deltaTime;
-		if (sd.ambientSpawnTimer > 0.f) { return; }
-		sd.ambientSpawnTimer = getRandomNumberFloat(rng, 8.f, 14.f);
+		std::vector<std::uint64_t> result;
+		for (const auto &entry : getAllClientsReff())
+		{
+			if (!entry.second.playerData.killed &&
+				entry.second.playerData.otherPlayerSettings.gameMode ==
+				OtherPlayerSettings::SURVIVAL)
+			{
+				result.push_back(entry.first);
+			}
+		}
+		return result;
+	}
+
+	void updateAmbientEcologySpawning(float deltaTime, WorldSaver &worldSaver,
+		std::minstd_rand &rng, const NaturalSpawnPressure &pressure)
+	{
+		sd.passiveSpawnTimer -= deltaTime;
+		if (sd.passiveSpawnTimer > 0.f) { return; }
+		sd.passiveSpawnTimer = getRandomNumberFloat(rng,
+			pressure.passiveIntervalMin, pressure.passiveIntervalMax);
 
 		auto &clients = getAllClientsReff();
-		if (clients.empty()) { return; }
-		const std::size_t ambientCap = std::max<std::size_t>(8, clients.size() * 12);
-		if (countAmbientCreatures() >= ambientCap) { return; }
+		if (clients.empty() || pressure.passiveCap == 0 ||
+			countAmbientCreatures() >= pressure.passiveCap) { return; }
 
 		auto selectedClient = clients.begin();
 		std::advance(selectedClient, getRandomNumber(rng, 0, static_cast<int>(clients.size()) - 1));
 		glm::dvec3 spawnPosition;
-		if (!findAmbientSpawn(selectedClient->second.playerData.entity.position, rng, spawnPosition))
+		if (!findAmbientSpawn(selectedClient->second.playerData.entity.position,
+			rng, spawnPosition, 18.f, 42.f, 14.0))
 		{
 			return;
 		}
@@ -205,6 +245,45 @@ namespace
 			goblin.position = spawnPosition;
 			goblin.lastPosition = spawnPosition;
 			spawnGoblin(sd.chunkCache, goblin, worldSaver, rng, nullptr, true);
+		}
+	}
+
+	void updateNightHostileSpawning(float deltaTime, WorldSaver &worldSaver,
+		std::minstd_rand &rng, const NaturalSpawnPressure &pressure,
+		const std::vector<std::uint64_t> &survivalPlayers)
+	{
+		if (!pressure.hostileSpawningEnabled || survivalPlayers.empty()) { return; }
+		sd.naturalHostileSpawnTimer -= deltaTime;
+		if (sd.naturalHostileSpawnTimer > 0.f) { return; }
+		sd.naturalHostileSpawnTimer = getRandomNumberFloat(rng,
+			pressure.hostileIntervalMin, pressure.hostileIntervalMax);
+		if (countNaturalHostiles() >= pressure.hostileCap) { return; }
+
+		const std::uint64_t targetId = survivalPlayers[static_cast<std::size_t>(
+			getRandomNumber(rng, 0, static_cast<int>(survivalPlayers.size()) - 1))];
+		auto foundTarget = getAllClientsReff().find(targetId);
+		if (foundTarget == getAllClientsReff().end()) { return; }
+
+		glm::dvec3 spawnPosition;
+		if (!findAmbientSpawn(foundTarget->second.playerData.entity.position,
+			rng, spawnPosition, 22.f, 46.f, 18.0))
+		{
+			return;
+		}
+
+		Zombie zombie;
+		zombie.position = spawnPosition;
+		zombie.lastPosition = spawnPosition;
+		const std::uint64_t newId = getEntityIdAndIncrement(worldSaver,
+			EntityType::zombies);
+		if (!spawnZombie(sd.chunkCache, zombie, newId)) { return; }
+		auto *chunk = sd.chunkCache.getChunkOrGetNull(
+			divideChunk(spawnPosition.x), divideChunk(spawnPosition.z));
+		if (!chunk) { return; }
+		auto foundZombie = chunk->entityData.zombies.find(newId);
+		if (foundZombie != chunk->entityData.zombies.end())
+		{
+			foundZombie->second.forceTarget(targetId);
 		}
 	}
 
@@ -610,10 +689,19 @@ void serverWorkerUpdate(
 
 		updateServerSiegeRuntime(sd.tickDeltaTime, sd.chunkCache, worldSaver, rng);
 		mie::native::updateServerNativeSystems(sd.tickDeltaTime);
+		const auto survivalPlayers = livingSurvivalPlayers();
+		const SiegeStatus siegeStatus = getServerSiegeStatus();
+		const NaturalSpawnPressure spawnPressure = getNaturalSpawnPressure(
+			getServerWorldDayPhase(), getServerVisibleWorldDay(),
+			getAllClientsReff().size(), survivalPlayers.size(),
+			getServerWorldDifficultySettings(), siegeStatus.phase != SiegePhase::Peace);
 		if (!isServerSiegeWaveActive())
 		{
-			updateAmbientEcologySpawning(sd.tickDeltaTime, worldSaver, rng);
+			updateAmbientEcologySpawning(sd.tickDeltaTime, worldSaver, rng,
+				spawnPressure);
 		}
+		updateNightHostileSpawning(sd.tickDeltaTime, worldSaver, rng,
+			spawnPressure, survivalPlayers);
 
 	#pragma endregion
 
@@ -1316,6 +1404,30 @@ std::string executeServerCommand(std::uint64_t cid, const char *command)
 			return std::string("Difficulty: ") +
 				getWorldDifficultyName(difficulty.difficulty) +
 				(difficulty.hardcore ? " (Hardcore)" : "");
+		}
+
+		if (consumeStringToken("pressure"))
+		{
+			const auto survivalPlayers = livingSurvivalPlayers();
+			const SiegeStatus siegeStatus = getServerSiegeStatus();
+			const NaturalSpawnPressure pressure = getNaturalSpawnPressure(
+				getServerWorldDayPhase(), getServerVisibleWorldDay(),
+				getAllClientsReff().size(), survivalPlayers.size(),
+				getServerWorldDifficultySettings(),
+				siegeStatus.phase != SiegePhase::Peace);
+			if (siegeStatus.phase != SiegePhase::Peace)
+			{
+				return std::string("World pressure: siege ") +
+					getSiegePhaseName(siegeStatus.phase);
+			}
+			if (!pressure.hostileSpawningEnabled)
+			{
+				return std::string("World pressure: calm (") +
+					(pressure.night ? "night" : "day") + ")";
+			}
+			return std::string("World pressure: night hostiles ") +
+				std::to_string(countNaturalHostiles()) + "/" +
+				std::to_string(pressure.hostileCap);
 		}
 
 		if (consumeStringToken("siege"))

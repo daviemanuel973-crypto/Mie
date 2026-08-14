@@ -161,6 +161,14 @@ jobs:
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \
+            tests/spawnPressureTests.cpp \
+            src/gameLayer/gameplay/spawnPressure.cpp \
+            src/gameLayer/gameplay/worldDifficulty.cpp \
+            -o spawnPressureTests
+          ./spawnPressureTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
             tests/nativeSystemsTests.cpp \
             src/gameLayer/native/contentRegistry.cpp \
             src/gameLayer/native/gameplayFoundation.cpp \

@@ -239,6 +239,14 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME world-difficulty COMMAND worldDifficultyTests)
 
+	add_executable(spawnPressureTests
+		tests/spawnPressureTests.cpp
+		src/gameLayer/gameplay/spawnPressure.cpp
+		src/gameLayer/gameplay/worldDifficulty.cpp)
+	target_include_directories(spawnPressureTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME day-night-spawn-pressure COMMAND spawnPressureTests)
+
 	add_executable(nativeSystemsTests
 		tests/nativeSystemsTests.cpp
 		src/gameLayer/native/contentRegistry.cpp
@@ -288,6 +296,7 @@ if (BUILD_TESTING)
 		update-protocol
 		siege-director
 		world-difficulty
+		day-night-spawn-pressure
 		native-systems
 		player-control-settings
 		entity-stats

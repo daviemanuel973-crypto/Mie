@@ -36,6 +36,8 @@
 #include <gameplay/food.h>
 #include <gameplay/playerControlSettings.h>
 #include <gameplay/fieldGuide.h>
+#include <gameplay/siege.h>
+#include <gameplay/spawnPressure.h>
 #include <gameplay/worldTime.h>
 #include <gameplay/worldDifficulty.h>
 #include <cameraShaker.h>
@@ -3288,6 +3290,13 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		programData.ui.menuRenderer.Text(std::string("Difficulty: ") +
 			getWorldDifficultyName(difficulty.difficulty) +
 			(difficulty.hardcore ? " (Hardcore)" : ""), Colors_White);
+		const bool siegeActive = getClientSiegeStatus().phase != SiegePhase::Peace;
+		const bool nightPressure = isNightSpawnPhase(getClientWorldDayPhase()) &&
+			difficulty.difficulty != WorldDifficulty::Peaceful && !siegeActive;
+		programData.ui.menuRenderer.Text(siegeActive ?
+			"World pressure: siege event" : (nightPressure ?
+				"World pressure: hostile night spawns active" :
+				"World pressure: calm"), Colors_White);
 
 		if (programData.ui.menuRenderer.Button("Back to Game", Colors_Gray, programData.ui.buttonTexture))
 		{

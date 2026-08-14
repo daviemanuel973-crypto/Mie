@@ -29,9 +29,12 @@ v0.8.0 begins the planned Survival milestones without changing the stable v0.7.2
 - Difficulty is persisted per world, synchronized by the authoritative server and shown in the world list and pause/death menus.
 - Incoming damage, starvation limits and siege wave size scale with difficulty.
 - Peaceful worlds keep manual administrator sieges available but disable scheduled natural sieges.
+- The persistent day/night cycle now drives a bounded natural-zombie budget at night, scaled by difficulty, living Survival players and world age.
+- Natural night pressure pauses during siege events, while passive ecology becomes less frequent after sunset.
 - Existing worlds without difficulty metadata remain compatible and load as Normal, non-Hardcore worlds.
 
-See [`docs/V0.8_DIFFICULTY_AND_HARDCORE.md`](docs/V0.8_DIFFICULTY_AND_HARDCORE.md).
+See [`docs/V0.8_DIFFICULTY_AND_HARDCORE.md`](docs/V0.8_DIFFICULTY_AND_HARDCORE.md)
+and [`docs/V0.8_DAY_NIGHT_PRESSURE.md`](docs/V0.8_DAY_NIGHT_PRESSURE.md).
 
 ## v0.7.2 stabilization
 

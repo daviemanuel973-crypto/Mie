@@ -16,6 +16,8 @@ bool saveServerSiegeRuntime(const WorldSaver &worldSaver);
 void updateServerSiegeRuntime(float deltaTime, ServerChunkStorer &chunkStorer,
 	WorldSaver &worldSaver, std::minstd_rand &rng);
 SiegeStatus getServerSiegeStatus();
+float getServerWorldDayPhase();
+std::uint64_t getServerVisibleWorldDay();
 bool isServerSiegeWaveActive();
 bool isServerSiegeEnemy(std::uint64_t entityId);
 bool forceServerSiegeWarning();
