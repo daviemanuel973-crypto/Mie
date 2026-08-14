@@ -25,6 +25,7 @@
 #include <multyPlayer/splitUpdatesLogic.h>
 #include <gameplay/crafting.h>
 #include <gameplay/cat.h>
+#include <gameplay/pig.h>
 #include <gameplay/gameplayRules.h>
 #include <gameplay/food.h>
 #include <gameplay/serverSiegeRuntime.h>
@@ -120,18 +121,17 @@ namespace
 			isAnyLeaves(type) || isAnyWoddenLOG(type) || isDecorativeFurniture(type);
 	}
 
-	bool farEnoughFromPlayers(const glm::dvec3 &position,
+	bool farEnoughFromPlayersForPassiveSpawn(const glm::dvec3 &position,
 		const std::unordered_map<std::uint64_t, Client> &clients)
 	{
 		for (const auto &entry : clients)
 		{
 			glm::dvec2 delta(position.x - entry.second.playerData.entity.position.x,
 				position.z - entry.second.playerData.entity.position.z);
-			if (glm::dot(delta, delta) < 18.0 * 18.0) { return false; }
+			if (glm::dot(delta, delta) < 14.0 * 14.0) { return false; }
 		}
 		return true;
 	}
-
 	bool findAmbientSpawn(const glm::dvec3 &playerPosition,
 		std::minstd_rand &rng, glm::dvec3 &spawnPosition)
 	{
@@ -139,7 +139,7 @@ namespace
 		for (int attempt = 0; attempt < 16; ++attempt)
 		{
 			const float angle = getRandomNumberFloat(rng, 0.f, pi * 2.f);
-			const float distance = getRandomNumberFloat(rng, 22.f, 46.f);
+			const float distance = getRandomNumberFloat(rng, 18.f, 42.f);
 			const int worldX = static_cast<int>(std::floor(playerPosition.x + std::cos(angle) * distance));
 			const int worldZ = static_cast<int>(std::floor(playerPosition.z + std::sin(angle) * distance));
 
@@ -158,19 +158,18 @@ namespace
 				if (!feet->air() || !head->air()) { continue; }
 
 				spawnPosition = glm::dvec3(worldX, y + 0.51, worldZ);
-				if (farEnoughFromPlayers(spawnPosition, getAllClientsReff())) { return true; }
+				if (farEnoughFromPlayersForPassiveSpawn(spawnPosition, getAllClientsReff())) { return true; }
 				break;
 			}
 		}
 		return false;
 	}
-
 	void updateAmbientEcologySpawning(float deltaTime, WorldSaver &worldSaver,
 		std::minstd_rand &rng)
 	{
 		sd.ambientSpawnTimer -= deltaTime;
 		if (sd.ambientSpawnTimer > 0.f) { return; }
-		sd.ambientSpawnTimer = getRandomNumberFloat(rng, 5.f, 9.f);
+		sd.ambientSpawnTimer = getRandomNumberFloat(rng, 8.f, 14.f);
 
 		auto &clients = getAllClientsReff();
 		if (clients.empty()) { return; }
@@ -184,7 +183,6 @@ namespace
 		{
 			return;
 		}
-
 		const int creatureRoll = getRandomNumber(rng, 0, 99);
 		if (creatureRoll < 50)
 		{
@@ -358,9 +356,8 @@ bool computeRevisionStuff(Client &client, bool allowed,
 			Packet_ValidateEvent packetData;
 			packetData.eventId = eventId;
 
-			sendPacket(client.peer, packet,
-				(char *)&packetData, sizeof(Packet_ValidateEvent),
-				true, channelChunksAndBlocks);
+			sendPacket(client.peer, packet, (char *)&packetData,
+				sizeof(Packet_ValidateEvent), true, channelChunksAndBlocks);
 		}
 		
 	}
@@ -431,17 +428,13 @@ void updateOtherPlayerSettings(Client &client)
 void changePlayerGameMode(std::uint64_t cid, unsigned char gameMode)
 {
 
-	auto client = getClientNotLocked(cid);
-
-	if (client)
+	if (auto client = getClientNotLocked(cid))
 	{
 		if (client->playerData.otherPlayerSettings.gameMode != gameMode)
 		{
 			client->playerData.otherPlayerSettings.gameMode = gameMode;
-
 			updateOtherPlayerSettings(*client);
 		}
-
 	}
 }
 
@@ -1002,7 +995,6 @@ void updateLoadedChunks(
 			{
 
 				if (chunkPos == pos) { generatedChunkPlayerIsIn = true; }
-
 				bool generated = 0;
 				bool loaded = 0;
 
@@ -1095,7 +1087,6 @@ void updateLoadedChunks(
 								};
 
 							}
-
 						}
 					}
 				#pragma endregion

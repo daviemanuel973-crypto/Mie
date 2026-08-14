@@ -7,6 +7,10 @@
 #include <random>
 
 bool spawnZombie(ServerChunkStorer &chunkManager, Zombie zombie, std::uint64_t newId);
+bool spawnPig(ServerChunkStorer &chunkManager, Pig pig,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
+bool spawnCat(ServerChunkStorer &chunkManager, Cat cat,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
 bool spawnGoblin(ServerChunkStorer &chunkManager, Goblin goblin,
 	WorldSaver &worldSaver, std::minstd_rand &rng, std::uint64_t *spawnedId = nullptr,
 	bool ambientNeutral = false);
