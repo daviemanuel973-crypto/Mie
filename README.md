@@ -33,11 +33,15 @@ v0.8.0 begins the planned Survival milestones without changing the stable v0.7.2
 - Natural night pressure pauses during siege events, while passive ecology becomes less frequent after sunset.
 - Survival tools and melee weapons now have material-based durability, server-authoritative wear and breakage.
 - Existing or newly crafted equipment without durability metadata starts at full durability; inventory cells and tooltips show the remaining condition.
+- Furnaces now have dedicated input, fuel and output areas, persistent timed processing and server-authoritative multiplayer synchronization.
+- All eight shipped furnace recipes remain compatible; charcoal, logs, planks and sticks provide bounded burn times, and blocked outputs do not waste fuel.
+- Crafting packets now require the correct server-side station, and furnace output slots reject client-side insertion.
 - Existing worlds without difficulty metadata remain compatible and load as Normal, non-Hardcore worlds.
 
 See [`docs/V0.8_DIFFICULTY_AND_HARDCORE.md`](docs/V0.8_DIFFICULTY_AND_HARDCORE.md)
 [`docs/V0.8_DAY_NIGHT_PRESSURE.md`](docs/V0.8_DAY_NIGHT_PRESSURE.md) and
-[`docs/V0.8_TOOL_DURABILITY.md`](docs/V0.8_TOOL_DURABILITY.md).
+[`docs/V0.8_TOOL_DURABILITY.md`](docs/V0.8_TOOL_DURABILITY.md) and
+[`docs/V0.8_FURNACE_PROCESSING.md`](docs/V0.8_FURNACE_PROCESSING.md).
 
 ## v0.7.2 stabilization
 

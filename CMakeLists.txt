@@ -300,6 +300,27 @@ if (BUILD_TESTING)
 	target_link_libraries(survivalRulesTests PRIVATE glm glad)
 	add_test(NAME survival-rules COMMAND survivalRulesTests)
 
+	add_executable(furnaceRecipesTests
+		tests/furnaceRecipesTests.cpp
+		src/gameLayer/gameplay/furnaceRecipes.cpp)
+	target_include_directories(furnaceRecipesTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME furnace-recipes COMMAND furnaceRecipesTests)
+
+	add_executable(furnaceBlockTests
+		tests/furnaceBlockTests.cpp
+		src/gameLayer/gameplay/furnaceRecipes.cpp
+		src/gameLayer/gameplay/blocks/furnaceBlock.cpp)
+	target_include_directories(furnaceBlockTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME furnace-block-runtime COMMAND furnaceBlockTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -312,5 +333,7 @@ if (BUILD_TESTING)
 		player-control-settings
 		entity-stats
 		survival-rules
+		furnace-recipes
+		furnace-block-runtime
 		PROPERTIES TIMEOUT 60)
 endif()

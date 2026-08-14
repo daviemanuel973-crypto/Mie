@@ -7,6 +7,7 @@
 #include <gameplay/entityStats.h>
 
 struct ChestBlock;
+struct FurnaceBlock;
 
 constexpr static unsigned short ItemsStartPoint = 2'048;
 
@@ -336,7 +337,7 @@ struct PlayerInventory
 	Item chestArmour = {}; //ARMOUR_START_INDEX + 1
 	Item bootsArmour = {}; //ARMOUR_START_INDEX + 2
 
-	Item *getItemFromIndex(int index, ChestBlock *chestBlock);
+	Item *getItemFromIndex(int index, ChestBlock *chestBlock, FurnaceBlock *furnaceBlock = nullptr);
 
 	//doesn't clear data vector!!
 	void formatIntoData(std::vector<unsigned char> &data);

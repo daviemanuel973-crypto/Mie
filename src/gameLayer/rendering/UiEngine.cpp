@@ -8,6 +8,7 @@
 #include <gameplay/player.h>
 #include <gameplay/blocks/structureBaseBlock.h>
 #include <gameplay/blocks/chestBlock.h>
+#include <gameplay/blocks/furnaceBlock.h>
 #include <gameplay/crafting.h>
 #include <gameplay/siege.h>
 #include <audioEngine.h>
@@ -329,7 +330,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 	int &currentInventoryTab, bool isCreative,
 	unsigned short &selectedItem, Life &playerHealth, ProgramData &programData, LocalPlayer &player
 	, int &craftingSlider, int &outCraftingRecepieGlobalIndex, bool showUI,
-	BlockType interactingBlock, ChestBlock *chestBlock
+	BlockType interactingBlock, ChestBlock *chestBlock, FurnaceBlock *furnaceBlock
 )
 {
 
@@ -498,7 +499,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 						if (glui::aabb(box, mousePos))
 						{
 							cursorItemIndex = i;
-							auto rez = inventory.getItemFromIndex(cursorItemIndex, chestBlock);
+							auto rez = inventory.getItemFromIndex(cursorItemIndex, chestBlock, furnaceBlock);
 							if (rez)currentItemHovered = *rez;
 							cursorItemIndexBox = box;
 							renderer2d.renderRectangle(shrinkRectanglePercentage(box, (2.f / 22.f)),
@@ -573,7 +574,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 						if (glui::aabb(itemBox, mousePos))
 						{
 							cursorItemIndex = start;
-							auto rez = inventory.getItemFromIndex(cursorItemIndex, chestBlock);
+							auto rez = inventory.getItemFromIndex(cursorItemIndex, chestBlock, furnaceBlock);
 							if (rez)currentItemHovered = *rez;
 							cursorItemIndexBox = itemBox;
 							renderer2d.renderRectangle(shrinkRectanglePercentage(itemBox, (2.f / 22.f)),
@@ -615,7 +616,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 						for (int i = start; i < start + rowCount; i++)
 						{
 
-							auto rez = inventory.getItemFromIndex(i, chestBlock);
+							auto rez = inventory.getItemFromIndex(i, chestBlock, furnaceBlock);
 
 							if(rez)
 							if (rez->type)
@@ -788,7 +789,72 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 
 
 						//crafting box
-						if (currentInventoryTab == INVENTORY_TAB_CRAFTING)
+						if (currentInventoryTab == INVENTORY_TAB_CRAFTING && furnaceBlock)
+						{
+							glui::Frame insideUpperPart(glui::Box().xCenter().yTopPerc(0.08).
+								xDimensionPercentage(0.90).yDimensionPercentage(0.47)());
+
+							auto panel = glui::Box().xCenter().yTopPerc(0.02).
+								xDimensionPercentage(0.96).yDimensionPercentage(0.92)();
+							renderer2d.render9Patch(panel, 24, {0.42f, 0.32f, 0.22f, 0.88f}, {}, 0.f,
+								buttonTexture, GL2D_DefaultTextureCoords, {0.2,0.8,0.8,0.2});
+
+							glm::vec4 inputBox = glui::Box().xLeftPerc(0.10).yTopPerc(0.23).
+								xDimensionPixels(oneItemSize).yDimensionPixels(oneItemSize)();
+							for (int slot = 0; slot < FURNACE_INPUT_CAPACITY; ++slot)
+							{
+								glm::vec4 box = inputBox;
+								box.x += slot * oneItemSize * 1.08f;
+								renderer2d.renderRectangle(box, oneInventorySlot);
+								checkInsideOneElement(box, PlayerInventory::CHEST_START_INDEX + slot);
+								renderOneItem(box, furnaceBlock->items[slot]);
+							}
+							renderSmallTextOnTopOfCell(inputBox, "Input");
+
+							glm::vec4 fuelBox = inputBox;
+							fuelBox.x += oneItemSize * 1.08f;
+							fuelBox.y += oneItemSize * 1.55f;
+							renderer2d.renderRectangle(fuelBox, oneInventorySlot);
+							checkInsideOneElement(fuelBox, PlayerInventory::CHEST_START_INDEX + FURNACE_FUEL_SLOT);
+							renderOneItem(fuelBox, furnaceBlock->items[FURNACE_FUEL_SLOT]);
+							renderSmallTextOnTopOfCell(fuelBox, "Fuel");
+
+							glm::vec4 outputBox = inputBox;
+							outputBox.x += oneItemSize * 5.30f;
+							outputBox.y += oneItemSize * 0.70f;
+							renderer2d.renderRectangle(outputBox, oneInventorySlot);
+							checkInsideOneElement(outputBox, PlayerInventory::CHEST_START_INDEX + FURNACE_OUTPUT_SLOT);
+							renderOneItem(outputBox, furnaceBlock->items[FURNACE_OUTPUT_SLOT]);
+							renderSmallTextOnTopOfCell(outputBox, "Output");
+
+							glm::vec4 progressBar = outputBox;
+							progressBar.x -= oneItemSize * 1.65f;
+							progressBar.z = oneItemSize * 1.20f;
+							progressBar.w = std::max(5.f, oneItemSize * 0.16f);
+							progressBar.y += oneItemSize * 0.42f;
+							renderer2d.renderRectangle(progressBar, {0.08f,0.08f,0.08f,0.95f});
+							glm::vec4 progressFill = progressBar;
+							progressFill.z *= furnaceBlock->progressFraction();
+							progressFill.x -= (progressBar.z - progressFill.z) * 0.5f;
+							renderer2d.renderRectangle(progressFill, {0.95f,0.58f,0.16f,1.f});
+
+							glm::vec4 fuelBar = fuelBox;
+							fuelBar.y += oneItemSize * 0.60f;
+							fuelBar.z *= 0.72f;
+							fuelBar.w = std::max(4.f, oneItemSize * 0.10f);
+							renderer2d.renderRectangle(fuelBar, {0.08f,0.08f,0.08f,0.95f});
+							glm::vec4 fuelFill = fuelBar;
+							fuelFill.z *= furnaceBlock->fuelFraction();
+							fuelFill.x -= (fuelBar.z - fuelFill.z) * 0.5f;
+							renderer2d.renderRectangle(fuelFill, {0.95f,0.28f,0.08f,1.f});
+
+							glm::vec4 titleBox = panel;
+							titleBox.y -= panel.w * 0.38f;
+							titleBox.w = oneItemSize * 0.55f;
+							renderer2d.renderText(titleBox, "Furnace - timed server processing",
+								font, {1.f,0.92f,0.78f,1.f}, std::max(14.f, oneItemSize * 0.30f));
+						}
+						else if (currentInventoryTab == INVENTORY_TAB_CRAFTING)
 						{
 							auto allItems = getAllPossibleRecepies(inventory, craftingStation);
 

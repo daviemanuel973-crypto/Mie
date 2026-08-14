@@ -143,13 +143,13 @@ void renderFieldGuideUi(UiENgine &ui, int w, int h, bool insideInventory,
 		const char *crafts[] = {
 			"WORKBENCH  -  4 wooden planks.",
 			"FURNACE  -  8 cobblestone at a workbench.",
-			"CHARCOAL  -  1 log becomes 2 charcoal in a furnace.",
+			"CHARCOAL  -  Put 1 log and fuel in a furnace for 2 charcoal.",
 			"TORCHES  -  1 charcoal + 1 stick becomes 4 torches.",
-			"TIN  -  2 cassiterite + 1 charcoal becomes 1 tin in a furnace.",
-			"BRONZE  -  3 copper + 1 tin + 1 charcoal becomes 4 bronze.",
-			"BRONZE PICKAXE  -  4 bronze + 3 planks at a workbench.",
-			"BRONZE AXE/SHOVEL  -  3 bronze + 3 planks at a workbench.",
-			"BRONZE SWORD  -  4 bronze + 1 stick at a workbench."
+			"TIN  -  Furnace: 2 cassiterite + 1 charcoal, plus fuel, makes 1 tin.",
+			"BRONZE  -  Furnace: 3 copper + 1 tin + 1 charcoal, plus fuel, makes 4.",
+			"BRONZE PICKAXE  -  4 bronze + 2 sticks at a workbench.",
+			"BRONZE AXE/SHOVEL  -  3/2 bronze + 2 sticks at a workbench.",
+			"BRONZE SWORD  -  3 bronze + 1 stick at a workbench."
 		};
 
 		float y = top + titleSize * 2.65f;
@@ -176,11 +176,12 @@ void UiENgine::renderGameUIWithFieldGuide(float deltaTime,
 	int &currentInventoryTab, bool isCreative,
 	unsigned short &selectedItem, Life &playerHealth, ProgramData &programData,
 	LocalPlayer &player, int &craftingSlider, int &outCraftingRecepieGlobalIndex,
-	bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock)
+	bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock,
+	FurnaceBlock *furnaceBlock)
 {
 	renderGameUI(deltaTime, w, h, itemSelected, inventory, blocksLoader,
 		insideInventory, cursorItemIndex, currentInventoryTab, isCreative,
 		selectedItem, playerHealth, programData, player, craftingSlider,
-		outCraftingRecepieGlobalIndex, showUI, interactingBlock, chestBlock);
+		outCraftingRecepieGlobalIndex, showUI, interactingBlock, chestBlock, furnaceBlock);
 	renderFieldGuideUi(*this, w, h, insideInventory, currentInventoryTab);
 }

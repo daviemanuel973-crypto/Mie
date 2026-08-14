@@ -1,4 +1,5 @@
 #include <gameplay/items.h>
+#include <gameplay/blocks/furnaceBlock.h>
 #include <gameplay/itemDurability.h>
 #include <serializing.h>
 #include <platformTools.h>
@@ -474,7 +475,7 @@ EntityStats Item::getItemStats()
 }
 
 
-Item *PlayerInventory::getItemFromIndex(int index, ChestBlock *chestBlock)
+Item *PlayerInventory::getItemFromIndex(int index, ChestBlock *chestBlock, FurnaceBlock *furnaceBlock)
 {
 	if (index < 0) { return 0; }
 
@@ -502,6 +503,11 @@ Item *PlayerInventory::getItemFromIndex(int index, ChestBlock *chestBlock)
 	if (index >= CHEST_START_INDEX && (index < CHEST_START_INDEX + CHEST_CAPACITY) && chestBlock)
 	{
 		return &(chestBlock->items[index - CHEST_START_INDEX]);
+	}
+
+	if (isFurnaceInventoryIndex(index) && furnaceBlock)
+	{
+		return &(furnaceBlock->items[index - CHEST_START_INDEX]);
 	}
 
 	return nullptr;

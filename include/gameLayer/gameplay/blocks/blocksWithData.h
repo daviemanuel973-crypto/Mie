@@ -1,6 +1,7 @@
 #pragma once
 #include "structureBaseBlock.h"
 #include "chestBlock.h"
+#include "furnaceBlock.h"
 #include <unordered_map>
 #include <blocks.h>
 
@@ -18,17 +19,21 @@ struct BlocksWithDataHolder
 {
 	std::unordered_map<std::uint16_t, BaseBlock> baseBlocks;
 	std::unordered_map<std::uint16_t, ChestBlock> chestBlocks;
+	std::unordered_map<std::uint16_t, FurnaceBlock> furnaceBlocks;
 
 	BaseBlock *getBaseBlock(unsigned char x, unsigned char y, unsigned char z);
 	BaseBlock *getOrCreateBaseBlock(unsigned char x, unsigned char y, unsigned char z);
 	ChestBlock *getChestBlock(unsigned char x, unsigned char y, unsigned char z);
 	ChestBlock *getOrCreateChestBlock(unsigned char x, unsigned char y, unsigned char z);
+	FurnaceBlock *getFurnaceBlock(unsigned char x, unsigned char y, unsigned char z);
+	FurnaceBlock *getOrCreateFurnaceBlock(unsigned char x, unsigned char y, unsigned char z);
 
 	void formatBlockData(std::vector<unsigned char> &dataToAppend, int chunkXChunkSpace, int chunkZChunkSpace);
 	bool loadBlockData(const std::vector<unsigned char> &data, int chunkXChunkSpace, int chunkZChunkSpace);
 };
 
 void appendChestBlock(std::vector<unsigned char> &dataToAppend, glm::ivec3 position, ChestBlock &chestBlock);
+void appendFurnaceBlock(std::vector<unsigned char> &dataToAppend, glm::ivec3 position, FurnaceBlock &furnaceBlock);
 
 struct InteractionData
 {

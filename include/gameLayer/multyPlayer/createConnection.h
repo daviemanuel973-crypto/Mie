@@ -12,6 +12,7 @@ struct ChunkSystem;
 struct LightSystem;
 struct PlayerConnectionData;
 struct ChestBlock;
+struct FurnaceBlock;
 
 struct Task
 {
@@ -82,13 +83,17 @@ ConnectionData getConnectionData();
 bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c);
 
 //0 for all
-bool placeItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to, int counter = 0);
+bool placeItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to,
+	int counter = 0, FurnaceBlock *furnaceBlock = nullptr);
 
 //0 for all
 
-bool swapItems(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to);
-bool grabItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to, int counter = 0);
-bool forceOverWriteItem(PlayerInventory &inventory, ChestBlock *chestBlock, int index, Item &item);
+bool swapItems(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to,
+	FurnaceBlock *furnaceBlock = nullptr);
+bool grabItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to,
+	int counter = 0, FurnaceBlock *furnaceBlock = nullptr);
+bool forceOverWriteItem(PlayerInventory &inventory, ChestBlock *chestBlock, int index, Item &item,
+	FurnaceBlock *furnaceBlock = nullptr);
 void clientMessageLoop(EventCounter &validatedEvent, RevisionNumber &invalidateRevision
 	,glm::ivec3 playerPosition, int squareDistance, ClientEntityManager& entityManager,
 	UndoQueue &undoQueue, ChunkSystem &chunkSystem,

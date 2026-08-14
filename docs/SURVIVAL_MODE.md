@@ -36,7 +36,7 @@ This branch turns the existing survival scaffolding into the default playable pr
 - difficulty selection and hardcore rules — implemented for v0.8.0;
 - day/night spawn pressure — implemented for v0.8.0;
 - tool and weapon durability — implemented for v0.8.0;
-- dedicated furnace fuel/progress UI;
+- dedicated furnace fuel/progress UI — implemented for v0.8.0;
 - recipe discovery/book;
 - farming expansion and additional cooked foods;
 - bed/spawn-point system.
