@@ -345,6 +345,8 @@ struct Packet_ClientBreakBlock
 {
 	glm::ivec3 blockPos = {};
 	EventId eventId = {}; //event id is used by the player
+	unsigned char inventoryRevision = 0;
+	unsigned char inventorySlot = 0;
 };
 
 struct Packet_ClientDroppedItem
@@ -373,6 +375,7 @@ struct Packet_AttackEntity
 	std::uint64_t entityID = 0;
 	glm::vec3 direction = {};
 	unsigned char inventorySlot = 0;
+	unsigned char inventoryRevision = 0;
 };
 
 struct Packet_TrainingDummyGotAttacked //from server to players!

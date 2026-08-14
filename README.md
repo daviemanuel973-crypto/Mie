@@ -31,10 +31,13 @@ v0.8.0 begins the planned Survival milestones without changing the stable v0.7.2
 - Peaceful worlds keep manual administrator sieges available but disable scheduled natural sieges.
 - The persistent day/night cycle now drives a bounded natural-zombie budget at night, scaled by difficulty, living Survival players and world age.
 - Natural night pressure pauses during siege events, while passive ecology becomes less frequent after sunset.
+- Survival tools and melee weapons now have material-based durability, server-authoritative wear and breakage.
+- Existing or newly crafted equipment without durability metadata starts at full durability; inventory cells and tooltips show the remaining condition.
 - Existing worlds without difficulty metadata remain compatible and load as Normal, non-Hardcore worlds.
 
 See [`docs/V0.8_DIFFICULTY_AND_HARDCORE.md`](docs/V0.8_DIFFICULTY_AND_HARDCORE.md)
-and [`docs/V0.8_DAY_NIGHT_PRESSURE.md`](docs/V0.8_DAY_NIGHT_PRESSURE.md).
+[`docs/V0.8_DAY_NIGHT_PRESSURE.md`](docs/V0.8_DAY_NIGHT_PRESSURE.md) and
+[`docs/V0.8_TOOL_DURABILITY.md`](docs/V0.8_TOOL_DURABILITY.md).
 
 ## v0.7.2 stabilization
 

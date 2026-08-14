@@ -208,7 +208,8 @@ bool DroppedItemServer::loadFromDisk(std::ifstream &f)
 	dontPickTimer = data.dontPickTimer;
 	item = itemCreator(data.type, data.counter);
 	item.metaData = std::move(metadata);
-	return true;
+	item.sanitize();
+	return item.type != 0;
 }
 
 void DroppedItemClient::update(float deltaTime, 

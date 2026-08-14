@@ -12,6 +12,7 @@
 #include <gameplay/crafting.h>
 #include <gameplay/food.h>
 #include <gameplay/worldDifficulty.h>
+#include <gameplay/itemDurability.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
@@ -705,7 +706,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						{
 							//this chunk isn't in this region so undo
 							computeRevisionStuff(*client, false, i.t.eventId);
-							if (i.t.taskType == Task::placeBlock) { sendPlayerInventoryAndIncrementRevision(*client); }
+							sendPlayerInventoryAndIncrementRevision(*client);
 						}
 						else
 						{
@@ -713,12 +714,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 							//if revision number for the inventory is good we can continue,
 							//	if else we need to undo that move
-							if (
-								i.t.taskType == Task::breakBlock ||
-								(
-								client->playerData.inventory.revisionNumber
+							if (client->playerData.inventory.revisionNumber
 								== i.t.revisionNumber)
-								)
 							{
 								if (i.t.taskType == Task::breakBlock)
 								{
@@ -746,7 +743,10 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								}
 
 								auto b = chunk->chunk.safeGet(convertedX, i.t.pos.y, convertedZ);
-								Item *item = 0;
+								Item *item = i.t.inventroySlot < PlayerInventory::HOTBAR_CAPACITY
+									? client->playerData.inventory.getItemFromIndex(i.t.inventroySlot, 0)
+									: nullptr;
+								if (!item) { legal = false; }
 
 								Block actualPlacedBLock;
 								actualPlacedBLock.typeAndFlags = i.t.blockType;
@@ -761,9 +761,6 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 									if (i.t.taskType == Task::placeBlock)
 									{
-										item = client->playerData.inventory.getItemFromIndex(i.t.inventroySlot, 0);
-
-
 										if (item && item->isBlock() &&
 											actualPlacedBLock.getType() == item->type
 											&& item->counter
@@ -885,8 +882,6 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										if (client->playerData.otherPlayerSettings.gameMode ==
 											OtherPlayerSettings::SURVIVAL)
 										{
-											//todo other checks here like tools
-
 											MotionState ms;
 											ms.velocity.y = 2;
 
@@ -894,16 +889,18 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 												worldSaver, 1, lastBlock, nullptr,
 												glm::dvec3(i.t.pos), ms);
 
-
+											if (item && item->isTool() &&
+												consumeItemDurability(item->type, item->metaData) ==
+												ItemDurabilityUseResult::broken)
+											{
+												*item = {};
+											}
 										}
 
 									}
 								}
 
-								if (i.t.taskType == Task::placeBlock && !legal) { sendPlayerInventoryAndIncrementRevision(*client); }
-								{
-									sendPlayerInventoryAndIncrementRevision(*client);
-								}
+								sendPlayerInventoryAndIncrementRevision(*client);
 
 								if (legal)
 								{
@@ -931,6 +928,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							{
 								//undo that move
 								computeRevisionStuff(*client, false, i.t.eventId);
+								sendPlayerInventoryNotIncrementRevision(*client);
 							}
 
 						}
@@ -1680,9 +1678,15 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 					if (client)
 					{
-						if (!client->playerData.killed)
+						if (client->playerData.inventory.revisionNumber != i.t.revisionNumber)
 						{
-							auto item = client->playerData.inventory.getItemFromIndex(itemInventoryIndex, 0);
+							sendPlayerInventoryNotIncrementRevision(*client);
+						}
+						else if (!client->playerData.killed)
+						{
+							auto item = itemInventoryIndex < PlayerInventory::HOTBAR_CAPACITY
+								? client->playerData.inventory.getItemFromIndex(itemInventoryIndex, 0)
+								: nullptr;
 							if (item)
 							{
 								int type = getEntityTypeFromEID(entityId);
@@ -1744,6 +1748,18 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										std::uint64_t wasKilled = 0;
 										bool rez = chunkCache.hitEntityByPlayer(entityId, client->playerData.getPosition(),
 											*item, wasKilled, dir, rng, hitResult.hitCorectness, hitResult.bonusCritChance, lootTable);
+
+										if (rez && item->isWeapon() &&
+											client->playerData.otherPlayerSettings.gameMode ==
+											OtherPlayerSettings::SURVIVAL)
+										{
+											if (consumeItemDurability(item->type, item->metaData) ==
+												ItemDurabilityUseResult::broken)
+											{
+												*item = {};
+											}
+											sendPlayerInventoryAndIncrementRevision(*client);
+										}
 
 										//todo  we have separate logic for killing players and
 										//	maybe do the same for entities?

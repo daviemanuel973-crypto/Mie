@@ -101,8 +101,8 @@ void clientMessageLoop(EventCounter &validatedEvent, RevisionNumber &invalidateR
 	std::unordered_map<std::uint64_t, PlayerConnectionData> &playersConnectionData
 	);
 
-void attackEntity(std::uint64_t eid, unsigned char inventorySlot, glm::vec3 direction,
-	HitResult hitResult);
+void attackEntity(std::uint64_t eid, unsigned char inventorySlot,
+	unsigned char inventoryRevision, glm::vec3 direction, HitResult hitResult);
 
 void sendBlockInteractionMessage(
 	std::uint64_t playerID,

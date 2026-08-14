@@ -313,6 +313,7 @@ struct PlayerInventory
 	PlayerInventory() = default;
 			
 	constexpr static int MAX_EQUIPEMENT_SLOTS = 7;
+	constexpr static int HOTBAR_CAPACITY = 9;
 
 											 //basic items    bonus slots   coins  amo  potions  ability equipement
 	constexpr static int INVENTORY_CAPACITY = 36 +             9            + 4  +  4 +  2        + 1    + MAX_EQUIPEMENT_SLOTS;

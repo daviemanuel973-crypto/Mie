@@ -540,10 +540,17 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerBreakBlock:
 		{
+			if (!data || size != sizeof(Packet_ClientBreakBlock))
+			{
+				break;
+			}
+
 			Packet_ClientBreakBlock packetData = *(Packet_ClientBreakBlock *)data;
 			serverTask.t.taskType = Task::breakBlock;
 			serverTask.t.pos = {packetData.blockPos};
 			serverTask.t.eventId = packetData.eventId;
+			serverTask.t.revisionNumber = packetData.inventoryRevision;
+			serverTask.t.inventroySlot = packetData.inventorySlot;
 
 			serverTasks.push_back(serverTask);
 			break;
@@ -835,6 +842,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 			serverTask.t.taskType = Task::clientAttackedEntity;
 			serverTask.t.entityId = packetData->entityID;
 			serverTask.t.inventroySlot = packetData->inventorySlot;
+			serverTask.t.revisionNumber = packetData->inventoryRevision;
 			serverTask.t.vector = packetData->direction;
 			serverTask.t.hitResult = packetData->hitResult;
 

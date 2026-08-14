@@ -1749,7 +1749,9 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 								gameData.chunkSystem.breakBlockByClient(rayCastPos
 									, gameData.undoQueue,
 									gameData.entityManager.localPlayer.entity.position,
-									gameData.lightSystem, gameData.entityManager);
+									gameData.lightSystem, gameData.entityManager,
+									gameData.currentItemSelected,
+									player.inventory.revisionNumber);
 								gameData.currentBlockBreaking = {};
 							}
 							else
@@ -2634,6 +2636,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 					//std::cout << "Attack! ";
 
 					attackEntity(targetedEntity, gameData.currentItemSelected,
+						player.inventory.revisionNumber,
 						gameData.inputCamera.viewDirection, hitStatus);
 
 					AudioEngine::playHitSound();

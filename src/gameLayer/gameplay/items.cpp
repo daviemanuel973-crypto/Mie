@@ -1,4 +1,5 @@
 #include <gameplay/items.h>
+#include <gameplay/itemDurability.h>
 #include <serializing.h>
 #include <platformTools.h>
 #include <iostream>
@@ -186,6 +187,11 @@ void Item::sanitize()
 		{
 			counter = getStackSize();
 		}
+	}
+
+	if (!sanitizeItemDurabilityMetadata(type, metaData))
+	{
+		*this = {};
 	}
 
 }
@@ -403,7 +409,14 @@ std::string Item::formatMetaDataToString()
 	if (shovel)
 		{ rez += "\nShovel Power: " + std::to_string(int(shovel)) + "%"; }
 
-	if (metaData.size())
+	const auto maximumDurability = getMaximumItemDurability(type);
+	if (maximumDurability)
+	{
+		rez += "\nDurability: " +
+			std::to_string(getRemainingItemDurability(type, metaData)) + " / " +
+			std::to_string(maximumDurability);
+	}
+	else if (metaData.size())
 	{
 		rez += "\nHas metadata";
 	}

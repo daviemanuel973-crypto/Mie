@@ -167,6 +167,16 @@ jobs:
             -o spawnPressureTests
           ./spawnPressureTests
 
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude/gameLayer \
+            -Ishared \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/itemDurabilityTests.cpp \
+            src/gameLayer/gameplay/itemDurability.cpp \
+            -o itemDurabilityTests
+          ./itemDurabilityTests
+
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \
             tests/nativeSystemsTests.cpp \

@@ -1,6 +1,7 @@
 #include "rendering/UiEngine.h"
 #include <platform/platformInput.h>
 #include <gameplay/items.h>
+#include <gameplay/itemDurability.h>
 #include <blocksLoader.h>
 #include <gameplay/life.h>
 #include <gamePlayLogic.h>
@@ -16,6 +17,7 @@
 #include <chunkSystem.h>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 
 float determineTextSize(gl2d::Renderer2D &renderer, const std::string &str,
@@ -409,6 +411,26 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 			renderer2d.renderText({itemBox}, s.c_str(),
 				font, {1,1,1,1}, 40 * (itemBox.z/100.f));
 
+		}
+
+		if (itemUsesDurability(item.type))
+		{
+			const float durability = getItemDurabilityFraction(item.type, item.metaData);
+			glm::vec4 bar = itemBox;
+			bar.y += itemBox.w * 0.40f;
+			bar.z *= 0.72f;
+			bar.w = std::max(2.f, itemBox.w * 0.075f);
+			renderer2d.renderRectangle(bar, {0.06f, 0.06f, 0.06f, 0.92f});
+
+			glm::vec4 fill = bar;
+			fill.z *= std::max(0.f, std::min(1.f, durability));
+			fill.x -= (bar.z - fill.z) * 0.5f;
+			const glm::vec4 durabilityColor = durability > 0.50f
+				? glm::vec4{0.25f, 0.90f, 0.30f, 1.f}
+				: (durability > 0.20f
+					? glm::vec4{0.95f, 0.75f, 0.15f, 1.f}
+					: glm::vec4{0.95f, 0.20f, 0.16f, 1.f});
+			renderer2d.renderRectangle(fill, durabilityColor);
 		}
 
 	};

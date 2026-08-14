@@ -247,6 +247,16 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME day-night-spawn-pressure COMMAND spawnPressureTests)
 
+	add_executable(itemDurabilityTests
+		tests/itemDurabilityTests.cpp
+		src/gameLayer/gameplay/itemDurability.cpp)
+	target_include_directories(itemDurabilityTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME item-durability COMMAND itemDurabilityTests)
+
 	add_executable(nativeSystemsTests
 		tests/nativeSystemsTests.cpp
 		src/gameLayer/native/contentRegistry.cpp
@@ -297,6 +307,7 @@ if (BUILD_TESTING)
 		siege-director
 		world-difficulty
 		day-night-spawn-pressure
+		item-durability
 		native-systems
 		player-control-settings
 		entity-stats
