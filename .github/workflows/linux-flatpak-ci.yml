@@ -177,6 +177,29 @@ jobs:
             -o itemDurabilityTests
           ./itemDurabilityTests
 
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/furnaceRecipesTests.cpp \
+            src/gameLayer/gameplay/furnaceRecipes.cpp \
+            -o furnaceRecipesTests
+          ./furnaceRecipesTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/furnaceBlockTests.cpp \
+            src/gameLayer/gameplay/furnaceRecipes.cpp \
+            src/gameLayer/gameplay/blocks/furnaceBlock.cpp \
+            -o furnaceBlockTests
+          ./furnaceBlockTests
+
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \
             tests/nativeSystemsTests.cpp \
