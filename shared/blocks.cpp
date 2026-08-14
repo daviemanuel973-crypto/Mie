@@ -689,7 +689,7 @@ unsigned char isInteractable(BlockType type)
 	return InteractionTypes::none;
 }
 
-bool isBlock(std::uint16_t type) //todo == 0 ???????????????????/
+bool isBlock(std::uint16_t type)
 {
 	return type > 0 && type < BlocksCount;
 }

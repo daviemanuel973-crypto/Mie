@@ -520,7 +520,6 @@ struct Block
 
 	bool isDecorativeFurniture()
 	{
-		auto type = getType();
 		return ::isDecorativeFurniture(getType());
 	}
 

@@ -3,6 +3,7 @@ name: Linux Flatpak CI
 on:
   push:
     branches:
+      - agent/v0.7.2-stabilization
       - agent/survival-linux-flatpak
       - agent/linux-lowend-performance
       - agent/release-packaging-stabilization
@@ -13,6 +14,7 @@ on:
       - main
   pull_request:
     paths:
+      - 'VERSION'
       - 'CMakeLists.txt'
       - 'src/**'
       - 'include/**'
@@ -35,6 +37,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Resolve and verify release version
+        shell: bash
+        run: |
+          MIE_VERSION="$(tr -d '\r\n' < VERSION)"
+          if [[ ! "$MIE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must contain a semantic version, got: '$MIE_VERSION'" >&2
+            exit 1
+          fi
+          grep -F "set(OURCRAFT_VERSION \"$MIE_VERSION\"" CMakeLists.txt
+          grep -F "#define MyAppVersion \"$MIE_VERSION\"" windows/Mie.iss
+          echo "MIE_VERSION=$MIE_VERSION" >> "$GITHUB_ENV"
 
       - name: Install Flatpak and shader tooling
         run: |
@@ -220,6 +234,6 @@ jobs:
       - name: Upload Linux Flatpak
         uses: actions/upload-artifact@v4
         with:
-          name: Mie-Survival-Linux-x86_64-nonbindless-renderer-fix
+          name: Mie-Survival-v${{ env.MIE_VERSION }}-Linux-x86_64-Flatpak
           path: Mie-Survival-Linux-x86_64.flatpak
           if-no-files-found: error
