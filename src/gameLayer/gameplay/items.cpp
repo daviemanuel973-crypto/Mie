@@ -9,6 +9,12 @@
 #include <gameplay/crafting.h>
 #include <gameplay/blocks/chestBlock.h>
 
+static_assert(BlockTypes::BlocksCount == RecipeDiscovery::BlockTypeCount,
+	"block IDs changed; migrate the recipe discovery bit set before appending content");
+static_assert(ItemsStartPoint == RecipeDiscovery::FirstItemType &&
+	ItemTypes::lastItem == RecipeDiscovery::LastItemTypeExclusive,
+	"item IDs changed; migrate the recipe discovery bit set before appending content");
+
 //todo can be placed
 
 bool Item::isBlock()
@@ -516,8 +522,10 @@ Item *PlayerInventory::getItemFromIndex(int index, ChestBlock *chestBlock, Furna
 
 void PlayerInventory::formatIntoData(std::vector<unsigned char> &data)
 {
+	learnCurrentInventoryTypes();
 
-	data.reserve(data.size() + (INVENTORY_CAPACITY + 4) * sizeof(Item));
+	data.reserve(data.size() + (INVENTORY_CAPACITY + 4) * sizeof(Item) +
+		RecipeDiscovery::SerializedBytes);
 
 	data.push_back(revisionNumber);
 
@@ -530,6 +538,7 @@ void PlayerInventory::formatIntoData(std::vector<unsigned char> &data)
 	headArmour.formatIntoData(data);
 	chestArmour.formatIntoData(data);
 	bootsArmour.formatIntoData(data);
+	recipeDiscovery.formatIntoData(data);
 
 }
 
@@ -571,6 +580,13 @@ bool PlayerInventory::readFromData(void *data, size_t size, size_t *bytesRead)
 	if (currentAdvance < size && !readOne(headArmour)) { return 0; }
 	if (currentAdvance < size && !readOne(chestArmour)) { return 0; }
 	if (currentAdvance < size && !readOne(bootsArmour)) { return 0; }
+	if (currentAdvance < size)
+	{
+		const int discoveryBytes = recipeDiscovery.readFromData(
+			static_cast<unsigned char *>(data) + currentAdvance, size - currentAdvance);
+		if (discoveryBytes <= 0) { return false; }
+		currentAdvance += static_cast<std::size_t>(discoveryBytes);
+	}
 
 	if (bytesRead) { *bytesRead = currentAdvance; }
 	return true;
@@ -583,7 +599,23 @@ void PlayerInventory::sanitize()
 	{
 		getItemFromIndex(i, nullptr)->sanitize();
 	}
+	recipeDiscovery.sanitize();
 
+}
+
+bool PlayerInventory::learnCurrentInventoryTypes()
+{
+	bool changed = false;
+	for (const Item &item : items)
+	{
+		if (item.counter > 0) { changed |= recipeDiscovery.learnType(item.type); }
+	}
+	const Item *extraItems[] = {&heldInMouse, &headArmour, &chestArmour, &bootsArmour};
+	for (const Item *item : extraItems)
+	{
+		if (item->counter > 0) { changed |= recipeDiscovery.learnType(item->type); }
+	}
+	return changed;
 }
 
 int PlayerInventory::tryPickupItem(const Item &item)

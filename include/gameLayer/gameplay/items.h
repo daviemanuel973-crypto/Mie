@@ -5,6 +5,7 @@
 #include <cstring>
 #include <gameplay/weaponStats.h>
 #include <gameplay/entityStats.h>
+#include <gameplay/recipeDiscovery.h>
 
 struct ChestBlock;
 struct FurnaceBlock;
@@ -337,6 +338,10 @@ struct PlayerInventory
 	Item chestArmour = {}; //ARMOUR_START_INDEX + 1
 	Item bootsArmour = {}; //ARMOUR_START_INDEX + 2
 
+	// v0.8 recipe-book state. It is appended to inventory packets/saves, so
+	// pre-v0.8 payloads that end after armour remain valid.
+	RecipeDiscovery recipeDiscovery = {};
+
 	Item *getItemFromIndex(int index, ChestBlock *chestBlock, FurnaceBlock *furnaceBlock = nullptr);
 
 	//doesn't clear data vector!!
@@ -345,6 +350,10 @@ struct PlayerInventory
 	bool readFromData(void *data, size_t size, size_t *bytesRead = nullptr);
 
 	void sanitize();
+
+	// Records every valid content type currently owned by this player. Returns
+	// true only when at least one material is discovered for the first time.
+	bool learnCurrentInventoryTypes();
 
 	//returns how many items were picked!
 	int tryPickupItem(const Item &item);

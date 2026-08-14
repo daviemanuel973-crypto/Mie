@@ -202,6 +202,25 @@ jobs:
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \
+            tests/recipeDiscoveryTests.cpp \
+            src/gameLayer/gameplay/recipeDiscovery.cpp \
+            -o recipeDiscoveryTests
+          ./recipeDiscoveryTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/recipeBookTests.cpp \
+            src/gameLayer/gameplay/crafting.cpp \
+            src/gameLayer/gameplay/recipeDiscovery.cpp \
+            -o recipeBookTests
+          ./recipeBookTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
             tests/nativeSystemsTests.cpp \
             src/gameLayer/native/contentRegistry.cpp \
             src/gameLayer/native/gameplayFoundation.cpp \

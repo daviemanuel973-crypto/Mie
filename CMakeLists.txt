@@ -321,6 +321,24 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
 	add_test(NAME furnace-block-runtime COMMAND furnaceBlockTests)
 
+	add_executable(recipeDiscoveryTests
+		tests/recipeDiscoveryTests.cpp
+		src/gameLayer/gameplay/recipeDiscovery.cpp)
+	target_include_directories(recipeDiscoveryTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME recipe-discovery-persistence COMMAND recipeDiscoveryTests)
+
+	add_executable(recipeBookTests
+		tests/recipeBookTests.cpp
+		src/gameLayer/gameplay/crafting.cpp
+		src/gameLayer/gameplay/recipeDiscovery.cpp)
+	target_include_directories(recipeBookTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME recipe-book-discovery COMMAND recipeBookTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -335,5 +353,7 @@ if (BUILD_TESTING)
 		survival-rules
 		furnace-recipes
 		furnace-block-runtime
+		recipe-discovery-persistence
+		recipe-book-discovery
 		PROPERTIES TIMEOUT 60)
 endif()
