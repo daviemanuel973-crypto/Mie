@@ -1,12 +1,17 @@
 #include <gameplay/itemDurability.h>
 #include <gameplay/items.h>
 
-#include <cassert>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <vector>
 
-#define REQUIRE(condition) assert(condition)
+namespace
+{
+	#define REQUIRE(condition) do { if (!(condition)) { \
+		std::cerr << "Requirement failed at line " << __LINE__ << ": " #condition "\n"; \
+		std::exit(1); } } while (false)
+}
 
 int main()
 {
