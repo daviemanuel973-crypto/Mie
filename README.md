@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current version: v0.7.2**
+**Current development version: v0.8.0**
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -19,6 +19,10 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.8 development
+
+v0.8 starts from the validated v0.7.2 survival and packaging baseline. New gameplay work for this cycle belongs on `agent/v0.8-development` until it is independently tested and approved for integration.
 
 ## v0.7.2 stabilization
 
