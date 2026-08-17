@@ -9,7 +9,8 @@
 struct PlayerServer;
 
 constexpr std::uint32_t PLAYER_IDENTITY_PROTOCOL_VERSION = 1;
-constexpr std::uint32_t PLAYER_SAVE_FORMAT_VERSION = 3;
+constexpr std::uint32_t PLAYER_SAVE_FORMAT_VERSION = 4;
+constexpr std::uint32_t PLAYER_SAVE_GUIDE_FORMAT_VERSION = 3;
 constexpr std::uint32_t PLAYER_SAVE_LEGACY_FORMAT_VERSION = 1;
 constexpr std::size_t PLAYER_IDENTITY_SIZE = 16;
 constexpr std::size_t MAX_PLAYER_INVENTORY_SAVE_SIZE = 1024 * 1024;
@@ -48,6 +49,19 @@ struct PlayerGuideSaveState
 	}
 };
 
+// v0.9 home extension. The save representation intentionally stays independent
+// from glm/runtime structs so the on-disk layout remains explicit and testable.
+struct PlayerHomeSaveState
+{
+	bool hasHome = false;
+	std::array<double, 3> position = {};
+
+	bool operator==(const PlayerHomeSaveState &other) const
+	{
+		return hasHome == other.hasHome && position == other.position;
+	}
+};
+
 // This representation is intentionally independent from the runtime PlayerServer
 // layout. It keeps the on-disk format stable when entity structs gain new fields.
 struct PlayerSaveSnapshot
@@ -60,6 +74,7 @@ struct PlayerSaveSnapshot
 	std::int16_t maxHunger = 100;
 	std::uint8_t gameMode = 0;
 	PlayerGuideSaveState guideState = {};
+	PlayerHomeSaveState homeState = {};
 	std::vector<unsigned char> inventory;
 };
 
