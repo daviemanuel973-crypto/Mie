@@ -27,8 +27,9 @@ namespace mie::native
 		"v0.5 defence block IDs must remain stable");
 	static_assert(ItemTypes::stick == V05_FIRST_ITEM_ID &&
 		ItemTypes::fieldGuide == V07_FIRST_ITEM_ID &&
-		ItemTypes::lastItem == V07_LAST_ITEM_EXCLUSIVE,
-		"persisted v0.5/v0.7 item IDs changed; append without renumbering existing content");
+		ItemTypes::bronzeSword + 1 == V07_LAST_ITEM_EXCLUSIVE &&
+		ItemTypes::bedroll == V07_LAST_ITEM_EXCLUSIVE,
+		"persisted v0.5/v0.7 item IDs changed; append new content after the frozen legacy range");
 	static_assert(EntitiesTypesCount == V05_ENTITY_TYPE_COUNT,
 		"v0.5 entity type namespace changed without a migration");
 
