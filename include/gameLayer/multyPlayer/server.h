@@ -1,4 +1,5 @@
 #pragma once
+
 #include <chrono>
 #include <unordered_map>
 #include <glm/vec2.hpp>
@@ -18,6 +19,8 @@ struct ServerChunkStorer;
 bool isServerRunning();
 bool startServer(const std::string &path);
 ServerChunkStorer &getServerChunkStorer();
+bool tryResolveSafeServerSpawn(WorldSaver &worldSaver, glm::dvec3 &safePosition);
+glm::dvec3 resolveSafeServerSpawn(WorldSaver &worldSaver);
 int getServerTicksPerSeccond();
 void clearSD(WorldSaver &worldSaver);
 int getChunkCapacity();

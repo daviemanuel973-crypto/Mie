@@ -66,6 +66,17 @@ std::uint64_t getCurrentEntityId(int entityType)
 	return entityIds.entityIds[entityType];
 }
 
+void reserveEntityId(std::uint64_t entityId)
+{
+	const unsigned int entityType = getEntityTypeFromEID(entityId);
+	if (entityType >= EntitiesTypesCount) { return; }
+	const std::uint64_t rawId = getOnlyIdFromEID(entityId);
+	if (rawId >= entityIds.entityIds[entityType] && rawId < 0x00FFFFFFFFFFFFFFULL)
+	{
+		entityIds.entityIds[entityType] = rawId + 1;
+	}
+}
+
 void broadCastNotLocked(Packet p, void *data, size_t size, ENetPeer *peerToIgnore, 
 	bool reliable, int channel)
 {
@@ -256,14 +267,17 @@ void finishAddingConnection(ENetEvent &event, WorldSaver &worldSaver,
 	{
 		Client c{event.peer};
 		c.identity = identity;
-		c.playerData.entity.position = worldSaver.spawnPosition;
-		c.playerData.entity.lastPosition = worldSaver.spawnPosition;
+		glm::dvec3 safeSpawn = glm::dvec3(worldSaver.spawnPosition);
+		const bool resolvedSafeSpawn = tryResolveSafeServerSpawn(worldSaver, safeSpawn);
+		c.playerData.entity.position = safeSpawn;
+		c.playerData.entity.lastPosition = safeSpawn;
 
 		// Survival is now the default. Creative remains available through the server command.
 		c.playerData.otherPlayerSettings.gameMode = OtherPlayerSettings::SURVIVAL;
 		c.playerData.inventory = PlayerInventory{};
 		c.playerData.survivalStats = {};
 		const bool restored = loadPlayerFromDisk(worldSaver.savePath, identity, c.playerData);
+		c.needsSafeSpawnPlacement = !restored && !resolvedSafeSpawn;
 		c.playerData.lastChunkPositionWhenAnUpdateWasSent.x = divideChunk(c.playerData.entity.position.x);
 		c.playerData.lastChunkPositionWhenAnUpdateWasSent.y = divideChunk(c.playerData.entity.position.z);
 		std::cout << (restored ? "Restored" : "Created") << " player "

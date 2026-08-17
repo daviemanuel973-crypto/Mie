@@ -89,7 +89,7 @@ struct ServerData
 	float seccondsTimer = 0;
 
 	float saveEntitiesTimer = 5;
-	float passiveSpawnTimer = 2;
+	float ambientSpawnTimer = 4;
 	std::uint64_t lastTimer = 0;
 
 	//this is used as an unique id for chunk packets
@@ -99,7 +99,7 @@ struct ServerData
 
 namespace
 {
-	std::size_t countNaturalPassives()
+	std::size_t countAmbientCreatures()
 	{
 		std::size_t count = 0;
 		for (const auto &entry : sd.chunkCache.savedChunks)
@@ -107,11 +107,15 @@ namespace
 			if (!entry.second || !entry.second->otherData.withinSimulationDistance) { continue; }
 			count += entry.second->entityData.pigs.size();
 			count += entry.second->entityData.cats.size();
+			for (const auto &goblin : entry.second->entityData.goblins)
+			{
+				if (!isServerSiegeEnemy(goblin.first)) { ++count; }
+			}
 		}
 		return count;
 	}
 
-	bool unsuitablePassiveGround(BlockType type)
+	bool unsuitableAmbientGround(BlockType type)
 	{
 		return type == BlockTypes::water || type == BlockTypes::ice ||
 			isAnyLeaves(type) || isAnyWoddenLOG(type) || isDecorativeFurniture(type);
@@ -128,8 +132,7 @@ namespace
 		}
 		return true;
 	}
-
-	bool findNaturalPassiveSpawn(const glm::dvec3 &playerPosition,
+	bool findAmbientSpawn(const glm::dvec3 &playerPosition,
 		std::minstd_rand &rng, glm::dvec3 &spawnPosition)
 	{
 		constexpr float pi = 3.14159265358979323846f;
@@ -151,7 +154,7 @@ namespace
 				auto *feet = chunk->chunk.safeGet(localX, y + 1, localZ);
 				auto *head = chunk->chunk.safeGet(localX, y + 2, localZ);
 				if (!ground || !feet || !head) { continue; }
-				if (!ground->isColidable() || unsuitablePassiveGround(ground->getType())) { continue; }
+				if (!ground->isColidable() || unsuitableAmbientGround(ground->getType())) { continue; }
 				if (!feet->air() || !head->air()) { continue; }
 
 				spawnPosition = glm::dvec3(worldX, y + 0.51, worldZ);
@@ -161,41 +164,68 @@ namespace
 		}
 		return false;
 	}
-
-	void updateNaturalPassiveSpawning(float deltaTime, WorldSaver &worldSaver,
+	void updateAmbientEcologySpawning(float deltaTime, WorldSaver &worldSaver,
 		std::minstd_rand &rng)
 	{
-		sd.passiveSpawnTimer -= deltaTime;
-		if (sd.passiveSpawnTimer > 0.f) { return; }
-		sd.passiveSpawnTimer = getRandomNumberFloat(rng, 8.f, 14.f);
+		sd.ambientSpawnTimer -= deltaTime;
+		if (sd.ambientSpawnTimer > 0.f) { return; }
+		sd.ambientSpawnTimer = getRandomNumberFloat(rng, 8.f, 14.f);
 
 		auto &clients = getAllClientsReff();
 		if (clients.empty()) { return; }
-		const std::size_t passiveCap = std::max<std::size_t>(8, clients.size() * 12);
-		if (countNaturalPassives() >= passiveCap) { return; }
+		const std::size_t ambientCap = std::max<std::size_t>(8, clients.size() * 12);
+		if (countAmbientCreatures() >= ambientCap) { return; }
 
 		auto selectedClient = clients.begin();
 		std::advance(selectedClient, getRandomNumber(rng, 0, static_cast<int>(clients.size()) - 1));
 		glm::dvec3 spawnPosition;
-		if (!findNaturalPassiveSpawn(selectedClient->second.playerData.entity.position, rng, spawnPosition))
+		if (!findAmbientSpawn(selectedClient->second.playerData.entity.position, rng, spawnPosition))
 		{
 			return;
 		}
-
-		if (getRandomChance(rng, 0.75f))
+		const int creatureRoll = getRandomNumber(rng, 0, 99);
+		if (creatureRoll < 50)
 		{
 			Pig pig;
 			pig.position = spawnPosition;
 			pig.lastPosition = spawnPosition;
 			spawnPig(sd.chunkCache, pig, worldSaver, rng);
 		}
-		else
+		else if (creatureRoll < 75)
 		{
 			Cat cat;
 			cat.position = spawnPosition;
 			cat.lastPosition = spawnPosition;
 			spawnCat(sd.chunkCache, cat, worldSaver, rng);
 		}
+		else
+		{
+			Goblin goblin;
+			goblin.position = spawnPosition;
+			goblin.lastPosition = spawnPosition;
+			spawnGoblin(sd.chunkCache, goblin, worldSaver, rng, nullptr, true);
+		}
+	}
+
+	bool findSafeSpawnColumn(int worldX, int worldZ, glm::dvec3 &result)
+	{
+		auto *chunk = sd.chunkCache.getChunkOrGetNull(divideChunk(worldX), divideChunk(worldZ));
+		if (!chunk) { return false; }
+
+		const int localX = modBlockToChunk(worldX);
+		const int localZ = modBlockToChunk(worldZ);
+		for (int feetY = CHUNK_HEIGHT - 2; feetY >= 1; --feetY)
+		{
+			Block *ground = chunk->chunk.safeGet(localX, feetY - 1, localZ);
+			Block *feet = chunk->chunk.safeGet(localX, feetY, localZ);
+			Block *head = chunk->chunk.safeGet(localX, feetY + 1, localZ);
+			if (!ground || !feet || !head) { continue; }
+			if (!ground->isColidable() || unsuitableAmbientGround(ground->getType())) { continue; }
+			if (!feet->air() || !head->air()) { continue; }
+			result = glm::dvec3(worldX, feetY, worldZ);
+			return true;
+		}
+		return false;
 	}
 }
 
@@ -209,6 +239,34 @@ int getServerTicksPerSeccond()
 ServerChunkStorer &getServerChunkStorer()
 {
 	return sd.chunkCache;
+}
+
+bool tryResolveSafeServerSpawn(WorldSaver &worldSaver, glm::dvec3 &safePosition)
+{
+	const glm::ivec3 preferred = worldSaver.spawnPosition;
+	for (int radius = 0; radius <= 4; ++radius)
+	{
+		for (int dz = -radius; dz <= radius; ++dz)
+		{
+			for (int dx = -radius; dx <= radius; ++dx)
+			{
+				if (radius != 0 && std::max(std::abs(dx), std::abs(dz)) != radius) { continue; }
+				if (findSafeSpawnColumn(preferred.x + dx, preferred.z + dz, safePosition))
+				{
+					worldSaver.spawnPosition = glm::ivec3(safePosition);
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+glm::dvec3 resolveSafeServerSpawn(WorldSaver &worldSaver)
+{
+	glm::dvec3 safePosition = glm::dvec3(worldSaver.spawnPosition);
+	tryResolveSafeServerSpawn(worldSaver, safePosition);
+	return safePosition;
 }
 
 void clearSD(WorldSaver &worldSaver)
@@ -517,6 +575,25 @@ void serverWorkerUpdate(
 
 		for (auto &client : getAllClientsReff())
 		{
+			if (client.second.needsSafeSpawnPlacement)
+			{
+				glm::dvec3 safePosition;
+				if (tryResolveSafeServerSpawn(worldSaver, safePosition))
+				{
+					client.second.playerData.entity.position = safePosition;
+					client.second.playerData.entity.lastPosition = safePosition;
+					client.second.playerData.entity.forces = {};
+					client.second.needsSafeSpawnPlacement = false;
+
+					Packet packet;
+					packet.cid = client.first;
+					packet.header = headerRespawnPlayer;
+					Packet_RespawnPlayer packetData;
+					packetData.pos = safePosition;
+					sendPacket(client.second.peer, packet, reinterpret_cast<const char *>(&packetData),
+						sizeof(packetData), true, channelChunksAndBlocks);
+				}
+			}
 
 			auto cPos = determineChunkThatIsEntityIn(client.second.playerData.entity.position);
 
@@ -533,7 +610,7 @@ void serverWorkerUpdate(
 		mie::native::updateServerNativeSystems(sd.tickDeltaTime);
 		if (!isServerSiegeWaveActive())
 		{
-			updateNaturalPassiveSpawning(sd.tickDeltaTime, worldSaver, rng);
+			updateAmbientEcologySpawning(sd.tickDeltaTime, worldSaver, rng);
 		}
 
 	#pragma endregion
@@ -560,101 +637,8 @@ void serverWorkerUpdate(
 		//
 		//}
 
-		//todo if first time ever or not do it if the chunk isn't loaded!
 	#pragma region replace spawn position
-		//worldSaver.spawnPosition.y = 170;
-		//if(0)
-		//TODO this should run once at server startup, and also create this chunk,
-		// also this should run when someone wants to respawn.
-		//just at start
-		{
-
-			//wg, structuresManager, biomesManager,
-			//sendNewBlocksToPlayers, true, nullptr, worldSaver
-
-			glm::ivec3 spawnPos = worldSaver.spawnPosition;
-			auto spawnChunk = sd.chunkCache.getChunkOrGetNull(divideChunk(spawnPos.x),
-				divideChunk(spawnPos.z));
-
-			//only if the chunk is loaded for now
-			if (spawnChunk)
-			{
-				glm::ivec3 blockPos = spawnPos;
-				blockPos.x = modBlockToChunk(blockPos.x);
-				blockPos.z = modBlockToChunk(blockPos.z);
-
-				if (blockPos.y >= CHUNK_HEIGHT)
-				{
-					worldSaver.spawnPosition.y = CHUNK_HEIGHT;
-				}
-				else
-				{
-					if (blockPos.y < 1)
-					{
-						blockPos.y = 1;
-					}
-
-					//try down first
-					{
-						while (true)
-						{
-							auto b = spawnChunk->chunk.safeGet(blockPos.x, blockPos.y, blockPos.z);
-
-							if (!b)
-							{
-								break;
-							}
-
-							if (!b->isColidable())
-							{
-								auto bunder = spawnChunk->chunk.safeGet(blockPos.x, blockPos.y - 1, blockPos.z);
-								if (bunder && !bunder->isColidable())
-								{
-									blockPos.y--;
-								}
-								else
-								{
-									break;
-								}
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-					
-					while (true)
-					{
-						auto b = spawnChunk->chunk.safeGet(blockPos.x, blockPos.y, blockPos.z);
-
-						if (!b)
-						{
-							worldSaver.spawnPosition.y = blockPos.y;
-							break;
-						}
-
-						if (!b->isColidable())
-						{
-							auto bunder = spawnChunk->chunk.safeGet(blockPos.x, blockPos.y - 1, blockPos.z);
-							if (bunder && bunder->isColidable())
-							{
-								auto bUp = spawnChunk->chunk.safeGet(blockPos.x, blockPos.y + 1, blockPos.z);
-								if (!bUp || !bUp->isColidable())
-								{
-									//good
-									worldSaver.spawnPosition.y = blockPos.y;
-									break;
-								}
-							}
-						}
-						blockPos.y++;
-					}
-
-				}
-			}
-
-		}
+		resolveSafeServerSpawn(worldSaver);
 	#pragma endregion
 
 

@@ -5,6 +5,7 @@
 #include <chunkSystem.h>
 #include <iostream>
 #include <multyPlayer/enetServerFunction.h>
+#include <multyPlayer/server.h>
 #include <deque>
 #include <platformTools.h>
 #include <gameplay/gameplayRules.h>
@@ -307,7 +308,7 @@ bool spawnPig(
 bool spawnGoblin(
 	ServerChunkStorer &chunkManager,
 	Goblin goblin, WorldSaver &worldSaver,
-	std::minstd_rand &rng, std::uint64_t *spawnedId)
+	std::minstd_rand &rng, std::uint64_t *spawnedId, bool ambientNeutral)
 {
 	//todo also send packets
 	//todo generic spawn for any entity
@@ -318,9 +319,9 @@ bool spawnGoblin(
 	{
 		GoblinServer e = {};
 		e.entity = goblin;
-		//e.configureSpawnSettings(rng);
 		auto newId = getEntityIdAndIncrement(worldSaver, EntityType::goblins);
-		e.configureVariant(newId);
+		if (ambientNeutral) { e.configureAmbientNeutral(); }
+		else { e.configureVariant(newId); }
 		c->entityData.goblins.insert({newId, e});
 		chunkManager.entityChunkPositions[newId] = determineChunkThatIsEntityIn(e.getPosition());
 		if (spawnedId) { *spawnedId = newId; }
@@ -894,8 +895,6 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 
 										}
-
-										chunkCache.removeBlockDataFromThisPos(lastBlock, i.t.pos);
 
 									}
 								}
@@ -1884,12 +1883,32 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							sendUpdateLifeLifePlayerPacket(*client);
 							updatePlayerSurvivalStats(*client);
 
+							const glm::dvec3 respawnPosition = resolveSafeServerSpawn(worldSaver);
+							const auto previousChunk = chunkCache.entityChunkPositions.find(i.cid);
+							if (previousChunk != chunkCache.entityChunkPositions.end())
+							{
+								if (auto *oldChunk = chunkCache.getChunkOrGetNull(
+									previousChunk->second.x, previousChunk->second.y))
+								{
+									oldChunk->entityData.players.erase(i.cid);
+								}
+							}
+							client->playerData.entity.position = respawnPosition;
+							client->playerData.entity.lastPosition = respawnPosition;
+							client->playerData.entity.forces = {};
+							const glm::ivec2 respawnChunk = determineChunkThatIsEntityIn(respawnPosition);
+							chunkCache.entityChunkPositions[i.cid] = respawnChunk;
+							if (auto *newChunk = chunkCache.getChunkOrGetNull(respawnChunk.x, respawnChunk.y))
+							{
+								newChunk->entityData.players[i.cid] = &client->playerData;
+							}
+
 							Packet packet;
 							packet.cid = i.cid;
 							packet.header = headerRespawnPlayer;
 
 							Packet_RespawnPlayer packetData;
-							packetData.pos = worldSaver.spawnPosition;
+							packetData.pos = respawnPosition;
 
 							broadCastNotLocked(packet, &packetData, sizeof(packetData),
 								nullptr, true, channelChunksAndBlocks);

@@ -5,6 +5,7 @@
 #include <glm/mat3x3.hpp>
 #include <glm/gtx/transform.hpp>
 #include <gameplay/goblin.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <multyPlayer/serverChunkStorer.h>
 #include <iostream>
 #include <glm/gtx/quaternion.hpp>
@@ -43,8 +44,14 @@ int GoblinClient::getTextureIndex()
 
 void GoblinServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
-	(void)f;
-	(void)eId;
+	static_assert(std::is_trivially_copyable_v<GoblinServer>);
+	basicEntitySave(f, Markers::goblin, eId, this, sizeof(*this));
+}
+
+bool GoblinServer::loadFromDisk(std::ifstream &f)
+{
+	static_assert(std::is_trivially_copyable_v<GoblinServer>);
+	return readData(f, this, sizeof(*this));
 }
 
 static unsigned int getGoblinVariantRoll(std::uint64_t eId)
@@ -89,6 +96,17 @@ void GoblinServer::configureVariant(std::uint64_t eId)
 	variantConfigured = true;
 }
 
+void GoblinServer::configureAmbientNeutral()
+{
+	const float oldMaxLife = entity.life.maxLife > 0.f ? entity.life.maxLife : 30.f;
+	const float lifePercent = glm::clamp(entity.life.life / oldMaxLife, 0.f, 1.f);
+	variant = Common;
+	moveSpeedMultiplier = 1.f;
+	entity.life.maxLife = 30;
+	entity.life.life = static_cast<short>(glm::clamp(30.f * lifePercent, 0.f, 30.f));
+	variantConfigured = true;
+}
+
 void GoblinServer::forceTarget(std::uint64_t playerId)
 {
 	basicEnemyBehaviour.playerLockedOn = playerId;
@@ -97,22 +115,24 @@ void GoblinServer::forceTarget(std::uint64_t playerId)
 }
 
 static bool hasNearbyGoblinChief(ServerChunkStorer &serverChunkStorer,
-	const glm::dvec3 &position, std::uint64_t yourEID)
+	const glm::dvec3 &position, std::uint64_t selfId)
 {
-	constexpr double chiefProtectionRadiusSquared = 18.0 * 18.0;
-	for (const auto &chunkEntry : serverChunkStorer.savedChunks)
+	constexpr double packRadius = 18.0;
+	constexpr double packRadiusSquared = packRadius * packRadius;
+
+	for (auto &chunkEntry : serverChunkStorer.savedChunks)
 	{
-		const SavedChunk *chunk = chunkEntry.second;
-		if (!chunk || !chunk->otherData.withinSimulationDistance) { continue; }
+		if (!chunkEntry.second || !chunkEntry.second->otherData.withinSimulationDistance) { continue; }
 
-		for (const auto &goblinEntry : chunk->entityData.goblins)
+		for (auto &goblinEntry : chunkEntry.second->entityData.goblins)
 		{
-			if (goblinEntry.first == yourEID) { continue; }
-			const GoblinServer &other = goblinEntry.second;
-			if (!other.variantConfigured || other.variant != GoblinServer::Chief) { continue; }
+			if (goblinEntry.first == selfId) { continue; }
+			auto &other = goblinEntry.second;
+			other.configureVariant(goblinEntry.first);
+			if (other.variant != GoblinServer::Chief) { continue; }
 
-			const glm::dvec3 delta = other.entity.position - position;
-			if (glm::dot(delta, delta) <= chiefProtectionRadiusSquared) { return true; }
+			const glm::dvec3 delta = other.getPosition() - position;
+			if (glm::dot(delta, delta) <= packRadiusSquared) { return true; }
 		}
 	}
 	return false;
@@ -129,7 +149,8 @@ bool GoblinServer::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 
 	const bool commonProtectedByChief = variant == Common &&
 		hasNearbyGoblinChief(serverChunkStorer, getPosition(), yourEID);
-	const bool aggressive = variant != Common || commonProtectedByChief;
+	const bool aggressive = variant != Common || isServerSiegeEnemy(yourEID) ||
+		commonProtectedByChief;
 
 	if (!aggressive)
 	{

@@ -16,6 +16,7 @@ struct Client
 
 	PlayerServer playerData;
 	PlayerIdentity identity = {};
+	bool needsSafeSpawnPlacement = false;
 
 	std::vector<unsigned char> skinData;
 	bool skinDataCompressed = false;

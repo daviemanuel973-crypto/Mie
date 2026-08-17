@@ -25,10 +25,10 @@ void SiegeDirector::reset()
 	nextSiegeCycle = std::max<std::uint64_t>(tuning.cyclesPerSiege, 1u);
 }
 
-void SiegeDirector::restoreSchedule(std::uint64_t completedWorldCycles,
+void SiegeDirector::restoreSchedule(std::uint64_t currentWorldDay,
 	std::uint64_t restoredNextSiegeCycle, unsigned int restoredCompletedSieges)
 {
-	observedWorldCycles = completedWorldCycles;
+	observedWorldCycles = currentWorldDay;
 	nextSiegeCycle = std::max<std::uint64_t>(restoredNextSiegeCycle, 1u);
 	completedSieges = restoredCompletedSieges;
 }
@@ -51,10 +51,10 @@ void SiegeDirector::beginWave(unsigned int survivalPlayers)
 }
 
 void SiegeDirector::update(float deltaTime, unsigned int survivalPlayers,
-	unsigned int activeSiegeEnemies, std::uint64_t completedWorldCycles)
+	unsigned int activeSiegeEnemies, std::uint64_t currentWorldDay, bool scheduledNight)
 {
 	if (deltaTime <= 0.f) { return; }
-	observedWorldCycles = completedWorldCycles;
+	observedWorldCycles = currentWorldDay;
 	if (survivalPlayers == 0)
 	{
 		lastPlayerCount = 1;
@@ -66,7 +66,7 @@ void SiegeDirector::update(float deltaTime, unsigned int survivalPlayers,
 	switch (phase)
 	{
 	case SiegePhase::Peace:
-		if (completedWorldCycles >= nextSiegeCycle)
+		if (scheduledNight && currentWorldDay >= nextSiegeCycle)
 		{
 			const std::uint64_t interval = std::max<std::uint64_t>(tuning.cyclesPerSiege, 1u);
 			do
@@ -75,7 +75,7 @@ void SiegeDirector::update(float deltaTime, unsigned int survivalPlayers,
 				nextSiegeCycle = nextSiegeCycle > maximumCycle - interval ?
 					maximumCycle : nextSiegeCycle + interval;
 			}
-			while (nextSiegeCycle <= completedWorldCycles &&
+			while (nextSiegeCycle <= currentWorldDay &&
 				nextSiegeCycle != std::numeric_limits<std::uint64_t>::max());
 			phase = SiegePhase::Warning;
 			timer = std::max(tuning.warningSeconds, 0.f);
@@ -131,6 +131,14 @@ void SiegeDirector::forceWarning()
 	if (phase == SiegePhase::Wave || phase == SiegePhase::Intermission) { return; }
 	phase = SiegePhase::Warning;
 	timer = std::max(tuning.warningSeconds, 0.f);
+	currentWave = 0;
+	pendingSpawns = 0;
+}
+
+void SiegeDirector::cancelCurrentSiege()
+{
+	phase = SiegePhase::Peace;
+	timer = 0.f;
 	currentWave = 0;
 	pendingSpawns = 0;
 }

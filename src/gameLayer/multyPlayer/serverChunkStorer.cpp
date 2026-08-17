@@ -150,6 +150,21 @@ void ServerChunkStorer::removeEntityChunkPositionsForChunk(SavedChunk &chunk)
 }
 #undef ENTITY_ITERATE
 
+#define ENTITY_INDEX(X) indexContainer(*chunk.entityData.entityGetter<X>());
+void ServerChunkStorer::indexEntityChunkPositionsForChunk(SavedChunk &chunk)
+{
+	const glm::ivec2 chunkPosition(chunk.chunk.x, chunk.chunk.z);
+	auto indexContainer = [&](auto &container)
+	{
+		for (const auto &entity : container)
+		{
+			entityChunkPositions[entity.first] = chunkPosition;
+		}
+	};
+	REPEAT_FOR_ALL_ENTITIES_NO_PLAYERS(ENTITY_INDEX);
+}
+#undef ENTITY_INDEX
+
 SavedChunk *ServerChunkStorer::getChunkOrGetNull(int posX, int posZ)
 {
 	glm::ivec2 pos = {posX, posZ};
@@ -265,6 +280,7 @@ SavedChunk *ServerChunkStorer::getOrCreateChunk(int posX, int posZ,
 	for (auto &c : newCreatedChunks)
 	{
 		worldSaver.loadEntityData(c.second->entityData, c.first);
+		indexEntityChunkPositionsForChunk(*c.second);
 	}
 
 #pragma endregion
@@ -1557,6 +1573,12 @@ int ServerChunkStorer::unloadChunksThatNeedUnloading(WorldSaver &worldSaver, int
 					continue;
 				}
 			}
+			else
+			{
+				// Entity state can change without block data becoming dirty.
+				worldSaver.saveEntitiesForChunk(*c.second);
+				c.second->otherData.dirtyEntity = false;
+			}
 
 			delete c.second;
 			it = savedChunks.erase(it); // Erase the element
@@ -1752,7 +1774,7 @@ bool ServerChunkStorer::removeEntity(WorldSaver &worldSaver, std::uint64_t eid)
 	auto entityType = getEntityTypeFromEID(eid);
 	
 	//this function will just return 0 for players!
-	if (eid == EntityType::player) { return 0; }
+	if (entityType == EntityType::player) { return 0; }
 
 
 	for (auto &c :savedChunks)
@@ -1770,11 +1792,12 @@ bool ServerChunkStorer::removeEntity(WorldSaver &worldSaver, std::uint64_t eid)
 
 void ServerChunkStorer::removeBlockDataFromThisPos(BlockType lastBlock, glm::ivec3 blockPos)
 {
-	auto c= getChunkOrGetNull(modBlockToChunk(blockPos.x), modBlockToChunk(blockPos.z));
+	auto c = getChunkOrGetNull(divideChunk(blockPos.x), divideChunk(blockPos.z));
 
 	if (c)
 	{
-		c->removeBlockWithData(blockPos, lastBlock);
+		c->removeBlockWithData({modBlockToChunk(blockPos.x), blockPos.y,
+			modBlockToChunk(blockPos.z)}, lastBlock);
 	}
 }
 

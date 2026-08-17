@@ -689,7 +689,7 @@ unsigned char isInteractable(BlockType type)
 	return InteractionTypes::none;
 }
 
-bool isBlock(std::uint16_t type) //todo == 0 ???????????????????/
+bool isBlock(std::uint16_t type)
 {
 	return type > 0 && type < BlocksCount;
 }
@@ -748,11 +748,17 @@ int isCraftingStation(unsigned short type)
 
 
 
+bool isFragileContainer(BlockType type)
+{
+	return type == crate || type == smallCrate || type == pot || type == jar;
+}
+
 float getBlockBaseMineDuration(BlockType type)
 {
 
 	if (!isBlock(type)) { return 0; }
 	if (type == water) { return 0; }
+	if (isFragileContainer(type)) { return 0.12f; }
 
 	if (isAnyWoddenBlock(type))
 	{

@@ -37,7 +37,7 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build --config Release --parallel 2
-          ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings|entity-stats)$'
+          ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings|entity-stats|survival-rules)$'
 
       - name: Stage Windows package
         shell: pwsh
@@ -46,6 +46,10 @@ jobs:
           Copy-Item "build/Release/Mie.exe" "stage/Mie.exe"
           Copy-Item "build/Release/MieLauncher.exe" "stage/MieLauncher.exe"
           Copy-Item "resources" "stage/resources" -Recurse -Force
+          Remove-Item "stage/resources/worlds" -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "stage/resources/worlds" | Out-Null
+          if (Test-Path "stage/playerSettings") { throw "portable package contains player settings" }
+          if (Get-ChildItem "stage/resources/worlds" -Force) { throw "portable package contains world saves" }
           Compress-Archive -Path "stage/*" -DestinationPath "dist/Mie-Survival-Windows-x64-Portable.zip" -CompressionLevel Optimal
 
       - name: Install Inno Setup compiler

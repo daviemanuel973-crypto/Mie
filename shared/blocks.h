@@ -520,7 +520,6 @@ struct Block
 
 	bool isDecorativeFurniture()
 	{
-		auto type = getType();
 		return ::isDecorativeFurniture(getType());
 	}
 
@@ -824,4 +823,5 @@ namespace InteractionTypes
 
 };
 
+bool isFragileContainer(BlockType type);
 float getBlockBaseMineDuration(BlockType type);

@@ -12,7 +12,12 @@ bool spawnPig(ServerChunkStorer &chunkManager, Pig pig,
 bool spawnCat(ServerChunkStorer &chunkManager, Cat cat,
 	WorldSaver &worldSaver, std::minstd_rand &rng);
 bool spawnGoblin(ServerChunkStorer &chunkManager, Goblin goblin,
-	WorldSaver &worldSaver, std::minstd_rand &rng, std::uint64_t *spawnedId = nullptr);
+	WorldSaver &worldSaver, std::minstd_rand &rng, std::uint64_t *spawnedId = nullptr,
+	bool ambientNeutral = false);
+bool spawnPig(ServerChunkStorer &chunkManager, Pig pig,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
+bool spawnCat(ServerChunkStorer &chunkManager, Cat cat,
+	WorldSaver &worldSaver, std::minstd_rand &rng);
 
 void killEntity(WorldSaver &worldSaver, std::uint64_t entity, ServerChunkStorer &chunkCache);
 
@@ -37,4 +42,3 @@ void doGameTick(float deltaTime,
 void sendDamagePlayerPacket(Client &client);
 void sendIncreaseLifePlayerPacket(Client &client);
 void sendUpdateLifeLifePlayerPacket(Client &client);
-

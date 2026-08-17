@@ -47,6 +47,7 @@ struct PigServer: public ServerEntity<Pig>,
 		);
 
 	void appendDataToDisk(std::ofstream &f, std::uint64_t eId);
+	bool loadFromDisk(std::ifstream &f);
 
 	//todo change to init
 	void configureSpawnSettings(std::minstd_rand &rng);
@@ -57,7 +58,6 @@ struct PigServer: public ServerEntity<Pig>,
 
 	LootTable &getLootTable() { return getEmptyLootTable(); }
 };
-
 
 
 

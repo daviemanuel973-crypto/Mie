@@ -1,6 +1,21 @@
 #include <gameplay/droppedItem.h>
 #include <multyPlayer/serverChunkStorer.h>
 #include <multyPlayer/enetServerFunction.h>
+namespace
+{
+	struct DroppedItemDiskData
+	{
+		PhysicalEntity entity;
+		float restantTime = 0.f;
+		float stayTimer = 0.f;
+		float dontPickTimer = 0.f;
+		std::uint16_t type = 0;
+		std::uint16_t counter = 0;
+		std::uint32_t metadataSize = 0;
+	};
+
+	constexpr std::uint32_t maxPersistedItemMetadata = 64u * 1024u;
+}
 
 
 void DroppedItem::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter)
@@ -159,12 +174,41 @@ bool DroppedItemServer::update(float deltaTime, decltype(chunkGetterSignature) *
 
 void DroppedItemServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
-	//basicEntitySave(f, Markers::droppedItem, eId, &entity, sizeof(entity));
+	if (!f || item.type == 0 || item.counter == 0 ||
+		item.metaData.size() > maxPersistedItemMetadata) { return; }
+	DroppedItemDiskData data;
+	data.entity = entity;
+	data.restantTime = restantTime;
+	data.stayTimer = stayTimer;
+	data.dontPickTimer = dontPickTimer;
+	data.type = item.type;
+	data.counter = item.counter;
+	data.metadataSize = static_cast<std::uint32_t>(item.metaData.size());
+	basicEntitySave(f, Markers::droppedItem, eId, &data, sizeof(data));
+	if (!item.metaData.empty())
+	{
+		appendData(f, item.metaData.data(), item.metaData.size());
+	}
 }
 
 bool DroppedItemServer::loadFromDisk(std::ifstream &f)
 {
-	return readData(f, &entity, sizeof(entity));
+	DroppedItemDiskData data;
+	if (!readData(f, &data, sizeof(data)) || data.type == 0 || data.counter == 0 ||
+		data.metadataSize > maxPersistedItemMetadata ||
+		!(data.type < BlocksCount || isItem(data.type)))
+	{
+		return false;
+	}
+	std::vector<unsigned char> metadata(data.metadataSize);
+	if (!metadata.empty() && !readData(f, metadata.data(), metadata.size())) { return false; }
+	entity = data.entity;
+	restantTime = data.restantTime;
+	stayTimer = data.stayTimer;
+	dontPickTimer = data.dontPickTimer;
+	item = itemCreator(data.type, data.counter);
+	item.metaData = std::move(metadata);
+	return true;
 }
 
 void DroppedItemClient::update(float deltaTime, 

@@ -4,8 +4,8 @@
 
 - **Base:** `main` na v0.5, commit `06ae7d6`.
 - **Branch de trabalho:** `agent/native-systems-foundation-v0.6`.
-- **Situação:** implementação executável concluída localmente; validação de pacotes
-  Windows/Flatpak fica a cargo do CI ao publicar a branch.
+- **Situação histórica:** implementação executável concluída. A validação de
+  distribuição Windows/Flatpak foi concluída pelo CI nas versões posteriores.
 - **Runtime:** identificado como `0.6.0`.
 
 Este documento transforma o roadmap de longo prazo em trabalho implementável. A
@@ -141,7 +141,7 @@ Cada subsistema escalável deve fornecer pelo menos:
 | `V06-05` | dirty flags, eventos e interesse | `V06-02`, `V06-04` | deltas locais não viram broadcast nem full save | **Concluído** |
 | `V06-06` | métricas e stress harness | `V06-04`, `V06-05` | execução headless mede custo e filas | **Concluído** |
 | `V06-07` | piloto interno de máquina | `V06-02` a `V06-06` | processa, salva, carrega e replica em SP/MP | **Concluído** |
-| `V06-08` | hardening e empacotamento | todos | MSVC/Flatpak, migração e Low aprovados | **Implementado; CI de distribuição pendente** |
+| `V06-08` | hardening e empacotamento | todos | MSVC/Flatpak, migração e Low aprovados | **Concluído e validado pelo CI** |
 
 Os pacotes `V06-01` a `V06-07` estão implementados. Nenhum bloco de máquina foi
 adicionado; expansões jogáveis continuam condicionadas à validação distributiva de

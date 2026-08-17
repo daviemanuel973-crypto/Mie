@@ -1,9 +1,11 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "gameplay/physics.h"
+#include <gameplay/environmentMotion.h>
 #include <glm/glm.hpp>
 #include <chunkSystem.h>
 #include <iostream>
 #include <glm/gtx/intersect.hpp>
+#include <cmath>
 
 
 //used for air friction
@@ -44,6 +46,10 @@ bool resolveConstrains(
 	MotionState *forces, float deltaTime, glm::vec3 colliderSize, PhysicalSettings physicalSettings)
 {
 	bool rez = 0;
+	if (forces && isTouchingCobweb(pos, colliderSize, chunkGetter))
+	{
+		applyCobwebMotion(forces->velocity, forces->acceleration, deltaTime);
+	}
 
 	float distance = glm::length(lastPos - pos);
 	const float BLOCK_SIZE = 1;
@@ -101,6 +107,39 @@ end:
 	
 	return rez;
 
+}
+
+bool isTouchingCobweb(const glm::dvec3 &position, const glm::vec3 &colliderSize,
+	decltype(chunkGetterSignature) *chunkGetter)
+{
+	if (!chunkGetter) { return false; }
+	const int minX = static_cast<int>(std::floor(position.x - colliderSize.x * 0.5)) - 1;
+	const int maxX = static_cast<int>(std::ceil(position.x + colliderSize.x * 0.5)) + 1;
+	const int minY = std::max(0, static_cast<int>(std::floor(position.y)) - 1);
+	const int maxY = std::min(CHUNK_HEIGHT - 1,
+		static_cast<int>(std::ceil(position.y + colliderSize.y)) + 1);
+	const int minZ = static_cast<int>(std::floor(position.z - colliderSize.z * 0.5)) - 1;
+	const int maxZ = static_cast<int>(std::ceil(position.z + colliderSize.z * 0.5)) + 1;
+
+	for (int worldX = minX; worldX <= maxX; ++worldX)
+	{
+		for (int worldZ = minZ; worldZ <= maxZ; ++worldZ)
+		{
+			ChunkData *chunk = chunkGetter({divideChunk(worldX), divideChunk(worldZ)});
+			if (!chunk) { continue; }
+			for (int y = minY; y <= maxY; ++y)
+			{
+				Block *block = chunk->safeGet(modBlockToChunk(worldX), y,
+					modBlockToChunk(worldZ));
+				if (block && block->getType() == BlockTypes::cobweb &&
+					boxColideBlock(position, colliderSize, {worldX, y, worldZ}))
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
 }
 
 bool checkCollisionBrute(glm::dvec3 &pos, glm::dvec3 lastPos,

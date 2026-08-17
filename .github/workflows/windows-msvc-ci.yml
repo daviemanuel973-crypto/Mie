@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
+      - agent/v0.7.2-stabilization
       - agent/content-exploration-v01
       - agent/release-packaging-stabilization
       - agent/release-packaging-windows-fix
       - agent/linux-nonbindless-renderer-fix
   pull_request:
     paths:
+      - 'VERSION'
       - 'CMakeLists.txt'
       - 'src/**'
       - 'include/**'
@@ -33,11 +35,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Resolve and verify release version
+        shell: pwsh
+        run: |
+          $version = (Get-Content "VERSION" -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "VERSION must contain a semantic version, got: '$version'"
+          }
+
+          $cmake = Get-Content "CMakeLists.txt" -Raw
+          if (-not $cmake.Contains("set(OURCRAFT_VERSION `"$version`"")) {
+            throw "CMakeLists.txt version does not match VERSION ($version)"
+          }
+
+          $installer = Get-Content "windows/Mie.iss" -Raw
+          if (-not $installer.Contains("#define MyAppVersion `"$version`"")) {
+            throw "windows/Mie.iss version does not match VERSION ($version)"
+          }
+
+          "MIE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Configure MSVC Release
         shell: pwsh
         run: |
           cmake -S . -B build -A x64 `
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
+            "-DOURCRAFT_VERSION=$env:MIE_VERSION" `
             -DOURCRAFT_INSTALLABLE=ON `
             -DOURCRAFT_ENABLE_AVX2=OFF
 
@@ -47,7 +70,7 @@ jobs:
 
       - name: Test all Mie gameplay contracts
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings|entity-stats)$'
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|native-systems|player-control-settings|entity-stats|survival-rules)$'
 
       - name: Stage portable Windows build
         shell: pwsh
@@ -62,9 +85,14 @@ jobs:
           $launcher = "build/Release/MieLauncher.exe"
           if (-not (Test-Path $launcher)) { throw "Release launcher missing: $launcher" }
           Copy-Item $launcher "stage/MieLauncher.exe"
+          Copy-Item "VERSION" "stage/VERSION.txt"
 
           if (-not (Test-Path "resources")) { throw "resources directory missing" }
           Copy-Item "resources" "stage/resources" -Recurse -Force
+          Remove-Item "stage/resources/worlds" -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "stage/resources/worlds" | Out-Null
+          if (Test-Path "stage/playerSettings") { throw "portable package contains player settings" }
+          if (Get-ChildItem "stage/resources/worlds" -Force) { throw "portable package contains world saves" }
 
           if (-not (Test-Path "stage/Mie.exe")) { throw "stage/Mie.exe missing" }
           if (-not (Test-Path "stage/MieLauncher.exe")) { throw "stage/MieLauncher.exe missing" }
@@ -121,7 +149,7 @@ jobs:
       - name: Build Windows setup executable
         shell: pwsh
         run: |
-          & "$env:ISCC" "/DMyAppVersion=0.7.1" "windows/Mie.iss"
+          & "$env:ISCC" "/DMyAppVersion=$env:MIE_VERSION" "windows/Mie.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path "dist/Mie-Survival-Windows-x64-Setup.exe")) { throw "setup executable missing" }
 
@@ -137,6 +165,15 @@ jobs:
           if (-not (Test-Path "$installDir/Mie.exe")) { throw "Mie.exe missing after install" }
           if (-not (Test-Path "$installDir/MieLauncher.exe")) { throw "MieLauncher.exe missing after install" }
           if (-not (Test-Path "$installDir/resources/shaders")) { throw "shader resources missing after install" }
+          if ((Get-Content "$installDir/VERSION.txt" -Raw).Trim() -ne $env:MIE_VERSION) {
+            throw "installed VERSION.txt does not match $env:MIE_VERSION"
+          }
+
+          $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{7B31E8F2-920D-49B9-81D8-2C2CFE9237AF}_is1"
+          $displayVersion = (Get-ItemProperty -Path $uninstallKey -ErrorAction Stop).DisplayVersion
+          if ($displayVersion -ne $env:MIE_VERSION) {
+            throw "installer registered version '$displayVersion', expected '$env:MIE_VERSION'"
+          }
 
           New-Item -ItemType Directory -Force "$installDir/resources/worlds/ci-preserve" | Out-Null
           Set-Content -Path "$installDir/resources/worlds/ci-preserve/save.txt" -Value "keep-me"

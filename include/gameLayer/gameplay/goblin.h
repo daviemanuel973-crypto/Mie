@@ -46,11 +46,13 @@ struct GoblinServer: public ServerEntity<Goblin>
 	float moveSpeedMultiplier = 1.f;
 
 	void configureVariant(std::uint64_t eId);
+	void configureAmbientNeutral();
 	void forceTarget(std::uint64_t playerId);
 
 	bool isUnaware() { return  basicEnemyBehaviour.isUnaware(); };
 
 	void appendDataToDisk(std::ofstream &f, std::uint64_t eId);
+	bool loadFromDisk(std::ifstream &f);
 
 	bool update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter,
 		ServerChunkStorer &serverChunkStorer, std::minstd_rand &rng, std::uint64_t yourEID,

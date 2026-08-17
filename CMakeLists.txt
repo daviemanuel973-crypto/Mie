@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.7.1" CACHE STRING "Mie Survival semantic version")
+set(OURCRAFT_VERSION "0.7.2" CACHE STRING "Mie Survival semantic version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -139,7 +139,8 @@ if (OURCRAFT_INSTALLABLE)
 			USER_ERROR_LOG_PATH="errorLogs.txt")
 		set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES OUTPUT_NAME "Mie")
 		install(TARGETS "${CMAKE_PROJECT_NAME}" RUNTIME DESTINATION ".")
-		install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/" DESTINATION "resources")
+		install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/" DESTINATION "resources"
+			PATTERN "worlds" EXCLUDE)
 	else()
 		# Flatpak has a fixed /app prefix, while writable save/settings data is
 		# provided by its launcher in the app's private XDG data directory.
@@ -154,7 +155,8 @@ if (OURCRAFT_INSTALLABLE)
 		set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES OUTPUT_NAME "ourcraft")
 		install(TARGETS "${CMAKE_PROJECT_NAME}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 		install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/"
-			DESTINATION "${CMAKE_INSTALL_DATADIR}/ourcraft/resources")
+			DESTINATION "${CMAKE_INSTALL_DATADIR}/ourcraft/resources"
+			PATTERN "worlds" EXCLUDE)
 	endif()
 else()
 	# Developer build: load assets directly from the checkout.
@@ -260,6 +262,18 @@ if (BUILD_TESTING)
 	target_link_libraries(entityStatsTests PRIVATE glm)
 	add_test(NAME entity-stats COMMAND entityStatsTests)
 
+	add_executable(survivalRulesTests
+		tests/survivalRulesTests.cpp
+		shared/blocks.cpp
+		src/gameLayer/gameplay/environmentMotion.cpp)
+	target_include_directories(survivalRulesTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/platform/")
+	target_link_libraries(survivalRulesTests PRIVATE glm glad)
+	add_test(NAME survival-rules COMMAND survivalRulesTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -268,5 +282,6 @@ if (BUILD_TESTING)
 		native-systems
 		player-control-settings
 		entity-stats
+		survival-rules
 		PROPERTIES TIMEOUT 60)
 endif()

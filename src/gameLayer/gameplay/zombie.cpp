@@ -6,10 +6,25 @@
 #include <glm/gtx/transform.hpp>
 #include <gameplay/zombie.h>
 #include <gameplay/basicEnemyBehaviour.h>
+#include <gameplay/combatBalance.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <multyPlayer/serverChunkStorer.h>
 #include <iostream>
 #include <glm/gtx/quaternion.hpp>
 #include <rendering/model.h>
+#include <cmath>
+
+namespace
+{
+	struct ZombieDiskData
+	{
+		Zombie entity;
+		BasicEnemyBehaviour behaviour;
+		std::uint8_t variant = ZombieServer::Walker;
+		bool variantConfigured = false;
+		float moveSpeedMultiplier = 1.f;
+	};
+}
 
 static const auto frontHands = glm::rotate(glm::radians(90.f), glm::vec3{1.f, 0.f, 0.f});
 
@@ -64,8 +79,30 @@ int ZombieClient::getTextureIndex()
 
 void ZombieServer::appendDataToDisk(std::ofstream &f, std::uint64_t eId)
 {
-	(void)f;
-	(void)eId;
+	ensureBehaviour();
+	ZombieDiskData data;
+	data.entity = entity;
+	data.behaviour = *basicEnemyBehaviour;
+	data.variant = static_cast<std::uint8_t>(variant);
+	data.variantConfigured = variantConfigured;
+	data.moveSpeedMultiplier = moveSpeedMultiplier;
+	basicEntitySave(f, Markers::zombie, eId, &data, sizeof(data));
+}
+
+bool ZombieServer::loadFromDisk(std::ifstream &f)
+{
+	ZombieDiskData data;
+	if (!readData(f, &data, sizeof(data)) || data.variant > Brute ||
+		!std::isfinite(data.moveSpeedMultiplier) || data.moveSpeedMultiplier <= 0.f)
+	{
+		return false;
+	}
+	entity = data.entity;
+	basicEnemyBehaviour = std::make_shared<BasicEnemyBehaviour>(data.behaviour);
+	variant = static_cast<Variant>(data.variant);
+	variantConfigured = data.variantConfigured;
+	moveSpeedMultiplier = data.moveSpeedMultiplier;
+	return true;
 }
 
 void ZombieServer::ensureBehaviour()
@@ -188,7 +225,7 @@ WeaponStats ZombieServer::getWeaponStats()
 		weaponStats.damage = 5.f;
 		weaponStats.critDamage = 8.f;
 		weaponStats.surprizeDamage = 8.f;
-		weaponStats.speed = 4.f;
+		weaponStats.speed = ZOMBIE_RUNNER_ATTACK_COOLDOWN;
 		weaponStats.range = 1.45f;
 		weaponStats.knockBack = 1.5f;
 		weaponStats.accuracy = 8.f;
@@ -197,7 +234,7 @@ WeaponStats ZombieServer::getWeaponStats()
 		weaponStats.damage = 11.f;
 		weaponStats.critDamage = 16.f;
 		weaponStats.surprizeDamage = 14.f;
-		weaponStats.speed = 0.f;
+		weaponStats.speed = ZOMBIE_BRUTE_ATTACK_COOLDOWN;
 		weaponStats.range = 1.8f;
 		weaponStats.knockBack = 5.f;
 		weaponStats.accuracy = 6.f;
@@ -207,7 +244,7 @@ WeaponStats ZombieServer::getWeaponStats()
 		weaponStats.damage = 6.f;
 		weaponStats.critDamage = 9.f;
 		weaponStats.surprizeDamage = 9.f;
-		weaponStats.speed = 1.5f;
+		weaponStats.speed = ZOMBIE_WALKER_ATTACK_COOLDOWN;
 		weaponStats.knockBack = 2.f;
 		break;
 	}

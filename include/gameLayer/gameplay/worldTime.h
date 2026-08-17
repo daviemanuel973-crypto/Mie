@@ -25,6 +25,8 @@ public:
 	std::uint64_t update(double deltaTime, bool advancing);
 
 	float getDayPhase() const;
+	std::uint64_t getVisibleDayNumber() const;
+	bool isNight() const;
 	double getCycleProgressSeconds() const { return cycleProgressSeconds; }
 	std::uint64_t getCompletedCycles() const { return completedCycles; }
 	double getCycleDurationSeconds() const { return cycleDurationSeconds; }

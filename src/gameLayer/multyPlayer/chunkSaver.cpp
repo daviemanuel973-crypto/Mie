@@ -6,6 +6,8 @@
 #include <cmath>
 #include <safeSave.h>
 #include <multyPlayer/packet.h>
+#include <multyPlayer/enetServerFunction.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <sstream>
 
 constexpr unsigned int CHUNK_PACK = 4;
@@ -43,6 +45,7 @@ void saveOneEntityTypeIntoOpenFile(std::ofstream &f, T &entityContainer)
 {
 	for (auto &e : entityContainer)
 	{
+		if (isServerSiegeEnemy(e.first)) { continue; }
 		e.second.appendDataToDisk(f, e.first);
 	}
 }
@@ -55,7 +58,8 @@ void saveAllEntitiesIntoOpenFile(std::ofstream &f, EntityData &entityData)
 	saveOneEntityTypeIntoOpenFile(f, entityData.zombies);
 	saveOneEntityTypeIntoOpenFile(f, entityData.pigs);
 	saveOneEntityTypeIntoOpenFile(f, entityData.cats);
-
+	saveOneEntityTypeIntoOpenFile(f, entityData.goblins);
+	saveOneEntityTypeIntoOpenFile(f, entityData.scareCrows);
 
 }
 
@@ -493,9 +497,63 @@ void WorldSaver::loadEntityData(EntityData &entityData,
 						case Markers::droppedItem:
 						{
 							DroppedItemServer item;
-							if (success = item.loadFromDisk(f))
+							if (success = (getEntityTypeFromEID(eid) == EntityType::droppedItems &&
+								item.loadFromDisk(f)))
 							{
-								entityData.droppedItems.insert({eid,item});
+								success = entityData.droppedItems.insert({eid,item}).second;
+							}
+						}
+						break;
+
+						case Markers::zombie:
+						{
+							ZombieServer zombie;
+							if (success = (getEntityTypeFromEID(eid) == EntityType::zombies &&
+								zombie.loadFromDisk(f)))
+							{
+								success = entityData.zombies.insert({eid, std::move(zombie)}).second;
+							}
+						}
+						break;
+
+						case Markers::pig:
+						{
+							PigServer pig;
+							if (success = (getEntityTypeFromEID(eid) == EntityType::pigs && pig.loadFromDisk(f)))
+							{
+								success = entityData.pigs.insert({eid, pig}).second;
+							}
+						}
+						break;
+
+						case Markers::cat:
+						{
+							CatServer cat;
+							if (success = (getEntityTypeFromEID(eid) == EntityType::cats && cat.loadFromDisk(f)))
+							{
+								success = entityData.cats.insert({eid, cat}).second;
+							}
+						}
+						break;
+
+						case Markers::goblin:
+						{
+							GoblinServer goblin;
+							if (success = (getEntityTypeFromEID(eid) == EntityType::goblins &&
+								goblin.loadFromDisk(f)))
+							{
+								success = entityData.goblins.insert({eid, goblin}).second;
+							}
+						}
+						break;
+
+						case Markers::scareCrow:
+						{
+							ScareCrowServer scareCrow;
+							if (success = (getEntityTypeFromEID(eid) == EntityType::scareCrow &&
+								scareCrow.loadFromDisk(f)))
+							{
+								success = entityData.scareCrows.insert({eid, scareCrow}).second;
 							}
 						}
 						break;
@@ -504,6 +562,7 @@ void WorldSaver::loadEntityData(EntityData &entityData,
 						default:
 						success = false;
 						};
+						if (success) { reserveEntityId(eid); }
 
 
 					}
