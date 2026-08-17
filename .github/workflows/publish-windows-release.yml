@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+      - '.github/workflows/publish-windows-release.yml'
 
 permissions:
   contents: write
@@ -18,11 +23,36 @@ jobs:
       - name: Resolve release version
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
+          $sourceVersion = (Get-Content "VERSION" -Raw).Trim()
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+            $version = $tag.TrimStart('v')
+          } else {
+            $version = $sourceVersion
+            $tag = "v$version"
+          }
           if ($version -notmatch '^\d+\.\d+\.\d+([+-][0-9A-Za-z.-]+)?$') {
-            throw "Invalid semantic version tag: ${{ github.ref_name }}"
+            throw "Invalid semantic release version: $version"
+          }
+          if ($sourceVersion -ne $version) {
+            throw "VERSION ($sourceVersion) does not match release tag ($tag)"
           }
           "MIE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MIE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create release tag from main
+        if: github.ref_type == 'branch'
+        shell: pwsh
+        run: |
+          git fetch origin --tags --force
+          $existingTag = git ls-remote --tags origin "refs/tags/$env:MIE_TAG"
+          if ($existingTag) {
+            throw "Release tag $env:MIE_TAG already exists; refusing to move it"
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$env:MIE_TAG" "${{ github.sha }}" -m "Mie Survival $env:MIE_TAG"
+          git push origin "refs/tags/$env:MIE_TAG"
 
       - name: Configure MSVC Release
         shell: pwsh
@@ -45,6 +75,7 @@ jobs:
           New-Item -ItemType Directory -Force stage, dist | Out-Null
           Copy-Item "build/Release/Mie.exe" "stage/Mie.exe"
           Copy-Item "build/Release/MieLauncher.exe" "stage/MieLauncher.exe"
+          Copy-Item "VERSION" "stage/VERSION.txt"
           Copy-Item "resources" "stage/resources" -Recurse -Force
           Remove-Item "stage/resources/worlds" -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force "stage/resources/worlds" | Out-Null
@@ -83,10 +114,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" `
+          gh release create "$env:MIE_TAG" `
             "dist/Mie-Survival-Windows-x64-Setup.exe" `
             "dist/Mie-Survival-Windows-x64-Setup.exe.sha256" `
             "dist/Mie-Survival-Windows-x64-Portable.zip" `
             --verify-tag `
             --generate-notes `
-            --title "Mie Survival ${{ github.ref_name }}"
+            --title "Mie Survival $env:MIE_TAG"
