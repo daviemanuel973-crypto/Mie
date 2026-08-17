@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - agent/v0.8-development
       - agent/v0.7.2-stabilization
       - agent/content-exploration-v01
       - agent/release-packaging-stabilization
