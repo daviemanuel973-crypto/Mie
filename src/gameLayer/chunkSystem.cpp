@@ -1455,7 +1455,8 @@ bool ChunkSystem::placeBlockByClientForce(glm::ivec3 pos, Block block,
 
 
 bool ChunkSystem::breakBlockByClient(glm::ivec3 pos, UndoQueue &undoQueue, 
-	glm::dvec3 playerPos, LightSystem &lightSystem, ClientEntityManager &clientEntityManager)
+	glm::dvec3 playerPos, LightSystem &lightSystem, ClientEntityManager &clientEntityManager,
+	unsigned char inventorySlot, unsigned char inventoryRevision)
 {
 	Chunk *chunk = 0;
 	std::vector<unsigned char> oldBlockData;
@@ -1475,6 +1476,8 @@ bool ChunkSystem::breakBlockByClient(glm::ivec3 pos, UndoQueue &undoQueue,
 			Packet_ClientBreakBlock packetData = {};
 			packetData.blockPos = pos;
 			packetData.eventId = undoQueue.currentEventId;
+			packetData.inventorySlot = inventorySlot;
+			packetData.inventoryRevision = inventoryRevision;
 
 			sendPacket(getConnectionData().server,
 				p, (char *)&packetData, sizeof(packetData), 1,

@@ -72,6 +72,20 @@ ChestBlock *BlocksWithDataHolder::getOrCreateChestBlock
 	}
 }
 
+FurnaceBlock *BlocksWithDataHolder::getFurnaceBlock
+(unsigned char x, unsigned char y, unsigned char z)
+{
+	auto found = furnaceBlocks.find(fromBlockPosInChunkToHashValue(x, y, z));
+	return found != furnaceBlocks.end() ? &found->second : nullptr;
+}
+
+FurnaceBlock *BlocksWithDataHolder::getOrCreateFurnaceBlock
+(unsigned char x, unsigned char y, unsigned char z)
+{
+	auto inserted = furnaceBlocks.try_emplace(fromBlockPosInChunkToHashValue(x, y, z));
+	return &inserted.first->second;
+}
+
 
 void appendBaseBlock(std::vector<unsigned char> &dataToAppend, 
 	glm::ivec3 position, BaseBlock &baseBlock)
@@ -112,6 +126,26 @@ void appendChestBlock(std::vector<unsigned char> &dataToAppend,
 
 }
 
+void appendFurnaceBlock(std::vector<unsigned char> &dataToAppend,
+	glm::ivec3 position, FurnaceBlock &furnaceBlock)
+{
+	size_t headerStart = dataToAppend.size();
+	dataToAppend.resize(dataToAppend.size() + sizeof(BlockDataHeader));
+
+	const size_t wroteData = furnaceBlock.formatIntoData(dataToAppend);
+	if (wroteData > UINT16_MAX)
+	{
+		dataToAppend.resize(headerStart);
+		return;
+	}
+
+	BlockDataHeader header = {};
+	header.pos = position;
+	header.blockType = BlockTypes::furnace;
+	header.dataSize = static_cast<std::uint16_t>(wroteData);
+	std::memcpy(dataToAppend.data() + headerStart, &header, sizeof(header));
+}
+
 
 void BlocksWithDataHolder::formatBlockData
 	(std::vector<unsigned char> &dataToAppend, int chunkXChunkSpace, int chunkZChunkSpace)
@@ -120,6 +154,7 @@ void BlocksWithDataHolder::formatBlockData
 	size_t extraSize = baseBlocks.size() * (sizeof(BaseBlock) + sizeof(BlockDataHeader));
 
 	extraSize += chestBlocks.size() * sizeof(Item) * CHEST_CAPACITY; //estimate
+	extraSize += furnaceBlocks.size() * sizeof(Item) * FURNACE_CAPACITY; //estimate
 
 
 	glm::ivec3 chunkBlockPos = glm::ivec3(chunkXChunkSpace * CHUNK_SIZE, 0, chunkZChunkSpace * CHUNK_SIZE);
@@ -138,6 +173,12 @@ void BlocksWithDataHolder::formatBlockData
 		{
 			glm::ivec3 pos = chunkBlockPos + fromHashValueToBlockPosinChunk(b.first);
 			appendChestBlock(dataToAppend, pos, b.second);
+		}
+
+		for (auto &b : furnaceBlocks)
+		{
+			glm::ivec3 pos = chunkBlockPos + fromHashValueToBlockPosinChunk(b.first);
+			appendFurnaceBlock(dataToAppend, pos, b.second);
 		}
 
 	}
@@ -225,6 +266,19 @@ bool BlocksWithDataHolder::loadBlockData(const std::vector<unsigned char> &data,
 
 			candidate.chestBlocks[fromBlockPosInChunkToHashValue(posInChunk.x,
 				posInChunk.y, posInChunk.z)] = std::move(c);
+		}
+		else if (header.blockType == BlockTypes::furnace)
+		{
+			FurnaceBlock furnace;
+			size_t bytesRead = 0;
+			if (!furnace.readFromBuffer(data.data() + pointer, size, bytesRead) ||
+				bytesRead != size || !furnace.isDataValid())
+			{
+				std::cout << "Error read from buffer in loadBlockData furnace!\n";
+				return false;
+			}
+			candidate.furnaceBlocks[fromBlockPosInChunkToHashValue(posInChunk.x,
+				posInChunk.y, posInChunk.z)] = std::move(furnace);
 		}
 		else
 		{

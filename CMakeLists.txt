@@ -211,7 +211,8 @@ if (BUILD_TESTING)
 
 	add_executable(worldCatalogTests
 		tests/worldCatalogTests.cpp
-		src/gameLayer/worldCatalog.cpp)
+		src/gameLayer/worldCatalog.cpp
+		src/gameLayer/gameplay/worldDifficulty.cpp)
 	target_include_directories(worldCatalogTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME world-catalog COMMAND worldCatalogTests)
@@ -230,6 +231,31 @@ if (BUILD_TESTING)
 	target_include_directories(siegeDirectorTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME siege-director COMMAND siegeDirectorTests)
+
+	add_executable(worldDifficultyTests
+		tests/worldDifficultyTests.cpp
+		src/gameLayer/gameplay/worldDifficulty.cpp)
+	target_include_directories(worldDifficultyTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME world-difficulty COMMAND worldDifficultyTests)
+
+	add_executable(spawnPressureTests
+		tests/spawnPressureTests.cpp
+		src/gameLayer/gameplay/spawnPressure.cpp
+		src/gameLayer/gameplay/worldDifficulty.cpp)
+	target_include_directories(spawnPressureTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME day-night-spawn-pressure COMMAND spawnPressureTests)
+
+	add_executable(itemDurabilityTests
+		tests/itemDurabilityTests.cpp
+		src/gameLayer/gameplay/itemDurability.cpp)
+	target_include_directories(itemDurabilityTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME item-durability COMMAND itemDurabilityTests)
 
 	add_executable(nativeSystemsTests
 		tests/nativeSystemsTests.cpp
@@ -274,14 +300,60 @@ if (BUILD_TESTING)
 	target_link_libraries(survivalRulesTests PRIVATE glm glad)
 	add_test(NAME survival-rules COMMAND survivalRulesTests)
 
+	add_executable(furnaceRecipesTests
+		tests/furnaceRecipesTests.cpp
+		src/gameLayer/gameplay/furnaceRecipes.cpp)
+	target_include_directories(furnaceRecipesTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME furnace-recipes COMMAND furnaceRecipesTests)
+
+	add_executable(furnaceBlockTests
+		tests/furnaceBlockTests.cpp
+		src/gameLayer/gameplay/furnaceRecipes.cpp
+		src/gameLayer/gameplay/blocks/furnaceBlock.cpp)
+	target_include_directories(furnaceBlockTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME furnace-block-runtime COMMAND furnaceBlockTests)
+
+	add_executable(recipeDiscoveryTests
+		tests/recipeDiscoveryTests.cpp
+		src/gameLayer/gameplay/recipeDiscovery.cpp)
+	target_include_directories(recipeDiscoveryTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME recipe-discovery-persistence COMMAND recipeDiscoveryTests)
+
+	add_executable(recipeBookTests
+		tests/recipeBookTests.cpp
+		src/gameLayer/gameplay/crafting.cpp
+		src/gameLayer/gameplay/recipeDiscovery.cpp)
+	target_include_directories(recipeBookTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME recipe-book-discovery COMMAND recipeBookTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
 		update-protocol
 		siege-director
+		world-difficulty
+		day-night-spawn-pressure
+		item-durability
 		native-systems
 		player-control-settings
 		entity-stats
 		survival-rules
+		furnace-recipes
+		furnace-block-runtime
+		recipe-discovery-persistence
+		recipe-book-discovery
 		PROPERTIES TIMEOUT 60)
 endif()

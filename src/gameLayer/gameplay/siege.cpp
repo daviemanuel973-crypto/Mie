@@ -39,7 +39,10 @@ unsigned int SiegeDirector::waveEnemyCount(unsigned int wave, unsigned int survi
 	const unsigned int safeWave = std::clamp(wave, 1u, static_cast<unsigned int>(tuning.totalWaves));
 	const unsigned int baseCount = 2u + safeWave * 2u;
 	const unsigned int perPlayer = 1u + safeWave;
-	return std::min(baseCount + players * perPlayer, 32u);
+	const unsigned int unscaled = baseCount + players * perPlayer;
+	const unsigned int scaled = static_cast<unsigned int>(std::ceil(
+		static_cast<float>(unscaled) * enemyCountMultiplier));
+	return std::clamp(scaled, 1u, 32u);
 }
 
 void SiegeDirector::beginWave(unsigned int survivalPlayers)
@@ -141,6 +144,12 @@ void SiegeDirector::cancelCurrentSiege()
 	timer = 0.f;
 	currentWave = 0;
 	pendingSpawns = 0;
+}
+
+void SiegeDirector::setEnemyCountMultiplier(float multiplier)
+{
+	if (!std::isfinite(multiplier)) { multiplier = 1.f; }
+	enemyCountMultiplier = std::clamp(multiplier, 0.5f, 2.f);
 }
 
 SiegeStatus SiegeDirector::getStatus(unsigned int activeSiegeEnemies) const

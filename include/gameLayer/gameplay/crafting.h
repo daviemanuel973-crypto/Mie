@@ -34,6 +34,14 @@ struct CraftingRecepieIndex
 
 std::vector<CraftingRecepieIndex> getAllPossibleRecepies(PlayerInventory &playerInventory, int craftingStation);
 
+// Recipe-book queries never change the legacy recipe indexes used by crafting
+// packets. Discovery is knowledge-only; the server still validates materials
+// and the required station when a craft is requested.
+int getCraftingRecipeCount();
+bool isCraftingRecipeDiscovered(int recepieIndex, const RecipeDiscovery &discovery);
+std::vector<CraftingRecepieIndex> getDiscoveredCraftingRecipes(const RecipeDiscovery &discovery);
+const char *getCraftingRecipeStationName(const CraftingRecepie &recepie);
+
 
 bool recepieExists(int recepieIndex);
 

@@ -133,6 +133,7 @@ jobs:
             -Iinclude/gameLayer \
             tests/worldCatalogTests.cpp \
             src/gameLayer/worldCatalog.cpp \
+            src/gameLayer/gameplay/worldDifficulty.cpp \
             -o worldCatalogTests
           ./worldCatalogTests
 
@@ -150,6 +151,73 @@ jobs:
             src/gameLayer/gameplay/worldTime.cpp \
             -o siegeDirectorTests
           ./siegeDirectorTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/worldDifficultyTests.cpp \
+            src/gameLayer/gameplay/worldDifficulty.cpp \
+            -o worldDifficultyTests
+          ./worldDifficultyTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/spawnPressureTests.cpp \
+            src/gameLayer/gameplay/spawnPressure.cpp \
+            src/gameLayer/gameplay/worldDifficulty.cpp \
+            -o spawnPressureTests
+          ./spawnPressureTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude/gameLayer \
+            -Ishared \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/itemDurabilityTests.cpp \
+            src/gameLayer/gameplay/itemDurability.cpp \
+            -o itemDurabilityTests
+          ./itemDurabilityTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/furnaceRecipesTests.cpp \
+            src/gameLayer/gameplay/furnaceRecipes.cpp \
+            -o furnaceRecipesTests
+          ./furnaceRecipesTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/furnaceBlockTests.cpp \
+            src/gameLayer/gameplay/furnaceRecipes.cpp \
+            src/gameLayer/gameplay/blocks/furnaceBlock.cpp \
+            -o furnaceBlockTests
+          ./furnaceBlockTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/recipeDiscoveryTests.cpp \
+            src/gameLayer/gameplay/recipeDiscovery.cpp \
+            -o recipeDiscoveryTests
+          ./recipeDiscoveryTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/recipeBookTests.cpp \
+            src/gameLayer/gameplay/crafting.cpp \
+            src/gameLayer/gameplay/recipeDiscovery.cpp \
+            -o recipeBookTests
+          ./recipeBookTests
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \

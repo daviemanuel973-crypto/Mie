@@ -59,6 +59,8 @@ std::vector<WorldCatalogEntry> loadWorldCatalog(
 		if (entry.folderName.empty() || entry.folderName == "." || entry.folderName == "..") { continue; }
 
 		entry.hasSeed = readSeedValue(it->path(), entry.seed);
+		entry.hasExplicitDifficulty = loadWorldDifficultySettings(
+			it->path(), entry.difficultySettings);
 		entry.hasGeneratedWorld = std::filesystem::is_directory(it->path() / "world", entryError);
 		entryError.clear();
 		const auto lastPlayed = it->path() / ".last_played";

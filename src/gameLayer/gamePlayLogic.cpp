@@ -36,7 +36,10 @@
 #include <gameplay/food.h>
 #include <gameplay/playerControlSettings.h>
 #include <gameplay/fieldGuide.h>
+#include <gameplay/siege.h>
+#include <gameplay/spawnPressure.h>
 #include <gameplay/worldTime.h>
+#include <gameplay/worldDifficulty.h>
 #include <cameraShaker.h>
 #include <cmath>
 #include <cstdint>
@@ -1746,7 +1749,9 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 								gameData.chunkSystem.breakBlockByClient(rayCastPos
 									, gameData.undoQueue,
 									gameData.entityManager.localPlayer.entity.position,
-									gameData.lightSystem, gameData.entityManager);
+									gameData.lightSystem, gameData.entityManager,
+									gameData.currentItemSelected,
+									player.inventory.revisionNumber);
 								gameData.currentBlockBreaking = {};
 							}
 							else
@@ -2631,6 +2636,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 					//std::cout << "Attack! ";
 
 					attackEntity(targetedEntity, gameData.currentItemSelected,
+						player.inventory.revisionNumber,
 						gameData.inputCamera.viewDirection, hitStatus);
 
 					AudioEngine::playHitSound();
@@ -2645,6 +2651,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 #pragma region ui
 
 	ChestBlock *currentChestBlock = 0;
+	FurnaceBlock *currentFurnaceBlock = 0;
 	if (isChest(gameData.interaction.block))
 	{
 
@@ -2673,6 +2680,26 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				modBlockToChunk(gameData.interaction.blockInteractionPosition.z)};
 				currentChestBlock = c->blockData.getOrCreateChestBlock(pos.x, pos.y, pos.z);
 			}
+		}
+	}
+	else if (gameData.interaction.block == BlockTypes::furnace)
+	{
+		Chunk *c = 0;
+		Block *b = gameData.chunkSystem.getBlockSafeAndChunk(
+			gameData.interaction.blockInteractionPosition.x,
+			gameData.interaction.blockInteractionPosition.y,
+			gameData.interaction.blockInteractionPosition.z, c);
+		if (!b || !c || b->getType() != BlockTypes::furnace)
+		{
+			gameData.interaction = {};
+			gameData.insideInventoryMenu = false;
+		}
+		else
+		{
+			const glm::ivec3 pos = {modBlockToChunk(gameData.interaction.blockInteractionPosition.x),
+				gameData.interaction.blockInteractionPosition.y,
+				modBlockToChunk(gameData.interaction.blockInteractionPosition.z)};
+			currentFurnaceBlock = c->blockData.getOrCreateFurnaceBlock(pos.x, pos.y, pos.z);
 		}
 	}
 
@@ -2750,7 +2777,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				cursorSelected,  gameData.currentInventoryTab, 
 				player.otherPlayerSettings.gameMode == OtherPlayerSettings::CREATIVE,
 				selectedCreativeItem, player.life, programData, player, 
-				gameData.craftingSlider, craftedItemIndex, gameData.showUI, gameData.interaction.block, currentChestBlock
+				gameData.craftingSlider, craftedItemIndex, gameData.showUI, gameData.interaction.block,
+				currentChestBlock, currentFurnaceBlock
 			);
 		}
 
@@ -3022,7 +3050,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 					//todo force overwrite item with metadata here!
 					forceOverWriteItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX,
-						item);
+						item, currentFurnaceBlock);
 
 					player.inventory.heldInMouse = item;
 				}
@@ -3041,7 +3069,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				//grab items
 				if (cursorSelected >= 0)
 				{
-					Item *selected = player.inventory.getItemFromIndex(cursorSelected, currentChestBlock);
+					Item *selected = player.inventory.getItemFromIndex(cursorSelected, currentChestBlock, currentFurnaceBlock);
 					Item *cursor = &player.inventory.heldInMouse;
 
 					if (selected && selected != cursor)
@@ -3050,15 +3078,18 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 						if (cursor->type == 0)
 						{
 							//grab
-							grabItem(player.inventory, currentChestBlock, cursorSelected, PlayerInventory::CURSOR_INDEX);
+							grabItem(player.inventory, currentChestBlock, cursorSelected,
+								PlayerInventory::CURSOR_INDEX, 0, currentFurnaceBlock);
 						}
 						else
 						{
 							//place
-							if (!placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX, cursorSelected))
+							if (!placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX,
+								cursorSelected, 0, currentFurnaceBlock))
 							{
 								//swap
-								swapItems(player.inventory, currentChestBlock, cursorSelected, PlayerInventory::CURSOR_INDEX);
+								swapItems(player.inventory, currentChestBlock, cursorSelected,
+									PlayerInventory::CURSOR_INDEX, currentFurnaceBlock);
 							}
 
 						}
@@ -3074,13 +3105,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 				if (cursorSelected >= 0)
 				{
-					Item *selected = player.inventory.getItemFromIndex(cursorSelected, currentChestBlock);
+					Item *selected = player.inventory.getItemFromIndex(cursorSelected, currentChestBlock, currentFurnaceBlock);
 					Item *cursor = &player.inventory.heldInMouse;
 
 					if (cursor->type != 0)
 					{
 						//place one
-						if (placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX, cursorSelected, 1))
+						if (placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX,
+							cursorSelected, 1, currentFurnaceBlock))
 						{
 							rightClickedThisClick[cursorSelected] = true;
 						}
@@ -3091,7 +3123,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 						//grab
 						grabItem(player.inventory, currentChestBlock, cursorSelected,
-							PlayerInventory::CURSOR_INDEX, selected->counter / 2);
+							PlayerInventory::CURSOR_INDEX, selected->counter / 2, currentFurnaceBlock);
 
 						//don't place it again lol
 						rightClickedThisClick[cursorSelected] = true;
@@ -3109,13 +3141,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				//right click held place items
 				if (cursorSelected >= 0 && !rightClickedThisClick[cursorSelected])
 				{
-					Item *selected = player.inventory.getItemFromIndex(cursorSelected, currentChestBlock);
+					Item *selected = player.inventory.getItemFromIndex(cursorSelected, currentChestBlock, currentFurnaceBlock);
 					Item *cursor = &player.inventory.heldInMouse;
 
 					if (cursor->type != 0)
 					{
 						//place one
-						if (placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX, cursorSelected, 1))
+						if (placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX,
+							cursorSelected, 1, currentFurnaceBlock))
 						{
 							rightClickedThisClick[cursorSelected] = true;
 						}
@@ -3170,12 +3203,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 				if (slot.type == 0)
 				{
-					swapItems(player.inventory, currentChestBlock, i, PlayerInventory::CURSOR_INDEX);
+					swapItems(player.inventory, currentChestBlock, i, PlayerInventory::CURSOR_INDEX,
+						currentFurnaceBlock);
 					break;
 				}else
 				if (areItemsTheSame(itemHeld, slot))
 				{
-					placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX, i);
+					placeItem(player.inventory, currentChestBlock, PlayerInventory::CURSOR_INDEX, i, 0,
+						currentFurnaceBlock);
 				}
 
 				if (itemHeld.counter == 0) { break; }
@@ -3283,6 +3318,17 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 
 		programData.ui.menuRenderer.Text("Game Menu", Colors_White);
+		const auto &difficulty = getClientWorldDifficultySettings();
+		programData.ui.menuRenderer.Text(std::string("Difficulty: ") +
+			getWorldDifficultyName(difficulty.difficulty) +
+			(difficulty.hardcore ? " (Hardcore)" : ""), Colors_White);
+		const bool siegeActive = getClientSiegeStatus().phase != SiegePhase::Peace;
+		const bool nightPressure = isNightSpawnPhase(getClientWorldDayPhase()) &&
+			difficulty.difficulty != WorldDifficulty::Peaceful && !siegeActive;
+		programData.ui.menuRenderer.Text(siegeActive ?
+			"World pressure: siege event" : (nightPressure ?
+				"World pressure: hostile night spawns active" :
+				"World pressure: calm"), Colors_White);
 
 		if (programData.ui.menuRenderer.Button("Back to Game", Colors_Gray, programData.ui.buttonTexture))
 		{
@@ -3312,9 +3358,12 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		programData.ui.menuRenderer.Begin(3);
 		programData.ui.menuRenderer.SetAlignModeFixedSizeWidgets({0,150});
 
-		programData.ui.menuRenderer.Text("You died :(", Colors_White);
+		const bool hardcore = getClientWorldDifficultySettings().hardcore;
+		programData.ui.menuRenderer.Text(hardcore ?
+			"Hardcore death - this character cannot respawn." : "You died :(", Colors_White);
 
-		if (programData.ui.menuRenderer.Button("Respawn", Colors_Gray, programData.ui.buttonTexture))
+		if (!hardcore && programData.ui.menuRenderer.Button("Respawn", Colors_Gray,
+			programData.ui.buttonTexture))
 		{
 			sendPacket(getServer(), headerClientWantsToRespawn, player.entityId,
 				0, 0, true, channelChunksAndBlocks);

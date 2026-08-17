@@ -17,6 +17,7 @@
 #include <gameplay/battleUI.h>
 #include <multyPlayer/playerPersistence.h>
 #include <gameplay/siege.h>
+#include <gameplay/worldDifficulty.h>
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
@@ -100,6 +101,7 @@ enum : std::uint32_t
 	headerClientIdentity,
 	headerUpdateSiegeStatus,
 	headerUpdateWorldTime,
+	headerUpdateWorldDifficulty,
 
 };
 
@@ -250,6 +252,12 @@ struct Packet_UpdateWorldTime
 	std::uint8_t advancing = 0;
 };
 
+struct Packet_UpdateWorldDifficulty
+{
+	std::uint8_t difficulty = static_cast<std::uint8_t>(WorldDifficulty::Normal);
+	std::uint8_t hardcore = 0;
+};
+
 struct Packet_UpdateGenericEntity
 {
 	std::uint64_t eid = 0;
@@ -337,6 +345,8 @@ struct Packet_ClientBreakBlock
 {
 	glm::ivec3 blockPos = {};
 	EventId eventId = {}; //event id is used by the player
+	unsigned char inventoryRevision = 0;
+	unsigned char inventorySlot = 0;
 };
 
 struct Packet_ClientDroppedItem
@@ -365,6 +375,7 @@ struct Packet_AttackEntity
 	std::uint64_t entityID = 0;
 	glm::vec3 direction = {};
 	unsigned char inventorySlot = 0;
+	unsigned char inventoryRevision = 0;
 };
 
 struct Packet_TrainingDummyGotAttacked //from server to players!

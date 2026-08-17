@@ -79,6 +79,13 @@ int main()
 	forced.returnSpawnRequest(4);
 	REQUIRE(forced.getPendingSpawns() <= 32);
 
+	SiegeDirector hard(fastTuning());
+	hard.setEnemyCountMultiplier(1.35f);
+	hard.update(0.1f, 1, 0, 7, true);
+	hard.update(3.f, 1, 0, 7, true);
+	REQUIRE(hard.getStatus(0).phase == SiegePhase::Wave);
+	REQUIRE(hard.getStatus(0).enemiesRemaining == 9);
+
 	SiegeDirector restored(fastTuning());
 	restored.restoreSchedule(13, 14, 3);
 	restored.update(0.1f, 1, 0, 13, true);

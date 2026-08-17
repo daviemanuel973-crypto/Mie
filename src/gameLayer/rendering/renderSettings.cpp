@@ -12,6 +12,7 @@
 #include <chrono>
 #include <worldCatalog.h>
 #include <gameplay/playerControlSettings.h>
+#include <gameplay/worldDifficulty.h>
 
 void displayRenderSettingsMenuButton(ProgramData &programData)
 {
@@ -1355,9 +1356,13 @@ void displayWorldSelectorMenu(ProgramData &programData)
 				{
 					if (allWorlds.size() <= i + advance) { break; }
 
-					auto s = allWorlds[i + advance].folderName;
+					const auto &world = allWorlds[i + advance];
+					const auto &worldDifficulty = world.difficultySettings;
+					const std::string s = world.folderName + " [" +
+						getWorldDifficultyName(worldDifficulty.difficulty) +
+						(worldDifficulty.hardcore ? " Hardcore]" : "]");
 
-					if (s == selected)
+					if (world.folderName == selected)
 					{
 						renderer.render9Patch(worldBox,
 							20, {0.3,0.3,0.3,0.7}, {}, 0, programData.ui.buttonTexture,
@@ -1366,7 +1371,7 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 					if (renderButton(renderer, {}, worldBox, s, &programData.ui.font))
 					{
-						selected = s;
+						selected = world.folderName;
 					}
 
 					worldBox.y += buttonH;
@@ -1464,6 +1469,8 @@ void displayWorldSelectorMenu(ProgramData &programData)
 	static char seed[12] = {};
 	static char name[49] = {};
 	static int currentIndex = 0; //0 normal, 1 super flat
+	static int difficultyIndex = static_cast<int>(WorldDifficulty::Normal);
+	static bool hardcore = false;
 	static WorldGeneratorSettings settings;
 	static gl2d::Texture worldPreviewTexture;
 	static WorldGenerator wg;
@@ -1549,6 +1556,20 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 		programData.ui.menuRenderer.InputText("Seed:", seed, sizeof(seed),
 			Colors_Gray, programData.ui.buttonTexture);
+
+		programData.ui.menuRenderer.toggleOptions("Difficulty: ",
+			"Peaceful|Easy|Normal|Hard", &difficultyIndex, true, Colors_White,
+			nullptr, programData.ui.buttonTexture, Colors_Gray,
+			"Peaceful disables natural sieges. Easy reduces damage and starvation. "
+			"Hard increases damage, starvation and siege size.");
+		programData.ui.menuRenderer.ToggleButton("Hardcore (one life)", Colors_White,
+			&hardcore, programData.ui.buttonTexture, Colors_Gray);
+		if (hardcore)
+		{
+			difficultyIndex = static_cast<int>(WorldDifficulty::Hard);
+			programData.ui.menuRenderer.Text(
+				"Hardcore locks Hard difficulty and disables respawning.", Colors_White);
+		}
 		
 		//programData.ui.menuRenderer.Toggle("Super Flat", Colors_Gray, &superFlatWorld, programData.ui.buttonTexture, programData.ui.buttonTexture);
 
@@ -1622,6 +1643,17 @@ void displayWorldSelectorMenu(ProgramData &programData)
 						settings.sanitize();
 						f << settings.saveSettings();
 						settingsError = !f;
+					}
+
+					if (!settingsError)
+					{
+						WorldDifficultySettings difficultySettings;
+						difficultySettings.difficulty = static_cast<WorldDifficulty>(
+							glm::clamp(difficultyIndex, 0, 3));
+						difficultySettings.hardcore = hardcore;
+						difficultySettings.sanitize();
+						settingsError = !saveWorldDifficultySettings(
+							finalName, difficultySettings);
 					}
 
 					if (!settingsError && createAndPlay)
@@ -1710,6 +1742,8 @@ void displayWorldSelectorMenu(ProgramData &programData)
 		memset(seed, 0, sizeof(seed));
 		memset(name, 0, sizeof(name));
 		currentIndex = 0;
+		difficultyIndex = static_cast<int>(WorldDifficulty::Normal);
+		hardcore = false;
 		settings = {};
 	}
 	

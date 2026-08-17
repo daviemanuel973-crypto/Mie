@@ -152,10 +152,15 @@ namespace mie::native
 					player.guideProgressDirty = true;
 					inventoryChanged = true;
 				}
+				const bool discoveryChanged = player.inventory.learnCurrentInventoryTypes();
 
 				if (inventoryChanged)
 				{
 					sendPlayerInventoryAndIncrementRevision(client);
+				}
+				else if (discoveryChanged)
+				{
+					sendPlayerInventoryNotIncrementRevision(client);
 				}
 				synchronizeGuideProgress(entry.first, client);
 			}
