@@ -26,7 +26,18 @@ struct CraftingRecepie
 	CraftingRecepie &setRequiresGoblin() { requiresGoblin = true; return *this; }
 	CraftingRecepie &setRequiresCookingPot() { requiresCookingPot = true; return *this; }
 	CraftingRecepie &setRequiresFurnace() { requiresFurnace = true; return *this; }
-	CraftingRecepie &setRepairsDurableItem() { repairsDurableItem = true; return *this; }
+	CraftingRecepie &setRepairsDurableItem()
+	{
+		repairsDurableItem = true;
+		// Repair recipes place the durable tool in the first ingredient slot. Give
+		// that recipe-side ingredient a non-empty marker so a pristine tool (whose
+		// canonical full-durability representation has empty metadata) cannot pass
+		// the normal exact-item comparison before the dedicated repair rule checks
+		// that the supplied tool is actually damaged. The marker is never persisted
+		// or emitted as the crafted result; it only disambiguates recipe matching.
+		if (items[0].type != 0) { items[0].metaData = {0}; }
+		return *this;
+	}
 };
 
 struct CraftingRecepieIndex
