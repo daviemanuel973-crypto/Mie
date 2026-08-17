@@ -295,9 +295,17 @@ namespace
 
 	bool ingredientMatches(const CraftingRecepie &recepie, Item &needed, Item &available)
 	{
+		// Repair recipes must only accept a damaged durable item. An undamaged
+		// item may be metadata-identical to the recipe prototype, so checking
+		// the generic equality rule first would bypass the durability guard.
+		if (recepie.repairsDurableItem && needed.type == available.type &&
+			itemUsesDurability(needed.type))
+		{
+			return matchesRepairRule(recepie, needed, available);
+		}
+
 		return areItemsTheSame(available, needed) ||
-			matchesAnyWoodRule(recepie, needed, available) ||
-			matchesRepairRule(recepie, needed, available);
+			matchesAnyWoodRule(recepie, needed, available);
 	}
 }
 
