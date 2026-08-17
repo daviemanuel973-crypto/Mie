@@ -76,11 +76,34 @@ jobs:
           text = text.replace(old, new, 1)
           ui.write_text(text)
 
-          header = "#pragma once\n\nnamespace CraftingUiSelection\n{\n\tinline int clampSlider(int slider, int recipeCount)\n\t{\n\t\tif (recipeCount <= 0) { return -1; }\n\t\tconst int maxSlider = recipeCount > 1 ? recipeCount - 2 : -1;\n\t\tif (slider < -1) { return -1; }\n\t\tif (slider > maxSlider) { return maxSlider; }\n\t\treturn slider;\n\t}\n\n\tinline bool isValidRecipeIndex(int index, int recipeCount)\n\t{\n\t\treturn index >= 0 && index < recipeCount;\n\t}\n\n\tinline int selectedRecipeIndex(int slider, int recipeCount)\n\t{\n\t\tif (recipeCount <= 0) { return -1; }\n\t\tconst int index = clampSlider(slider, recipeCount) + 1;\n\t\treturn isValidRecipeIndex(index, recipeCount) ? index : -1;\n\t}\n}\n"
-          Path('include/gameLayer/gameplay/craftingUiSelection.h').write_text(header)
+          Path('include/gameLayer/gameplay/craftingUiSelection.h').write_text(
+              '#pragma once\n\n'
+              'namespace CraftingUiSelection\n{\n'
+              '\tinline int clampSlider(int slider, int recipeCount)\n\t{\n'
+              '\t\tif (recipeCount <= 0) { return -1; }\n'
+              '\t\tconst int maxSlider = recipeCount > 1 ? recipeCount - 2 : -1;\n'
+              '\t\tif (slider < -1) { return -1; }\n'
+              '\t\tif (slider > maxSlider) { return maxSlider; }\n'
+              '\t\treturn slider;\n\t}\n\n'
+              '\tinline bool isValidRecipeIndex(int index, int recipeCount)\n\t{\n'
+              '\t\treturn index >= 0 && index < recipeCount;\n\t}\n\n'
+              '\tinline int selectedRecipeIndex(int slider, int recipeCount)\n\t{\n'
+              '\t\tif (recipeCount <= 0) { return -1; }\n'
+              '\t\tconst int index = clampSlider(slider, recipeCount) + 1;\n'
+              '\t\treturn isValidRecipeIndex(index, recipeCount) ? index : -1;\n'
+              '\t}\n}\n')
 
-          test = "#include <gameplay/craftingUiSelection.h>\n#include <cassert>\n#include <iostream>\n\nint main()\n{\n\tusing namespace CraftingUiSelection;\n\tassert(clampSlider(0, 0) == -1);\n\tassert(selectedRecipeIndex(0, 0) == -1);\n\tassert(clampSlider(0, 1) == -1);\n\tassert(clampSlider(100, 1) == -1);\n\tassert(selectedRecipeIndex(0, 1) == 0);\n\tassert(selectedRecipeIndex(100, 1) == 0);\n\tassert(!isValidRecipeIndex(-1, 1));\n\tassert(isValidRecipeIndex(0, 1));\n\tassert(!isValidRecipeIndex(1, 1));\n\tassert(clampSlider(-50, 2) == -1);\n\tassert(clampSlider(0, 2) == 0);\n\tassert(clampSlider(50, 2) == 0);\n\tassert(selectedRecipeIndex(-1, 2) == 0);\n\tassert(selectedRecipeIndex(0, 2) == 1);\n\tassert(clampSlider(100, 8) == 6);\n\tassert(selectedRecipeIndex(100, 8) == 7);\n\tstd::cout << \"crafting UI selection bounds: ok\\n\";\n\treturn 0;\n}\n"
-          Path('tests/craftingUiSelectionTests.cpp').write_text(test)
+          Path('tests/craftingUiSelectionTests.cpp').write_text(
+              '#include <gameplay/craftingUiSelection.h>\n#include <cassert>\n#include <iostream>\n\n'
+              'int main()\n{\n\tusing namespace CraftingUiSelection;\n'
+              '\tassert(clampSlider(0, 0) == -1);\n\tassert(selectedRecipeIndex(0, 0) == -1);\n'
+              '\tassert(clampSlider(0, 1) == -1);\n\tassert(clampSlider(100, 1) == -1);\n'
+              '\tassert(selectedRecipeIndex(0, 1) == 0);\n\tassert(selectedRecipeIndex(100, 1) == 0);\n'
+              '\tassert(!isValidRecipeIndex(-1, 1));\n\tassert(isValidRecipeIndex(0, 1));\n\tassert(!isValidRecipeIndex(1, 1));\n'
+              '\tassert(clampSlider(-50, 2) == -1);\n\tassert(clampSlider(0, 2) == 0);\n\tassert(clampSlider(50, 2) == 0);\n'
+              '\tassert(selectedRecipeIndex(-1, 2) == 0);\n\tassert(selectedRecipeIndex(0, 2) == 1);\n'
+              '\tassert(clampSlider(100, 8) == 6);\n\tassert(selectedRecipeIndex(100, 8) == 7);\n'
+              '\tstd::cout << "crafting UI selection bounds: ok\\n";\n\treturn 0;\n}\n')
 
           cmake = Path('CMakeLists.txt')
           text = cmake.read_text()
@@ -101,27 +124,6 @@ jobs:
           text = iss.read_text()
           assert text.count('#define MyAppVersion "0.9.0"') == 1
           iss.write_text(text.replace('#define MyAppVersion "0.9.0"', '#define MyAppVersion "0.9.1"', 1))
-
-          windows_ci = Path('.github/workflows/windows-msvc-ci.yml')
-          text = windows_ci.read_text()
-          anchor = '|recipe-book-discovery|farming-persistence)$\''
-          assert text.count(anchor) == 1
-          windows_ci.write_text(text.replace(anchor, '|recipe-book-discovery|crafting-ui-selection|farming-persistence)$\'', 1))
-
-          publish = Path('.github/workflows/publish-windows-release.yml')
-          text = publish.read_text()
-          anchor = '|recipe-book-discovery)$\''
-          assert text.count(anchor) == 1
-          publish.write_text(text.replace(anchor, '|recipe-book-discovery|crafting-ui-selection)$\'', 1))
-
-          linux_ci = Path('.github/workflows/linux-flatpak-ci.yml')
-          text = linux_ci.read_text()
-          anchor = '          ./recipeBookTests\n\n          # Farming pulls in GLM'
-          addition = '          ./recipeBookTests\n\n          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \\\n            -Iinclude/gameLayer \\\n            tests/craftingUiSelectionTests.cpp \\\n            -o craftingUiSelectionTests\n          ./craftingUiSelectionTests\n\n          # Farming pulls in GLM'
-          assert text.count(anchor) == 1
-          linux_ci.write_text(text.replace(anchor, addition, 1))
-
-          Path('.github/workflows/patch-crafting-inventory-crash-v091.yml').unlink()
           PY
 
           git diff --check
@@ -135,6 +137,6 @@ jobs:
           set -euo pipefail
           git config user.name 'Mie Release Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add -A
+          git add src/gameLayer/rendering/UiEngine.cpp include/gameLayer/gameplay/craftingUiSelection.h tests/craftingUiSelectionTests.cpp CMakeLists.txt VERSION windows/Mie.iss
           git commit -m 'fix: prevent crafting inventory single-recipe crash'
           git push origin HEAD:fix/crafting-inventory-crash-v0.9.1
