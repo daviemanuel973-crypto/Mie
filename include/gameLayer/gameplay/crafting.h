@@ -15,6 +15,9 @@ struct CraftingRecepie
 	bool requiresFurnace = 0;
 	bool requiresGoblin = 0;
 	bool requiresCookingPot = 0;
+	// v0.9: repair recipes may consume a damaged durable item regardless of its
+	// durability metadata. Normal recipes retain exact metadata matching.
+	bool repairsDurableItem = 0;
 
 	CraftingRecepie() {};
 
@@ -23,6 +26,7 @@ struct CraftingRecepie
 	CraftingRecepie &setRequiresGoblin() { requiresGoblin = true; return *this; }
 	CraftingRecepie &setRequiresCookingPot() { requiresCookingPot = true; return *this; }
 	CraftingRecepie &setRequiresFurnace() { requiresFurnace = true; return *this; }
+	CraftingRecepie &setRepairsDurableItem() { repairsDurableItem = true; return *this; }
 };
 
 struct CraftingRecepieIndex
