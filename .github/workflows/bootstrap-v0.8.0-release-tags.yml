@@ -1,0 +1,66 @@
+name: Bootstrap Mie v0.8.0 release tags
+
+on:
+  push:
+    branches:
+      - agent/v0.8.0-release-tags
+    paths:
+      - '.github/workflows/bootstrap-v0.8.0-release-tags.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  create-and-dispatch:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_SHA: c191f53142d7ed76a9b6e71e70cf26502d362997
+      WINDOWS_TAG: v0.8.0
+      LINUX_TAG: linux-v0.8.0
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout release helper branch
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify validated release target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(tr -d '\r\n' < VERSION)" = "0.8.0"
+          git fetch origin main:refs/remotes/origin/main --tags --force
+          test "$(git rev-parse origin/main)" = "$RELEASE_SHA"
+
+          for tag in "$WINDOWS_TAG" "$LINUX_TAG"; do
+            tag_target="$(git rev-list -n 1 "$tag" 2>/dev/null || true)"
+            if [[ -n "$tag_target" && "$tag_target" != "$RELEASE_SHA" ]]; then
+              echo "Tag $tag already points to $tag_target, expected $RELEASE_SHA" >&2
+              exit 1
+            fi
+          done
+
+      - name: Create validated release tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git show-ref --verify --quiet "refs/tags/$WINDOWS_TAG"; then
+            git tag -a "$WINDOWS_TAG" "$RELEASE_SHA" -m "Mie Survival $WINDOWS_TAG"
+            git push origin "refs/tags/$WINDOWS_TAG"
+          fi
+
+          if ! git show-ref --verify --quiet "refs/tags/$LINUX_TAG"; then
+            git tag -a "$LINUX_TAG" "$RELEASE_SHA" -m "Mie Survival $LINUX_TAG"
+            git push origin "refs/tags/$LINUX_TAG"
+          fi
+
+      - name: Dispatch Windows and Flatpak publishers
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run publish-windows-release.yml --repo "$GITHUB_REPOSITORY" --ref "$WINDOWS_TAG"
+          gh workflow run publish-flatpak-pages.yml --repo "$GITHUB_REPOSITORY" --ref "$LINUX_TAG"
