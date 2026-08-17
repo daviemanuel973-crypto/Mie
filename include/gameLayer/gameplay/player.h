@@ -3,6 +3,7 @@
 #include <multyPlayer/server.h>
 #include <gameplay/items.h>
 #include <gameplay/fieldGuide.h>
+#include <gameplay/homeSurvival.h>
 #include <gl2d/gl2d.h>
 #include <gameplay/life.h>
 #include <gameplay/gameplayRules.h>
@@ -98,10 +99,14 @@ struct PlayerServer: public ServerEntity<Player>
 	OtherPlayerSettings otherPlayerSettings = {};
 	PlayerInventory inventory;
 
-	// v0.7 survival-guide state. This is persisted in player save version 3.
+	// v0.7 survival-guide state. This is persisted from player save version 3 onward.
 	bool starterFieldGuideGranted = false;
 	GuideProgress guideProgress = {};
 	bool guideProgressDirty = true;
+
+	// v0.9 per-player home state. It is server-authoritative and persisted in
+	// player save version 4, so multiplayer players never overwrite one another's spawn.
+	HomeRespawnState homeRespawn = {};
 
 	unsigned char interactingWithBlock = 0;
 	unsigned char revisionNumberInteraction = 0;
