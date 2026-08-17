@@ -1,0 +1,221 @@
+name: Patch crafting inventory crash v0.9.1
+
+on:
+  push:
+    branches:
+      - fix/crafting-inventory-crash-v0.9.1
+    paths:
+      - '.github/workflows/patch-crafting-inventory-crash-v091.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v6
+        with:
+          ref: fix/crafting-inventory-crash-v0.9.1
+          fetch-depth: 0
+
+      - name: Apply bounds-safe crafting selection hotfix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 occurrence in {path}, found {count}")
+              p.write_text(text.replace(old, new, 1))
+
+          ui = Path('src/gameLayer/rendering/UiEngine.cpp')
+          text = ui.read_text()
+          old = '#include <gameplay/crafting.h>\n'
+          if text.count(old) != 1:
+              raise SystemExit('crafting include anchor changed')
+          text = text.replace(old, old + '#include <gameplay/craftingUiSelection.h>\n', 1)
+
+          old_block = '''\t\t\t\t\t\t\t\tint currentPos = craftingSlider;\n\t\t\t\t\t\t\t\tcraftingSlider -= platform::getScroll();\n\t\t\t\t\t\t\t\tint minVal = 0;\n\t\t\t\t\t\t\t\tif (allItems.size() <= itemsRowCount-2)\n\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\tminVal = -(allItems.size() - 2);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\tcraftingSlider = glm::clamp(craftingSlider, -1, std::max((int)allItems.size() - 2, minVal));\n\n\t\t\t\t\t\t\t\tif (currentPos != craftingSlider && platform::getScroll())\n'''
+          new_block = '''\t\t\t\t\t\t\t\tint currentPos = craftingSlider;\n\t\t\t\t\t\t\t\tconst int scrollDelta = platform::getScroll();\n\t\t\t\t\t\t\t\tcraftingSlider = CraftingUiSelection::clampSlider(\n\t\t\t\t\t\t\t\t\tcraftingSlider - scrollDelta, static_cast<int>(allItems.size()));\n\n\t\t\t\t\t\t\t\tif (currentPos != craftingSlider && scrollDelta)\n'''
+          if text.count(old_block) != 1:
+              raise SystemExit('primary crafting slider block changed')
+          text = text.replace(old_block, new_block, 1)
+
+          old = '\t\t\t\t\t\t\t\t\tif (allItems.size() > i)\n'
+          new = '\t\t\t\t\t\t\t\t\tif (CraftingUiSelection::isValidRecipeIndex(i, static_cast<int>(allItems.size())))\n'
+          if text.count(old) != 1:
+              raise SystemExit('recipe render bounds anchor changed')
+          text = text.replace(old, new, 1)
+
+          old = '\t\t\t\t\t\t\t\tint start = craftingSlider;\n\n\t\t\t\t\t\t\t\tstd::optional<int> currentIndexSelected;\n'
+          new = '''\t\t\t\t\t\t\t\tint start = craftingSlider;\n\t\t\t\t\t\t\t\tconst int selectedRecipeIndex = CraftingUiSelection::selectedRecipeIndex(\n\t\t\t\t\t\t\t\t\tcraftingSlider, static_cast<int>(allItems.size()));\n\n\t\t\t\t\t\t\t\tstd::optional<int> currentIndexSelected;\n'''
+          if text.count(old) != 1:
+              raise SystemExit('selected recipe declaration anchor changed')
+          text = text.replace(old, new, 1)
+
+          old = '\t\t\t\t\t\t\t\t\t\tcurrentItemHovered = allItems[start + 1].recepie.result;\n'
+          new = '''\t\t\t\t\t\t\t\t\t\tif (selectedRecipeIndex >= 0)\n\t\t\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\t\t\tcurrentItemHovered = allItems[selectedRecipeIndex].recepie.result;\n\t\t\t\t\t\t\t\t\t\t}\n'''
+          if text.count(old) != 1:
+              raise SystemExit('unsafe hovered recipe access anchor changed')
+          text = text.replace(old, new, 1)
+
+          old = '''\t\t\t\t\t\t\t\t\t\tif (allItems.size() > start + 1)\n\t\t\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\t\t\toutCraftingRecepieGlobalIndex = allItems[start + 1].index;\n\t\t\t\t\t\t\t\t\t\t}\n'''
+          new = '''\t\t\t\t\t\t\t\t\t\tif (selectedRecipeIndex >= 0)\n\t\t\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\t\t\toutCraftingRecepieGlobalIndex = allItems[selectedRecipeIndex].index;\n\t\t\t\t\t\t\t\t\t\t}\n'''
+          if text.count(old) != 1:
+              raise SystemExit('craft output recipe access anchor changed')
+          text = text.replace(old, new, 1)
+
+          old = '\t\t\t\t\t\t\t\tdoOneRender(start + 1, {0,1,1,1});\n'
+          new = '''\t\t\t\t\t\t\t\tif (selectedRecipeIndex >= 0)\n\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\tdoOneRender(selectedRecipeIndex, {0,1,1,1});\n\t\t\t\t\t\t\t\t}\n'''
+          if text.count(old) != 1:
+              raise SystemExit('selected recipe render anchor changed')
+          text = text.replace(old, new, 1)
+
+          click_pattern = re.compile(r'''\t\t\t\t\t\t\t\t\t\tcraftingSlider -= \(start \+ 1\) - \*currentIndexSelected;\n\n\t\t\t\t\t\t\t\t\t\tint minVal = 0;\n\t\t\t\t\t\t\t\t\t\tif \(allItems\.size\(\) <= 7\)\n\t\t\t\t\t\t\t\t\t\t\{\n\t\t\t\t\t\t\t\t\t\t\tminVal = -\(allItems\.size\(\) - 2\);\n\t\t\t\t\t\t\t\t\t\t\}\n\t\t\t\t\t\t\t\t\t\tcraftingSlider = glm::clamp\(craftingSlider, -1, std::max\(\(int\)allItems\.size\(\) \+ 7 - 9, minVal\)\);''')
+          replacement = '''\t\t\t\t\t\t\t\t\t\tcraftingSlider -= (start + 1) - *currentIndexSelected;\n\t\t\t\t\t\t\t\t\t\tcraftingSlider = CraftingUiSelection::clampSlider(\n\t\t\t\t\t\t\t\t\t\t\tcraftingSlider, static_cast<int>(allItems.size()));'''
+          text, count = click_pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('crafting click slider block changed')
+
+          old = '''\t\t\t\t\t\t\t\t\tint index = craftingSlider + 1;\n\n\t\t\t\t\t\t\t\t\tif (allItems.size() > index)\n'''
+          new = '''\t\t\t\t\t\t\t\t\tint index = CraftingUiSelection::selectedRecipeIndex(\n\t\t\t\t\t\t\t\t\t\tcraftingSlider, static_cast<int>(allItems.size()));\n\n\t\t\t\t\t\t\t\t\tif (CraftingUiSelection::isValidRecipeIndex(index, static_cast<int>(allItems.size())))\n'''
+          if text.count(old) != 1:
+              raise SystemExit('crafting detail recipe access anchor changed')
+          text = text.replace(old, new, 1)
+
+          ui.write_text(text)
+
+          Path('include/gameLayer/gameplay/craftingUiSelection.h').write_text(r'''#pragma once
+
+namespace CraftingUiSelection
+{
+	inline int clampSlider(int slider, int recipeCount)
+	{
+		if (recipeCount <= 0) { return -1; }
+		const int maxSlider = recipeCount > 1 ? recipeCount - 2 : -1;
+		if (slider < -1) { return -1; }
+		if (slider > maxSlider) { return maxSlider; }
+		return slider;
+	}
+
+	inline bool isValidRecipeIndex(int index, int recipeCount)
+	{
+		return index >= 0 && index < recipeCount;
+	}
+
+	inline int selectedRecipeIndex(int slider, int recipeCount)
+	{
+		if (recipeCount <= 0) { return -1; }
+		const int index = clampSlider(slider, recipeCount) + 1;
+		return isValidRecipeIndex(index, recipeCount) ? index : -1;
+	}
+}
+''')
+
+          Path('tests/craftingUiSelectionTests.cpp').write_text(r'''#include <gameplay/craftingUiSelection.h>
+#include <cassert>
+#include <iostream>
+
+int main()
+{
+	using namespace CraftingUiSelection;
+
+	assert(clampSlider(0, 0) == -1);
+	assert(selectedRecipeIndex(0, 0) == -1);
+
+	// Regression for the crash: one available recipe used to leave slider at 0,
+	// then the UI dereferenced allItems[slider + 1] == allItems[1] in a vector
+	// with size 1. A single recipe must select index 0 and never index 1.
+	assert(clampSlider(0, 1) == -1);
+	assert(clampSlider(100, 1) == -1);
+	assert(selectedRecipeIndex(0, 1) == 0);
+	assert(selectedRecipeIndex(100, 1) == 0);
+	assert(!isValidRecipeIndex(-1, 1));
+	assert(isValidRecipeIndex(0, 1));
+	assert(!isValidRecipeIndex(1, 1));
+
+	assert(clampSlider(-50, 2) == -1);
+	assert(clampSlider(0, 2) == 0);
+	assert(clampSlider(50, 2) == 0);
+	assert(selectedRecipeIndex(-1, 2) == 0);
+	assert(selectedRecipeIndex(0, 2) == 1);
+
+	assert(clampSlider(100, 8) == 6);
+	assert(selectedRecipeIndex(100, 8) == 7);
+
+	std::cout << "crafting UI selection bounds: ok\n";
+	return 0;
+}
+''')
+
+          cmake = Path('CMakeLists.txt')
+          text = cmake.read_text()
+          text = text.replace('set(OURCRAFT_VERSION "0.9.0" CACHE STRING "Mie Survival semantic version")',
+                              'set(OURCRAFT_VERSION "0.9.1" CACHE STRING "Mie Survival semantic version")', 1)
+          anchor = '''\tadd_executable(farmingTests\n'''
+          addition = '''\tadd_executable(craftingUiSelectionTests\n\t\ttests/craftingUiSelectionTests.cpp)\n\ttarget_include_directories(craftingUiSelectionTests PRIVATE\n\t\t"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")\n\tadd_test(NAME crafting-ui-selection COMMAND craftingUiSelectionTests)\n\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('CMake crafting test insertion anchor changed')
+          text = text.replace(anchor, addition + anchor, 1)
+          prop_anchor = '\t\trecipe-book-discovery\n\t\tfarming-persistence\n'
+          if text.count(prop_anchor) != 1:
+              raise SystemExit('CMake test property anchor changed')
+          text = text.replace(prop_anchor, '\t\trecipe-book-discovery\n\t\tcrafting-ui-selection\n\t\tfarming-persistence\n', 1)
+          cmake.write_text(text)
+
+          Path('VERSION').write_text('0.9.1\n')
+          iss = Path('windows/Mie.iss')
+          text = iss.read_text()
+          if text.count('#define MyAppVersion "0.9.0"') != 1:
+              raise SystemExit('Inno version anchor changed')
+          iss.write_text(text.replace('#define MyAppVersion "0.9.0"', '#define MyAppVersion "0.9.1"', 1))
+
+          windows_ci = Path('.github/workflows/windows-msvc-ci.yml')
+          text = windows_ci.read_text()
+          old = '|recipe-book-discovery|farming-persistence)$\''
+          new = '|recipe-book-discovery|crafting-ui-selection|farming-persistence)$\''
+          if text.count(old) != 1:
+              raise SystemExit('Windows CI test regex anchor changed')
+          windows_ci.write_text(text.replace(old, new, 1))
+
+          publish = Path('.github/workflows/publish-windows-release.yml')
+          text = publish.read_text()
+          old = '|recipe-book-discovery)$\''
+          new = '|recipe-book-discovery|crafting-ui-selection)$\''
+          if text.count(old) != 1:
+              raise SystemExit('Publish Windows test regex anchor changed')
+          publish.write_text(text.replace(old, new, 1))
+
+          linux_ci = Path('.github/workflows/linux-flatpak-ci.yml')
+          text = linux_ci.read_text()
+          anchor = '''          ./recipeBookTests\n\n          # Farming pulls in GLM'''
+          addition = '''          ./recipeBookTests\n\n          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \\\n            -Iinclude/gameLayer \\\n            tests/craftingUiSelectionTests.cpp \\\n            -o craftingUiSelectionTests\n          ./craftingUiSelectionTests\n\n          # Farming pulls in GLM'''
+          if text.count(anchor) != 1:
+              raise SystemExit('Linux CI crafting test insertion anchor changed')
+          linux_ci.write_text(text.replace(anchor, addition, 1))
+
+          Path('.github/workflows/patch-crafting-inventory-crash-v091.yml').unlink()
+          PY
+
+          git diff --check
+          grep -F 'selectedRecipeIndex' src/gameLayer/rendering/UiEngine.cpp
+          grep -F 'crafting-ui-selection' CMakeLists.txt .github/workflows/windows-msvc-ci.yml .github/workflows/publish-windows-release.yml
+          test "$(tr -d '\r\n' < VERSION)" = "0.9.1"
+
+      - name: Commit hotfix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Mie Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: prevent crafting inventory single-recipe crash'
+          git push origin HEAD:fix/crafting-inventory-crash-v0.9.1
