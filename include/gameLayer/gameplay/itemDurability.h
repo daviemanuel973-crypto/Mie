@@ -28,3 +28,10 @@ bool sanitizeItemDurabilityMetadata(unsigned short itemType,
 
 ItemDurabilityUseResult consumeItemDurability(unsigned short itemType,
 	std::vector<unsigned char> &metaData, std::uint16_t amount = 1);
+
+// v0.9 repair primitive. Restores at most `amount` durability and returns the
+// number of points actually restored. Fresh/full items are left untouched;
+// damaged legacy items keep using the same MIED metadata payload, so repair
+// does not require an inventory/save migration.
+std::uint16_t repairItemDurability(unsigned short itemType,
+	std::vector<unsigned char> &metaData, std::uint16_t amount);
