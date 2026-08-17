@@ -1,0 +1,48 @@
+name: Crafting UI Crash Regression
+
+on:
+  push:
+    branches:
+      - main
+      - fix/crafting-inventory-crash-v0.9.1
+    paths:
+      - 'include/gameLayer/gameplay/craftingUiSelection.h'
+      - 'src/gameLayer/rendering/UiEngine.cpp'
+      - 'tests/craftingUiSelectionTests.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/crafting-ui-regression.yml'
+  pull_request:
+    paths:
+      - 'include/gameLayer/gameplay/craftingUiSelection.h'
+      - 'src/gameLayer/rendering/UiEngine.cpp'
+      - 'tests/craftingUiSelectionTests.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/crafting-ui-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crafting-ui-selection-bounds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Compile crafting UI selection regression
+        run: |
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/craftingUiSelectionTests.cpp \
+            -o craftingUiSelectionTests
+
+      - name: Reproduce single-recipe boundary safely
+        run: ./craftingUiSelectionTests
+
+      - name: Guard the renderer against the original unsafe access
+        shell: bash
+        run: |
+          grep -F 'CraftingUiSelection::selectedRecipeIndex' src/gameLayer/rendering/UiEngine.cpp
+          grep -F 'CraftingUiSelection::isValidRecipeIndex' src/gameLayer/rendering/UiEngine.cpp
+          ! grep -F 'currentItemHovered = allItems[start + 1].recepie.result;' src/gameLayer/rendering/UiEngine.cpp
