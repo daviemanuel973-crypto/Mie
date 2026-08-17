@@ -93,7 +93,7 @@ int main()
 	REQUIRE(v3Decoded.identity == original.identity);
 	REQUIRE(v3Decoded.guideState == original.guideState);
 	REQUIRE(!v3Decoded.homeState.hasHome);
-	REQUIRE(v3Decoded.homeState.position == std::array<double, 3>{});
+	REQUIRE((v3Decoded.homeState.position == std::array<double, 3>{}));
 	REQUIRE(v3Decoded.inventory == original.inventory);
 
 	// The pre-v0.7 version also remains readable and defaults both extensions.
