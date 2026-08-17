@@ -193,13 +193,18 @@ enum ItemTypes : unsigned short
 	bronzeShovel,        // 2191
 	bronzeSword,         // 2192
 
-	lastItem,            // 2193
+	// v0.9 home/subsistence content is append-only. Bedroll reuses the existing
+	// cloth icon and acts as a portable home marker, avoiding any block-ID migration.
+	bedroll,             // 2193
+
+	lastItem,            // 2194
 
 };
 
 static_assert(ItemTypes::fieldGuide == 2184, "v0.7 Field Guide ID changed");
 static_assert(ItemTypes::bronzeSword == 2192, "v0.7 bronze sword ID changed");
-static_assert(ItemTypes::lastItem == 2193, "v0.7 item range changed");
+static_assert(ItemTypes::bedroll == 2193, "v0.9 bedroll ID changed");
+static_assert(ItemTypes::lastItem == 2194, "v0.9 item range changed");
 
 const char *getItemTextureName(int itemId);
 
@@ -263,14 +268,6 @@ struct Item
 	bool isCoin() const;
 
 	int getCoinValue() const;
-
-	//bool isBattleAxe();
-	//bool isSword();
-	//bool isHammer();
-	//bool isDagger();
-	//bool isScythe();
-	//bool isFlail();
-	//bool isSpear();
 
 	bool isHelmet();
 	bool isChestplate();

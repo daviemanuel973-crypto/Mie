@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - agent/v0.9-home-and-survival
       - agent/v0.8-development
       - agent/v0.7.2-stabilization
       - agent/content-exploration-v01
@@ -71,7 +72,7 @@ jobs:
 
       - name: Test all Mie gameplay contracts
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery)$'
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|farming-persistence)$'
 
       - name: Stage portable Windows build
         shell: pwsh

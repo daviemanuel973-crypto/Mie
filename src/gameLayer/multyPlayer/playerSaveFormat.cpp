@@ -31,6 +31,18 @@ namespace
 		std::memcpy(data.data() + oldSize, value, size);
 	}
 
+	bool validCoordinate(double coordinate)
+	{
+		return std::isfinite(coordinate) && std::abs(coordinate) <= 30'000'000.0;
+	}
+
+	bool validHomeState(const PlayerHomeSaveState &home)
+	{
+		if (!home.hasHome) { return true; }
+		return validCoordinate(home.position[0]) &&
+			validCoordinate(home.position[1]) && validCoordinate(home.position[2]);
+	}
+
 	class SaveReader
 	{
 	public:
@@ -82,7 +94,7 @@ std::string PlayerIdentity::toString() const
 
 std::vector<unsigned char> formatPlayerSaveSnapshot(const PlayerSaveSnapshot &snapshot)
 {
-	if (!snapshot.identity.isValid() ||
+	if (!snapshot.identity.isValid() || !validHomeState(snapshot.homeState) ||
 		snapshot.inventory.size() > MAX_PLAYER_INVENTORY_SAVE_SIZE ||
 		snapshot.inventory.size() > std::numeric_limits<std::uint32_t>::max())
 	{
@@ -93,7 +105,7 @@ std::vector<unsigned char> formatPlayerSaveSnapshot(const PlayerSaveSnapshot &sn
 	guideState.sanitize();
 
 	std::vector<unsigned char> data;
-	data.reserve(80 + snapshot.inventory.size());
+	data.reserve(112 + snapshot.inventory.size());
 	appendBytes(data, playerSaveMagic.data(), playerSaveMagic.size());
 	appendValue(data, PLAYER_SAVE_FORMAT_VERSION);
 	appendBytes(data, snapshot.identity.bytes.data(), snapshot.identity.bytes.size());
@@ -111,6 +123,12 @@ std::vector<unsigned char> formatPlayerSaveSnapshot(const PlayerSaveSnapshot &sn
 	appendValue(data, guideState.completedObjectives);
 	appendValue(data, guideState.rewardedObjectives);
 
+	// v0.9 extension. It is fixed-size and comes after the v0.7 guide fields so
+	// v3 saves can be upgraded without changing any earlier byte offsets.
+	const std::uint8_t hasHome = snapshot.homeState.hasHome ? 1u : 0u;
+	appendValue(data, hasHome);
+	for (const auto coordinate : snapshot.homeState.position) { appendValue(data, coordinate); }
+
 	const auto inventorySize = static_cast<std::uint32_t>(snapshot.inventory.size());
 	appendValue(data, inventorySize);
 	appendBytes(data, snapshot.inventory.data(), snapshot.inventory.size());
@@ -127,7 +145,9 @@ bool parsePlayerSaveSnapshot(const void *data, std::size_t size, PlayerSaveSnaps
 
 	if (!reader.readBytes(magic.data(), magic.size()) || magic != playerSaveMagic ||
 		!reader.read(version) ||
-		(version != PLAYER_SAVE_LEGACY_FORMAT_VERSION && version != PLAYER_SAVE_FORMAT_VERSION) ||
+		(version != PLAYER_SAVE_LEGACY_FORMAT_VERSION &&
+			version != PLAYER_SAVE_GUIDE_FORMAT_VERSION &&
+			version != PLAYER_SAVE_FORMAT_VERSION) ||
 		!reader.readBytes(snapshot.identity.bytes.data(), snapshot.identity.bytes.size()) ||
 		!snapshot.identity.isValid())
 	{
@@ -136,11 +156,7 @@ bool parsePlayerSaveSnapshot(const void *data, std::size_t size, PlayerSaveSnaps
 
 	for (auto &coordinate : snapshot.position)
 	{
-		if (!reader.read(coordinate) || !std::isfinite(coordinate) ||
-			std::abs(coordinate) > 30'000'000.0)
-		{
-			return false;
-		}
+		if (!reader.read(coordinate) || !validCoordinate(coordinate)) { return false; }
 	}
 
 	if (!reader.read(snapshot.life) || !reader.read(snapshot.maxLife) ||
@@ -150,7 +166,7 @@ bool parsePlayerSaveSnapshot(const void *data, std::size_t size, PlayerSaveSnaps
 		return false;
 	}
 
-	if (version == PLAYER_SAVE_FORMAT_VERSION)
+	if (version == PLAYER_SAVE_GUIDE_FORMAT_VERSION || version == PLAYER_SAVE_FORMAT_VERSION)
 	{
 		std::uint8_t starterGuide = 0;
 		if (!reader.read(starterGuide) || starterGuide > 1u ||
@@ -161,6 +177,18 @@ bool parsePlayerSaveSnapshot(const void *data, std::size_t size, PlayerSaveSnaps
 		}
 		snapshot.guideState.starterFieldGuideGranted = starterGuide != 0;
 		snapshot.guideState.sanitize();
+	}
+
+	if (version == PLAYER_SAVE_FORMAT_VERSION)
+	{
+		std::uint8_t hasHome = 0;
+		if (!reader.read(hasHome) || hasHome > 1u) { return false; }
+		snapshot.homeState.hasHome = hasHome != 0;
+		for (auto &coordinate : snapshot.homeState.position)
+		{
+			if (!reader.read(coordinate)) { return false; }
+		}
+		if (!validHomeState(snapshot.homeState)) { return false; }
 	}
 
 	if (!reader.read(inventorySize) ||

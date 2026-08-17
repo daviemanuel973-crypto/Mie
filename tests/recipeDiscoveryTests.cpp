@@ -31,8 +31,10 @@ int main()
 	check(discovery.learnType(RecipeDiscovery::FirstItemType),
 		"the first legacy item type can be learned");
 	check(discovery.learnType(RecipeDiscovery::LastItemTypeExclusive - 1),
-		"the last v0.7 item type can be learned");
-	check(discovery.knowsType(5) && discovery.knowsType(2048) && discovery.knowsType(2192),
+		"the last v0.9 item type can be learned");
+	check(discovery.knowsType(5) &&
+		discovery.knowsType(RecipeDiscovery::FirstItemType) &&
+		discovery.knowsType(RecipeDiscovery::LastItemTypeExclusive - 1),
 		"learned material types remain queryable");
 	check(discovery.learnedTypeCount() == 3, "the learned material count is exact");
 

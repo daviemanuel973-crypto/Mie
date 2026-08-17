@@ -44,7 +44,25 @@ int main()
 	REQUIRE(getRemainingItemDurability(ItemTypes::ironPickaxe, metadata) == 359);
 	REQUIRE(metadata.size() == 7);
 
+	// v0.9 repairs use the same metadata and cap safely at the material maximum.
+	REQUIRE(repairItemDurability(ItemTypes::ironPickaxe, metadata, 20) == 1);
+	REQUIRE(getRemainingItemDurability(ItemTypes::ironPickaxe, metadata) == 360);
+	REQUIRE(metadata.empty());
+	REQUIRE(repairItemDurability(ItemTypes::ironPickaxe, metadata, 20) == 0);
+	REQUIRE(repairItemDurability(ItemTypes::apple, metadata, 20) == 0);
+
+	REQUIRE(consumeItemDurability(ItemTypes::bronzeSword, metadata, 100) ==
+		ItemDurabilityUseResult::damaged);
+	REQUIRE(getRemainingItemDurability(ItemTypes::bronzeSword, metadata) == 140);
+	REQUIRE(repairItemDurability(ItemTypes::bronzeSword, metadata, 40) == 40);
+	REQUIRE(getRemainingItemDurability(ItemTypes::bronzeSword, metadata) == 180);
+	REQUIRE(repairItemDurability(ItemTypes::bronzeSword, metadata, 1000) == 60);
+	REQUIRE(getRemainingItemDurability(ItemTypes::bronzeSword, metadata) == 240);
+	REQUIRE(metadata.empty());
+
 	// The same canonical payload can be persisted and resumed.
+	REQUIRE(consumeItemDurability(ItemTypes::ironPickaxe, metadata) ==
+		ItemDurabilityUseResult::damaged);
 	auto persistedMetadata = metadata;
 	REQUIRE(consumeItemDurability(ItemTypes::ironPickaxe, persistedMetadata, 358) ==
 		ItemDurabilityUseResult::damaged);

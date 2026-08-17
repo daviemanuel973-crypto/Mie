@@ -107,7 +107,10 @@ const char *itemsDescriptions[] =
 	"A bronze pickaxe with 40% mining power.",
 	"A bronze axe with 40% chopping power.",
 	"A bronze shovel with 40% digging power.",
-	"A balanced early-metal sword dealing 10 base damage."
+	"A balanced early-metal sword dealing 10 base damage.",
+
+	// v0.9 home/subsistence content. Append-only after the shipped v0.7 range.
+	"A portable resting place that marks a safe home and respawn point." // bedroll (2193)
 };
 
 std::string Item::getItemDescription()

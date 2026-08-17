@@ -26,7 +26,7 @@ bool Item::isItemThatCanBeUsed()
 {
 	if (type == pigSpawnEgg || type == zombieSpawnEgg 
 		|| type == catSpawnEgg || type == goblinSpawnEgg || type == scareCrowSpawnEgg
-		|| type == fieldGuide || isEatable() || isPaint() 
+		|| type == fieldGuide || type == bedroll || isEatable() || isPaint() 
 		)
 	{
 		return true;
@@ -106,21 +106,6 @@ std::size_t Item::formatIntoData(std::vector<unsigned char> &data)
 		writeData(data, metaData.data(), sizeof(unsigned char) * metaData.size());
 
 		return data.size() - s;
-
-		//if (hasDurability())
-		//{
-		//	if (metaData.size() == 2)
-		//	{
-		//		unsigned short durability = 0;
-		//		readDataUnsafe(metaData.data(), durability);
-		//		writeData(data, durability);
-		//	}
-		//	else
-		//	{
-		//		permaAssert(0);
-		//	}
-		//}
-
 	}
 
 	static_assert(sizeof(unsigned short) == sizeof(type));
@@ -205,7 +190,7 @@ void Item::sanitize()
 
 unsigned short Item::getStackSize()
 {
-	if (type == fieldGuide)
+	if (type == fieldGuide || type == bedroll)
 	{
 		return 1;
 	}
@@ -959,6 +944,9 @@ const char *itemsNamesTextures[] =
 	"tools/copperAxe.png",
 	"tools/copperShovel.png",
 	"weapons/copperSword.png",
+
+	// v0.9 bedroll intentionally reuses the shipped cloth icon.
+	"cloth.png",
 };
 
 const char *itemsNames[] =
@@ -1122,6 +1110,7 @@ const char *itemsNames[] =
 	"Bronze Axe",
 	"Bronze Shovel",
 	"Bronze Sword",
+	"Bedroll",
 };
 
 const char *getItemTextureName(int itemId)

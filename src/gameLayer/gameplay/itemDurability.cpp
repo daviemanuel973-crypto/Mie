@@ -174,3 +174,23 @@ ItemDurabilityUseResult consumeItemDurability(unsigned short itemType,
 	encodeDurability(metaData, static_cast<std::uint16_t>(remaining - amount));
 	return ItemDurabilityUseResult::damaged;
 }
+
+std::uint16_t repairItemDurability(unsigned short itemType,
+	std::vector<unsigned char> &metaData, std::uint16_t amount)
+{
+	const std::uint16_t maximum = getMaximumItemDurability(itemType);
+	if (maximum == 0 || amount == 0) { return 0; }
+
+	const std::uint16_t remaining = getRemainingItemDurability(itemType, metaData);
+	if (remaining >= maximum) { return 0; }
+
+	const std::uint16_t restored = std::min<std::uint16_t>(amount,
+		static_cast<std::uint16_t>(maximum - remaining));
+	const std::uint16_t repaired = static_cast<std::uint16_t>(remaining + restored);
+
+	// Full durability has the legacy/fresh representation: no metadata. This
+	// keeps repaired items byte-for-byte compatible with newly crafted tools.
+	if (repaired >= maximum) { metaData.clear(); }
+	else { encodeDurability(metaData, repaired); }
+	return restored;
+}

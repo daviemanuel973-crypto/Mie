@@ -155,6 +155,13 @@ bool loadPlayerFromDisk(const std::string &worldSavePath,
 	player.guideProgress.rewardedMask = snapshot.guideState.rewardedObjectives;
 	player.guideProgress.sanitize();
 	player.guideProgressDirty = true;
+
+	player.homeRespawn.clear();
+	if (snapshot.homeState.hasHome)
+	{
+		player.homeRespawn.set({snapshot.homeState.position[0], snapshot.homeState.position[1],
+			snapshot.homeState.position[2]});
+	}
 	return true;
 }
 
@@ -177,6 +184,15 @@ bool savePlayerToDisk(const std::string &worldSavePath,
 	snapshot.guideState.completedObjectives = player.guideProgress.completedMask;
 	snapshot.guideState.rewardedObjectives = player.guideProgress.rewardedMask;
 	snapshot.guideState.sanitize();
+	if (player.homeRespawn.isValid())
+	{
+		snapshot.homeState.hasHome = true;
+		snapshot.homeState.position = {
+			player.homeRespawn.position.x,
+			player.homeRespawn.position.y,
+			player.homeRespawn.position.z,
+		};
+	}
 	auto inventory = player.inventory;
 	inventory.formatIntoData(snapshot.inventory);
 

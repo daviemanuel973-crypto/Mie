@@ -220,6 +220,22 @@ jobs:
             -o recipeBookTests
           ./recipeBookTests
 
+          # Farming pulls in GLM (which intentionally uses anonymous struct
+          # extensions) and safeSave (legacy signedness warnings). Keep warnings
+          # visible without turning third-party diagnostics into v0.9 failures.
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra \
+            -Iinclude \
+            -Ishared \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            -Ithirdparty/safeSave/include \
+            tests/farmingTests.cpp \
+            src/gameLayer/gameplay/farming.cpp \
+            thirdparty/safeSave/src/safeSave.cpp \
+            -o farmingTests
+          ./farmingTests
+
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \
             tests/nativeSystemsTests.cpp \
