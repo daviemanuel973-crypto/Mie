@@ -10,6 +10,7 @@
 #include <gameplay/blocks/chestBlock.h>
 #include <gameplay/blocks/furnaceBlock.h>
 #include <gameplay/crafting.h>
+#include <gameplay/craftingUiSelection.h>
 #include <gameplay/siege.h>
 #include <audioEngine.h>
 #include <iostream>
@@ -885,16 +886,11 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 							if (allItems.size())
 							{
 								int currentPos = craftingSlider;
-								craftingSlider -= platform::getScroll();
-								int minVal = 0;
-								if (allItems.size() <= itemsRowCount-2)
-								{
-									minVal = -(allItems.size() - 2);
-								}
+								const int scrollDelta = platform::getScroll();
+								craftingSlider = CraftingUiSelection::clampSlider(
+									craftingSlider - scrollDelta, static_cast<int>(allItems.size()));
 
-								craftingSlider = glm::clamp(craftingSlider, -1, std::max((int)allItems.size() - 2, minVal));
-
-								if (currentPos != craftingSlider && platform::getScroll())
+								if (currentPos != craftingSlider && scrollDelta)
 								{
 									AudioEngine::playSound(AudioEngine::uiSlider, UI_SOUND_VOLUME);
 								}
@@ -904,12 +900,14 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 							{
 								
 								int start = craftingSlider;
+								const int selectedRecipeIndex = CraftingUiSelection::selectedRecipeIndex(
+									craftingSlider, static_cast<int>(allItems.size()));
 
 								std::optional<int> currentIndexSelected;
 
 								auto doOneRender = [&](int i, glm::vec4 color = Colors_White)
 								{
-									if (allItems.size() > i)
+									if (CraftingUiSelection::isValidRecipeIndex(i, static_cast<int>(allItems.size())))
 									{
 										glm::ivec4 itemBox;
 										if (i >= (start + itemsRowCount))
@@ -966,33 +964,34 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 									{
 										//cursorItemIndex = i;
 										cursorItemIndexBox = itemBox;
-										currentItemHovered = allItems[start + 1].recepie.result;
+										if (selectedRecipeIndex >= 0)
+										{
+											currentItemHovered = allItems[selectedRecipeIndex].recepie.result;
+										}
 										renderer2d.renderRectangle(shrinkRectanglePercentage(itemBox, -0.3 + (0.3f / 4.f)),
 											{0.7,0.7,0.7,0.5});
 
 										//crafting selected
-										if (allItems.size() > start + 1)
+										if (selectedRecipeIndex >= 0)
 										{
-											outCraftingRecepieGlobalIndex = allItems[start + 1].index;
+											outCraftingRecepieGlobalIndex = allItems[selectedRecipeIndex].index;
 										}
 									}
 
 								}
 
-								doOneRender(start + 1, {0,1,1,1});
+								if (selectedRecipeIndex >= 0)
+								{
+									doOneRender(selectedRecipeIndex, {0,1,1,1});
+								}
 
 								if (currentIndexSelected)
 								{
 									if (platform::isLMousePressed() && *currentIndexSelected != start + 1)
 									{
 										craftingSlider -= (start + 1) - *currentIndexSelected;
-
-										int minVal = 0;
-										if (allItems.size() <= 7)
-										{
-											minVal = -(allItems.size() - 2);
-										}
-										craftingSlider = glm::clamp(craftingSlider, -1, std::max((int)allItems.size() + 7 - 9, minVal));
+										craftingSlider = CraftingUiSelection::clampSlider(
+											craftingSlider, static_cast<int>(allItems.size()));
 									}
 								}
 
@@ -1031,9 +1030,10 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 									}
 
 
-									int index = craftingSlider + 1;
+									int index = CraftingUiSelection::selectedRecipeIndex(
+										craftingSlider, static_cast<int>(allItems.size()));
 
-									if (allItems.size() > index)
+									if (CraftingUiSelection::isValidRecipeIndex(index, static_cast<int>(allItems.size())))
 									{
 										
 										//renderer2d.renderRectangle(craftingItems, itemsBarInventory);
