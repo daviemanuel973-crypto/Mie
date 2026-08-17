@@ -54,6 +54,7 @@ public:
 	void returnSpawnRequest(unsigned int count);
 	void forceWarning();
 	void cancelCurrentSiege();
+	void setEnemyCountMultiplier(float multiplier);
 
 	SiegeStatus getStatus(unsigned int activeSiegeEnemies) const;
 	unsigned int getPendingSpawns() const { return pendingSpawns; }
@@ -73,6 +74,7 @@ private:
 	unsigned int completedSieges = 0;
 	std::uint64_t observedWorldCycles = 0;
 	std::uint64_t nextSiegeCycle = 7;
+	float enemyCountMultiplier = 1.f;
 };
 
 const char *getSiegePhaseName(SiegePhase phase);

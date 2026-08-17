@@ -11,6 +11,8 @@
 #include <gameplay/gameplayRules.h>
 #include <gameplay/crafting.h>
 #include <gameplay/food.h>
+#include <gameplay/worldDifficulty.h>
+#include <gameplay/itemDurability.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
@@ -604,6 +606,55 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 	};
 
+	auto sendFurnaceData = [&](Client *clientToIgnore, FurnaceBlock &furnaceBlock,
+		glm::ivec3 pos, bool includeIgnoredClient)
+	{
+		std::vector<unsigned char> blockData;
+		appendFurnaceBlock(blockData, pos, furnaceBlock);
+		if (blockData.empty()) { return; }
+
+		Packet packet;
+		packet.header = headerRecieveUpdatesBlockDataForChunk;
+		packet.cid = 0;
+		for (auto &entry : clients)
+		{
+			if (!includeIgnoredClient && entry.second == clientToIgnore) { continue; }
+			if (includeIgnoredClient && clientToIgnore && entry.second != clientToIgnore) { continue; }
+			if (blockData.size() > 100)
+			{
+				sendPacketAndCompress(entry.second->peer, packet,
+					reinterpret_cast<char *>(blockData.data()), blockData.size(), true,
+					channelChunksAndBlocks);
+			}
+			else
+			{
+				sendPacket(entry.second->peer, packet,
+					reinterpret_cast<char *>(blockData.data()), blockData.size(), true,
+					channelChunksAndBlocks);
+			}
+		}
+	};
+
+	// Furnace simulation is server-authoritative and runs only for chunks kept in
+	// simulation distance. Clients receive throttled snapshots for smooth progress UI.
+	for (auto &chunkEntry : chunkCache.savedChunks)
+	{
+		SavedChunk *savedChunk = chunkEntry.second;
+		if (!savedChunk || !savedChunk->otherData.withinSimulationDistance) { continue; }
+		for (auto &furnaceEntry : savedChunk->blockData.furnaceBlocks)
+		{
+			auto update = furnaceEntry.second.tick(deltaTime);
+			if (update.changed) { savedChunk->otherData.dirtyBlockData = true; }
+			if (update.needsNetworkSync)
+			{
+				glm::ivec3 pos = fromHashValueToBlockPosinChunk(furnaceEntry.first);
+				pos.x += chunkEntry.first.x * CHUNK_SIZE;
+				pos.z += chunkEntry.first.y * CHUNK_SIZE;
+				sendFurnaceData(nullptr, furnaceEntry.second, pos, false);
+			}
+		}
+	}
+
 
 
 
@@ -704,7 +755,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						{
 							//this chunk isn't in this region so undo
 							computeRevisionStuff(*client, false, i.t.eventId);
-							if (i.t.taskType == Task::placeBlock) { sendPlayerInventoryAndIncrementRevision(*client); }
+							sendPlayerInventoryAndIncrementRevision(*client);
 						}
 						else
 						{
@@ -712,12 +763,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 							//if revision number for the inventory is good we can continue,
 							//	if else we need to undo that move
-							if (
-								i.t.taskType == Task::breakBlock ||
-								(
-								client->playerData.inventory.revisionNumber
+							if (client->playerData.inventory.revisionNumber
 								== i.t.revisionNumber)
-								)
 							{
 								if (i.t.taskType == Task::breakBlock)
 								{
@@ -745,7 +792,10 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								}
 
 								auto b = chunk->chunk.safeGet(convertedX, i.t.pos.y, convertedZ);
-								Item *item = 0;
+								Item *item = i.t.inventroySlot < PlayerInventory::HOTBAR_CAPACITY
+									? client->playerData.inventory.getItemFromIndex(i.t.inventroySlot, 0)
+									: nullptr;
+								if (!item) { legal = false; }
 
 								Block actualPlacedBLock;
 								actualPlacedBLock.typeAndFlags = i.t.blockType;
@@ -760,9 +810,6 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 									if (i.t.taskType == Task::placeBlock)
 									{
-										item = client->playerData.inventory.getItemFromIndex(i.t.inventroySlot, 0);
-
-
 										if (item && item->isBlock() &&
 											actualPlacedBLock.getType() == item->type
 											&& item->counter
@@ -849,6 +896,18 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								if (legal)
 								{
 									auto lastBlock = b->getType();
+									FurnaceBlock removedFurnace;
+									bool hadFurnaceData = false;
+									if (lastBlock == BlockTypes::furnace)
+									{
+										auto found = chunk->blockData.furnaceBlocks.find(
+											fromBlockPosInChunkToHashValue(convertedX, i.t.pos.y, convertedZ));
+										if (found != chunk->blockData.furnaceBlocks.end())
+										{
+											removedFurnace = found->second;
+											hadFurnaceData = true;
+										}
+									}
 									chunk->removeBlockWithData({convertedX,
 										i.t.pos.y, convertedZ}, lastBlock);
 									*b = actualPlacedBLock;
@@ -884,8 +943,6 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										if (client->playerData.otherPlayerSettings.gameMode ==
 											OtherPlayerSettings::SURVIVAL)
 										{
-											//todo other checks here like tools
-
 											MotionState ms;
 											ms.velocity.y = 2;
 
@@ -893,16 +950,29 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 												worldSaver, 1, lastBlock, nullptr,
 												glm::dvec3(i.t.pos), ms);
 
+											if (hadFurnaceData)
+											{
+												for (Item &storedItem : removedFurnace.items)
+												{
+													if (!storedItem.type || !storedItem.counter) { continue; }
+													spawnDroppedItemEntity(chunkCache, worldSaver,
+														storedItem.counter, storedItem.type, &storedItem.metaData,
+														glm::dvec3(i.t.pos) + glm::dvec3(0.0, 0.35, 0.0), ms);
+												}
+											}
 
+											if (item && item->isTool() &&
+												consumeItemDurability(item->type, item->metaData) ==
+												ItemDurabilityUseResult::broken)
+											{
+												*item = {};
+											}
 										}
 
 									}
 								}
 
-								if (i.t.taskType == Task::placeBlock && !legal) { sendPlayerInventoryAndIncrementRevision(*client); }
-								{
-									sendPlayerInventoryAndIncrementRevision(*client);
-								}
+								sendPlayerInventoryAndIncrementRevision(*client);
 
 								if (legal)
 								{
@@ -930,6 +1000,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							{
 								//undo that move
 								computeRevisionStuff(*client, false, i.t.eventId);
+								sendPlayerInventoryNotIncrementRevision(*client);
 							}
 
 						}
@@ -1041,122 +1112,67 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 				}
 				else if (i.t.taskType == Task::clientMovedItem)
 				{
-
 					auto client = getClientNotLocked(i.cid);
-
-					if (client)
+					if (client && client->playerData.inventory.revisionNumber == i.t.revisionNumber)
 					{
-
-						//if the revision number isn't good we don't do anything
-						if (client->playerData.inventory.revisionNumber
-							== i.t.revisionNumber
-							)
+						ChestBlock *chestBlock = nullptr;
+						FurnaceBlock *furnaceBlock = nullptr;
+						SavedChunk *containerChunk = nullptr;
+						const glm::ivec3 containerPos = client->playerData.currentBlockInteractWithPosition;
+						if (client->playerData.interactingWithBlock == InteractionTypes::chestInteraction)
 						{
+							chestBlock = chunkCache.getChestBlock(containerPos, containerChunk);
+						}
+						else if (client->playerData.interactingWithBlock == InteractionTypes::furnace)
+						{
+							furnaceBlock = chunkCache.getFurnaceBlock(containerPos, containerChunk);
+						}
 
-							ChestBlock *chestBlock = 0;
-							SavedChunk *currentChunkForChestBlock = 0;
-							if (client->playerData.interactingWithBlock == InteractionTypes::chestInteraction)
-							{
-								chestBlock = chunkCache.getChestBlock(client->playerData.currentBlockInteractWithPosition, currentChunkForChestBlock);
-								//std::cout << "Tried to get chest1! " << chestBlock << "\n";
-							}
-							bool isAChestOperation = currentChunkForChestBlock && (i.t.from >= PlayerInventory::CHEST_START_INDEX || i.t.to >= PlayerInventory::CHEST_START_INDEX);
-
-
-							Item *from = client->playerData.inventory.getItemFromIndex(i.t.from, chestBlock);
-							Item *to = client->playerData.inventory.getItemFromIndex(i.t.to, chestBlock);
-
-							if (client->playerData.killed)
-							{
-								sendPlayerInventoryAndIncrementRevision(*client); //dissalow
-								if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-							}
-							else
-								if (from && to)
-								{
-									//todo they should always be sanitized so we should check during task creation if they are
-
-
-									if (from->type != i.t.itemType
-										|| (i.t.blockCount > from->counter)
-										)
-									{
-										//this is a desync, resend inventory.
-										sendPlayerInventoryAndIncrementRevision(*client);
-										if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-									}
-									else
-									{
-
-										if (to->type == 0)
-										{
-											*to = *from;
-											to->counter = i.t.blockCount;
-											from->counter -= i.t.blockCount;
-
-											if (!from->counter) { *from = {}; }
-											
-											if (isAChestOperation
-												)
-											{
-												sendChestDataToOtherPlayers(client, *chestBlock, client->playerData.currentBlockInteractWithPosition);
-												currentChunkForChestBlock->otherData.dirtyBlockData = true;
-												//std::cout << "Marked data dirty1!\n";
-											}
-										}
-										else if (areItemsTheSame(*to, *from))
-										{
-
-											if (to->counter >= to->getStackSize())
-											{
-												sendPlayerInventoryAndIncrementRevision(*client);
-												if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-											}
-											else
-											{
-												int total = (int)to->counter + (int)i.t.blockCount;
-												if (total <= to->getStackSize())
-												{
-													to->counter += i.t.blockCount;
-													from->counter -= i.t.blockCount;
-
-													if (!from->counter) { *from = {}; }
-
-													if (isAChestOperation)
-													{
-														sendChestDataToOtherPlayers(client, *chestBlock, client->playerData.currentBlockInteractWithPosition);
-														currentChunkForChestBlock->otherData.dirtyBlockData = true;
-														//std::cout << "Marked data dirty1!\n";
-													}
-												}
-												else
-												{
-													//this is a desync, resend inventory.
-													sendPlayerInventoryAndIncrementRevision(*client);
-													if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-												}
-											};
-
-										}
-										else
-										{
-											//this is a desync, resend inventory.
-											sendPlayerInventoryAndIncrementRevision(*client);
-											if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-										}
-
-									}
-
-								}
-								else
-								{
-									sendPlayerInventoryAndIncrementRevision(*client);
-									if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-								}
-
+						const bool usesContainer = i.t.from >= PlayerInventory::CHEST_START_INDEX ||
+							i.t.to >= PlayerInventory::CHEST_START_INDEX;
+						auto resendContainer = [&]()
+						{
+							if (chestBlock) { sendChestDataToCurrentPlayer(client, *chestBlock, containerPos); }
+							if (furnaceBlock) { sendFurnaceData(client, *furnaceBlock, containerPos, true); }
+						};
+						auto publishContainer = [&]()
+						{
+							if (!usesContainer || !containerChunk) { return; }
+							containerChunk->otherData.dirtyBlockData = true;
+							if (chestBlock) { sendChestDataToOtherPlayers(client, *chestBlock, containerPos); }
+							if (furnaceBlock) { sendFurnaceData(client, *furnaceBlock, containerPos, false); }
 						};
 
-					};
+						Item *from = client->playerData.inventory.getItemFromIndex(i.t.from, chestBlock, furnaceBlock);
+						Item *to = client->playerData.inventory.getItemFromIndex(i.t.to, chestBlock, furnaceBlock);
+						bool allowed = !client->playerData.killed && from && to &&
+							(!usesContainer || containerChunk) && i.t.blockCount > 0 &&
+							from->type == i.t.itemType && i.t.blockCount <= from->counter &&
+							client->playerData.inventory.canItemFit(*from, i.t.to) &&
+							canMoveItemToFurnaceIndex(*from, i.t.to);
+
+						if (allowed && to->type == 0)
+						{
+							*to = *from;
+							to->counter = i.t.blockCount;
+							from->counter -= i.t.blockCount;
+							if (!from->counter) { *from = {}; }
+							publishContainer();
+						}
+						else if (allowed && areItemsTheSame(*to, *from) &&
+							static_cast<unsigned int>(to->counter) + i.t.blockCount <= to->getStackSize())
+						{
+							to->counter += i.t.blockCount;
+							from->counter -= i.t.blockCount;
+							if (!from->counter) { *from = {}; }
+							publishContainer();
+						}
+						else
+						{
+							sendPlayerInventoryAndIncrementRevision(*client);
+							resendContainer();
+						}
+					}
 
 				}
 				else if (i.t.taskType == Task::clientOverwriteItem)
@@ -1212,64 +1228,49 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 				}
 				else if (i.t.taskType == Task::clientSwapItems)
 				{
-
-
 					auto client = getClientNotLocked(i.cid);
-
-					if (client)
+					if (client && client->playerData.inventory.revisionNumber == i.t.revisionNumber)
 					{
-
-
-						//if the revision number isn't good we don't do anything
-						if (client->playerData.inventory.revisionNumber
-							== i.t.revisionNumber
-							)
+						ChestBlock *chestBlock = nullptr;
+						FurnaceBlock *furnaceBlock = nullptr;
+						SavedChunk *containerChunk = nullptr;
+						const glm::ivec3 containerPos = client->playerData.currentBlockInteractWithPosition;
+						if (client->playerData.interactingWithBlock == InteractionTypes::chestInteraction)
 						{
-
-							ChestBlock *chestBlock = 0;
-							SavedChunk *currentChunkForChestBlock = 0;
-							if (client->playerData.interactingWithBlock == InteractionTypes::chestInteraction)
-							{
-								chestBlock = chunkCache.getChestBlock(client->playerData.currentBlockInteractWithPosition, currentChunkForChestBlock);
-								//std::cout << "Tried to get chest2! " << chestBlock << "\n";
-							}
-
-							bool isAChestOperation = currentChunkForChestBlock && (i.t.from >= PlayerInventory::CHEST_START_INDEX || i.t.to >= PlayerInventory::CHEST_START_INDEX);
-
-
-							if (client->playerData.killed)
-							{
-								sendPlayerInventoryAndIncrementRevision(*client); //dissalow
-								if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-							}
-							else
-							{
-								Item *from = client->playerData.inventory.getItemFromIndex(i.t.from, chestBlock);
-								Item *to = client->playerData.inventory.getItemFromIndex(i.t.to, chestBlock);
-								if (from && to)
-								{
-									Item copy;
-									copy = std::move(*from);
-									*from = std::move(*to);
-									*to = std::move(copy);
-
-									if (isAChestOperation)
-									{
-										sendChestDataToOtherPlayers(client, *chestBlock, client->playerData.currentBlockInteractWithPosition);
-										currentChunkForChestBlock->otherData.dirtyBlockData = true;
-										//std::cout << "Marked data dirty2!\n";
-									}
-								}
-								else
-								{
-									sendPlayerInventoryAndIncrementRevision(*client);
-									if (isAChestOperation) { sendChestDataToCurrentPlayer(client, *chestBlock, client->playerData.currentBlockInteractWithPosition); }
-								}
-							}
-
-
+							chestBlock = chunkCache.getChestBlock(containerPos, containerChunk);
+						}
+						else if (client->playerData.interactingWithBlock == InteractionTypes::furnace)
+						{
+							furnaceBlock = chunkCache.getFurnaceBlock(containerPos, containerChunk);
 						}
 
+						const bool usesContainer = i.t.from >= PlayerInventory::CHEST_START_INDEX ||
+							i.t.to >= PlayerInventory::CHEST_START_INDEX;
+						Item *from = client->playerData.inventory.getItemFromIndex(i.t.from, chestBlock, furnaceBlock);
+						Item *to = client->playerData.inventory.getItemFromIndex(i.t.to, chestBlock, furnaceBlock);
+						const bool allowed = !client->playerData.killed && from && to && from != to &&
+							(!usesContainer || containerChunk) &&
+							client->playerData.inventory.canItemFit(*from, i.t.to) &&
+							client->playerData.inventory.canItemFit(*to, i.t.from) &&
+							canMoveItemToFurnaceIndex(*from, i.t.to) &&
+							canMoveItemToFurnaceIndex(*to, i.t.from);
+
+						if (allowed)
+						{
+							std::swap(*from, *to);
+							if (usesContainer)
+							{
+								containerChunk->otherData.dirtyBlockData = true;
+								if (chestBlock) { sendChestDataToOtherPlayers(client, *chestBlock, containerPos); }
+								if (furnaceBlock) { sendFurnaceData(client, *furnaceBlock, containerPos, false); }
+							}
+						}
+						else
+						{
+							sendPlayerInventoryAndIncrementRevision(*client);
+							if (chestBlock) { sendChestDataToCurrentPlayer(client, *chestBlock, containerPos); }
+							if (furnaceBlock) { sendFurnaceData(client, *furnaceBlock, containerPos, true); }
+						}
 					}
 
 				}
@@ -1305,6 +1306,32 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								{
 
 									auto resultCrafting = getRecepieFromIndexUnsafe(craftingIndex);
+									bool correctStation = true;
+									if (resultCrafting.requiresFurnace)
+									{
+										// Furnace recipes are completed only by the timed furnace runtime.
+										correctStation = false;
+									}
+									if (resultCrafting.requiresWorkBench &&
+										client->playerData.interactingWithBlock != InteractionTypes::craftingTable)
+									{
+										correctStation = false;
+									}
+									if (resultCrafting.requiresCookingPot &&
+										client->playerData.interactingWithBlock != InteractionTypes::cookingPot)
+									{
+										correctStation = false;
+									}
+									if (resultCrafting.requiresGoblin &&
+										client->playerData.interactingWithBlock != InteractionTypes::goblinStitchingPost)
+									{
+										correctStation = false;
+									}
+									if (!correctStation)
+									{
+										sendPlayerInventoryAndIncrementRevision(*client);
+										continue;
+									}
 
 									auto toslot = client->playerData.inventory.getItemFromIndex(to, 0);
 
@@ -1679,9 +1706,15 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 					if (client)
 					{
-						if (!client->playerData.killed)
+						if (client->playerData.inventory.revisionNumber != i.t.revisionNumber)
 						{
-							auto item = client->playerData.inventory.getItemFromIndex(itemInventoryIndex, 0);
+							sendPlayerInventoryNotIncrementRevision(*client);
+						}
+						else if (!client->playerData.killed)
+						{
+							auto item = itemInventoryIndex < PlayerInventory::HOTBAR_CAPACITY
+								? client->playerData.inventory.getItemFromIndex(itemInventoryIndex, 0)
+								: nullptr;
 							if (item)
 							{
 								int type = getEntityTypeFromEID(entityId);
@@ -1743,6 +1776,18 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										std::uint64_t wasKilled = 0;
 										bool rez = chunkCache.hitEntityByPlayer(entityId, client->playerData.getPosition(),
 											*item, wasKilled, dir, rng, hitResult.hitCorectness, hitResult.bonusCritChance, lootTable);
+
+										if (rez && item->isWeapon() &&
+											client->playerData.otherPlayerSettings.gameMode ==
+											OtherPlayerSettings::SURVIVAL)
+										{
+											if (consumeItemDurability(item->type, item->metaData) ==
+												ItemDurabilityUseResult::broken)
+											{
+												*item = {};
+											}
+											sendPlayerInventoryAndIncrementRevision(*client);
+										}
 
 										//todo  we have separate logic for killing players and
 										//	maybe do the same for entities?
@@ -1868,7 +1913,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 					if (client)
 					{
 
-						if (client->playerData.killed)
+						if (client->playerData.killed &&
+							!getServerWorldDifficultySettings().hardcore)
 						{
 
 							client->playerData.effects = {};
@@ -2155,10 +2201,13 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 			if (playerData.starvationTimer >= 4.f)
 			{
 				playerData.starvationTimer -= 4.f;
-				// Normal-difficulty style starvation: it cannot take the player below 10 HP.
-				if (playerData.newLife.life > 10)
+				const int healthFloor = getStarvationHealthFloor(
+					getServerWorldDifficultySettings());
+				if (playerData.newLife.life > healthFloor)
 				{
-					playerData.applyDamageOrLife(-5);
+					const int damage = std::min(5,
+						playerData.newLife.life - healthFloor);
+					playerData.applyDamageOrLife(static_cast<short>(-damage));
 				}
 			}
 		}

@@ -1368,6 +1368,23 @@ ChestBlock *ServerChunkStorer::getChestBlock(glm::ivec3 pos, SavedChunk *&c)
 	return nullptr;
 }
 
+FurnaceBlock *ServerChunkStorer::getFurnaceBlock(glm::ivec3 pos, SavedChunk *&c)
+{
+	c = getChunkOrGetNull(divideChunk(pos.x), divideChunk(pos.z));
+	if (!c) { return nullptr; }
+
+	if (pos.y > 0 && pos.y < CHUNK_HEIGHT)
+	{
+		auto &block = c->chunk.unsafeGet(modBlockToChunk(pos.x), pos.y, modBlockToChunk(pos.z));
+		if (block.getType() == BlockTypes::furnace)
+		{
+			return c->blockData.getOrCreateFurnaceBlock(modBlockToChunk(pos.x), pos.y,
+				modBlockToChunk(pos.z));
+		}
+	}
+	return nullptr;
+}
+
 Block *ServerChunkStorer::getBlockSafeAndChunk(glm::ivec3 pos, SavedChunk *&c)
 {
 	c = getChunkOrGetNull(divideChunk(pos.x), divideChunk(pos.z));
@@ -1986,6 +2003,12 @@ void SavedChunk::removeBlockWithData(glm::ivec3 pos,
 			pos.y, pos.z));
 	}
 
+	if (blockType == BlockTypes::furnace)
+	{
+		blockData.furnaceBlocks.erase(fromBlockPosInChunkToHashValue(pos.x,
+			pos.y, pos.z));
+	}
+
 
 }
 
@@ -2019,12 +2042,26 @@ bool SavedChunk::normalize()
 	{
 		glm::ivec3 pos = fromHashValueToBlockPosinChunk(it->first);
 
-		if (isChest(chunk.blocks[pos.x][pos.z][pos.y].getType()))
+		if (!isChest(chunk.blocks[pos.x][pos.z][pos.y].getType()))
 		{
 			it = blockData.chestBlocks.erase(it); // erase returns the next valid iterator
 		}
 		else
 		{
+			++it;
+		}
+	}
+
+	for (auto it = blockData.furnaceBlocks.begin(); it != blockData.furnaceBlocks.end(); )
+	{
+		glm::ivec3 pos = fromHashValueToBlockPosinChunk(it->first);
+		if (chunk.blocks[pos.x][pos.z][pos.y].getType() != BlockTypes::furnace)
+		{
+			it = blockData.furnaceBlocks.erase(it);
+		}
+		else
+		{
+			it->second.normalize();
 			++it;
 		}
 	}

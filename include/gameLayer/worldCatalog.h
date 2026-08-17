@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <gameplay/worldDifficulty.h>
 
 struct WorldCatalogEntry
 {
@@ -11,6 +12,8 @@ struct WorldCatalogEntry
 	std::int64_t seed = 0;
 	bool hasSeed = false;
 	bool hasGeneratedWorld = false;
+	WorldDifficultySettings difficultySettings = {};
+	bool hasExplicitDifficulty = false;
 	std::filesystem::file_time_type lastModified = {};
 };
 

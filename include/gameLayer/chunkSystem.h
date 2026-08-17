@@ -116,7 +116,8 @@ struct ChunkSystem
 	//returns true if succeeded
 	bool breakBlockByClient(glm::ivec3 pos,
 		UndoQueue &undoQueue, glm::dvec3 playerPos,
-		LightSystem &lightSystem, ClientEntityManager &clientEntityManager
+		LightSystem &lightSystem, ClientEntityManager &clientEntityManager,
+		unsigned char inventorySlot, unsigned char inventoryRevision
 	);
 
 	void placeBlockByServerAndRemoveFromUndoQueue(glm::ivec3 pos, Block block,

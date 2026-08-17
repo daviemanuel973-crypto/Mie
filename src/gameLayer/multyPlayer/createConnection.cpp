@@ -12,6 +12,7 @@
 #include <gameplay/blocks/blocksWithData.h>
 #include <gameplay/siege.h>
 #include <gameplay/worldTime.h>
+#include <gameplay/worldDifficulty.h>
 #include <lightSystem.h>
 
 static ConnectionData clientData;
@@ -371,6 +372,28 @@ void recieveDataClient(ENetEvent &event,
 					}
 
 
+				}
+				else if (blockHeader.blockType == BlockTypes::furnace &&
+					b->getType() == BlockTypes::furnace)
+				{
+					if (blockHeader.dataSize > size - pointer) { break; }
+					if (blockHeader.dataSize)
+					{
+						FurnaceBlock furnace;
+						size_t outSize = 0;
+						if (!furnace.readFromBuffer(reinterpret_cast<unsigned char *>(data) + pointer,
+							blockHeader.dataSize, outSize) || outSize != blockHeader.dataSize ||
+							!furnace.isDataValid())
+						{
+							break;
+						}
+						pointer += outSize;
+						chunk->blockData.furnaceBlocks[blockHash] = std::move(furnace);
+					}
+					else
+					{
+						chunk->blockData.furnaceBlocks[blockHash] = FurnaceBlock{};
+					}
 				}
 				else
 				{
@@ -811,6 +834,18 @@ void recieveDataClient(ENetEvent &event,
 		}
 		break;
 
+		case headerUpdateWorldDifficulty:
+		{
+			if (size != sizeof(Packet_UpdateWorldDifficulty)) { break; }
+			const auto *packetData = reinterpret_cast<const Packet_UpdateWorldDifficulty *>(data);
+			WorldDifficultySettings settings;
+			settings.difficulty = static_cast<WorldDifficulty>(packetData->difficulty);
+			settings.hardcore = packetData->hardcore != 0;
+			settings.sanitize();
+			setClientWorldDifficultySettings(settings);
+		}
+		break;
+
 		case headerRecieveDamage:
 		{
 			if (sizeof(Packet_UpdateLife) != size) { break; }
@@ -994,12 +1029,13 @@ void clientMessageLoop(EventCounter &validatedEvent, RevisionNumber &invalidateR
 
 }
 
-void attackEntity(std::uint64_t eid, unsigned char inventorySlot, glm::vec3 direction,
-	HitResult hitResult)
+void attackEntity(std::uint64_t eid, unsigned char inventorySlot,
+	unsigned char inventoryRevision, glm::vec3 direction, HitResult hitResult)
 {
 	Packet_AttackEntity packet;
 	packet.entityID = eid;
 	packet.inventorySlot = inventorySlot;
+	packet.inventoryRevision = inventoryRevision;
 	packet.direction = direction;
 	packet.hitResult = hitResult;
 
@@ -1030,6 +1066,7 @@ void closeConnection()
 	{
 		resetClientSiegeStatus();
 		resetClientWorldTime();
+		resetClientWorldDifficultySettings();
 		return;
 	}
 	
@@ -1062,6 +1099,7 @@ void closeConnection()
 	clientData = {};
 	resetClientSiegeStatus();
 	resetClientWorldTime();
+	resetClientWorldDifficultySettings();
 
 }
 
@@ -1070,6 +1108,7 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 	if (clientData.conected) { return false; }
 	resetClientSiegeStatus();
 	resetClientWorldTime();
+	resetClientWorldDifficultySettings();
 
 	clientData = ConnectionData{};
 
@@ -1201,13 +1240,13 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 }
 
 
-bool placeItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to, int counter)
+bool placeItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to, int counter,
+	FurnaceBlock *furnaceBlock)
 {
-
-	auto fromItem = inventory.getItemFromIndex(from, chestBlock);
-	auto toItem = inventory.getItemFromIndex(to, chestBlock);
-
-	if (!inventory.canItemFit(*fromItem, to)) { return false; }
+	auto fromItem = inventory.getItemFromIndex(from, chestBlock, furnaceBlock);
+	auto toItem = inventory.getItemFromIndex(to, chestBlock, furnaceBlock);
+	if (!fromItem || !toItem) { return false; }
+	if (!inventory.canItemFit(*fromItem, to) || !canMoveItemToFurnaceIndex(*fromItem, to)) { return false; }
 
 	if (fromItem && toItem)
 	{
@@ -1297,14 +1336,16 @@ bool placeItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int
 }
 
 
-bool swapItems(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to)
+bool swapItems(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to,
+	FurnaceBlock *furnaceBlock)
 {
 
-	auto fromPtr = inventory.getItemFromIndex(from, chestBlock);
-	auto toPtr = inventory.getItemFromIndex(to, chestBlock);
+	auto fromPtr = inventory.getItemFromIndex(from, chestBlock, furnaceBlock);
+	auto toPtr = inventory.getItemFromIndex(to, chestBlock, furnaceBlock);
+	if (!fromPtr || !toPtr) { return false; }
 
-	if (!inventory.canItemFit(*fromPtr, to)) { return false; }
-	if (!inventory.canItemFit(*toPtr, from)) { return false; }
+	if (!inventory.canItemFit(*fromPtr, to) || !canMoveItemToFurnaceIndex(*fromPtr, to)) { return false; }
+	if (!inventory.canItemFit(*toPtr, from) || !canMoveItemToFurnaceIndex(*toPtr, from)) { return false; }
 
 	if (fromPtr && toPtr && fromPtr != toPtr)
 	{
@@ -1325,13 +1366,15 @@ bool swapItems(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int
 	return false;
 }
 
-bool grabItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to, int counter)
+bool grabItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int to, int counter,
+	FurnaceBlock *furnaceBlock)
 {
 
-	auto fromItem = inventory.getItemFromIndex(from, chestBlock);
-	auto toItem = inventory.getItemFromIndex(to, chestBlock);
+	auto fromItem = inventory.getItemFromIndex(from, chestBlock, furnaceBlock);
+	auto toItem = inventory.getItemFromIndex(to, chestBlock, furnaceBlock);
+	if (!fromItem || !toItem) { return false; }
 
-	if (!inventory.canItemFit(*fromItem, to)) { return false; }
+	if (!inventory.canItemFit(*fromItem, to) || !canMoveItemToFurnaceIndex(*fromItem, to)) { return false; }
 
 	if (fromItem && toItem && (fromItem != toItem))
 	{
@@ -1370,13 +1413,14 @@ bool grabItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int 
 }
 
 
-bool forceOverWriteItem(PlayerInventory &inventory, ChestBlock *chestBlock, int index, Item &item)
+bool forceOverWriteItem(PlayerInventory &inventory, ChestBlock *chestBlock, int index, Item &item,
+	FurnaceBlock *furnaceBlock)
 {
 	static std::vector<unsigned char> tempData;
 
-	auto to = inventory.getItemFromIndex(index, chestBlock);
+	auto to = inventory.getItemFromIndex(index, chestBlock, furnaceBlock);
 
-	if (!inventory.canItemFit(item, index)) { return false; }
+	if (!inventory.canItemFit(item, index) || !canMoveItemToFurnaceIndex(item, index)) { return false; }
 
 	if (to)
 	{

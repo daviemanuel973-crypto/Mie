@@ -1,4 +1,5 @@
 #include <gameplay/fieldGuide.h>
+#include <gameplay/crafting.h>
 #include <rendering/UiEngine.h>
 #include <platform/platformInput.h>
 
@@ -10,6 +11,21 @@ namespace
 {
 	GuideProgress clientGuideProgress = {};
 	bool showGuideCrafts = false;
+	int recipeBookPage = 0;
+
+	std::string formatRecipeIngredients(CraftingRecepie &recipe)
+	{
+		std::ostringstream result;
+		bool first = true;
+		for (Item &ingredient : recipe.items)
+		{
+			if (ingredient.type == 0) { break; }
+			if (!first) { result << " + "; }
+			result << ingredient.counter << "x " << ingredient.getItemName();
+			first = false;
+		}
+		return result.str();
+	}
 }
 
 GuideProgress getClientGuideProgress()
@@ -29,10 +45,11 @@ void resetClientGuideProgress()
 {
 	clientGuideProgress = {};
 	showGuideCrafts = false;
+	recipeBookPage = 0;
 }
 
 void renderFieldGuideUi(UiENgine &ui, int w, int h, bool insideInventory,
-	int &currentInventoryTab)
+	int &currentInventoryTab, PlayerInventory &inventory)
 {
 	if (!insideInventory || w <= 0 || h <= 0) { return; }
 
@@ -128,36 +145,84 @@ void renderFieldGuideUi(UiENgine &ui, int w, int h, bool insideInventory,
 			"Pending rewards are delivered automatically when inventory space is available.",
 			smallSize, {0.96f, 0.72f, 0.24f, 1.f});
 
-		if (glui::drawButton(ui.renderer2d, pageButton, Colors_White, "CRAFTING GUIDE",
+		if (glui::drawButton(ui.renderer2d, pageButton, Colors_White, "RECIPE BOOK",
 			ui.font, ui.buttonTexture, platform::getRelMousePosition(),
 			platform::isLMouseHeld(), platform::isLMouseReleased()))
 		{
 			showGuideCrafts = true;
+			recipeBookPage = 0;
 		}
 	}
 	else
 	{
-		drawText(left, top + titleSize * 1.55f, "IMPORTANT CRAFTS", lineSize,
+		drawText(left, top + titleSize * 1.55f, "DISCOVERED RECIPES", lineSize,
 			{0.92f, 0.82f, 0.62f, 1.f});
 
-		const char *crafts[] = {
-			"WORKBENCH  -  4 wooden planks.",
-			"FURNACE  -  8 cobblestone at a workbench.",
-			"CHARCOAL  -  1 log becomes 2 charcoal in a furnace.",
-			"TORCHES  -  1 charcoal + 1 stick becomes 4 torches.",
-			"TIN  -  2 cassiterite + 1 charcoal becomes 1 tin in a furnace.",
-			"BRONZE  -  3 copper + 1 tin + 1 charcoal becomes 4 bronze.",
-			"BRONZE PICKAXE  -  4 bronze + 3 planks at a workbench.",
-			"BRONZE AXE/SHOVEL  -  3 bronze + 3 planks at a workbench.",
-			"BRONZE SWORD  -  4 bronze + 1 stick at a workbench."
-		};
+		auto discovered = getDiscoveredCraftingRecipes(inventory.recipeDiscovery);
+		constexpr int recipesPerPage = 6;
+		const int pageCount = std::max(1, (static_cast<int>(discovered.size()) +
+			recipesPerPage - 1) / recipesPerPage);
+		recipeBookPage = std::clamp(recipeBookPage, 0, pageCount - 1);
 
-		float y = top + titleSize * 2.65f;
-		const float advance = (pageButton.y - y - smallSize) / 9.f;
-		for (const char *craft : crafts)
+		std::ostringstream summary;
+		summary << discovered.size() << " / " << getCraftingRecipeCount()
+			<< " recipes  |  materials found: " << inventory.recipeDiscovery.learnedTypeCount();
+		drawText(left, top + titleSize * 2.35f, summary.str(), smallSize,
+			{0.86f, 0.84f, 0.78f, 1.f});
+
+		const float listTop = top + titleSize * 3.05f;
+		const float rowHeight = (pageButton.y - listTop - smallSize * 1.2f) /
+			static_cast<float>(recipesPerPage);
+		const int firstRecipe = recipeBookPage * recipesPerPage;
+		const int lastRecipe = std::min(firstRecipe + recipesPerPage,
+			static_cast<int>(discovered.size()));
+		for (int index = firstRecipe; index < lastRecipe; ++index)
 		{
-			drawText(left, y, craft, smallSize, {0.92f, 0.86f, 0.72f, 1.f});
-			y += advance;
+			CraftingRecepie &recipe = discovered[index].recepie;
+			std::ostringstream result;
+			result << recipe.result.counter << "x " << recipe.result.getItemName()
+				<< "  [" << getCraftingRecipeStationName(recipe) << "]";
+			const float y = listTop + rowHeight * static_cast<float>(index - firstRecipe);
+			drawText(left, y, result.str(), lineSize,
+				{0.96f, 0.82f, 0.48f, 1.f});
+			drawText(left + panel.z * 0.025f, y + lineSize * 1.18f,
+				formatRecipeIngredients(recipe), smallSize, {0.90f, 0.87f, 0.78f, 1.f});
+		}
+
+		if (discovered.empty())
+		{
+			drawText(left, listTop, "No recipes discovered yet.", lineSize,
+				{0.96f, 0.72f, 0.24f, 1.f});
+			drawText(left, listTop + lineSize * 1.5f,
+				"Pick up materials to permanently reveal recipes that use them.", smallSize,
+				{0.90f, 0.87f, 0.78f, 1.f});
+		}
+
+		glm::vec4 previousButton = pageButton;
+		previousButton.z = std::clamp(panel.z * 0.13f, 90.f, 125.f);
+		previousButton.x = left;
+		glm::vec4 nextButton = previousButton;
+		nextButton.x += previousButton.z + panel.z * 0.018f;
+		if (recipeBookPage > 0 && glui::drawButton(ui.renderer2d, previousButton,
+			Colors_White, "PREVIOUS", ui.font, ui.buttonTexture,
+			platform::getRelMousePosition(), platform::isLMouseHeld(),
+			platform::isLMouseReleased()))
+		{
+			--recipeBookPage;
+		}
+		if (recipeBookPage + 1 < pageCount && glui::drawButton(ui.renderer2d, nextButton,
+			Colors_White, "NEXT", ui.font, ui.buttonTexture,
+			platform::getRelMousePosition(), platform::isLMouseHeld(),
+			platform::isLMouseReleased()))
+		{
+			++recipeBookPage;
+		}
+		if (pageCount > 1)
+		{
+			std::ostringstream page;
+			page << "Page " << (recipeBookPage + 1) << " / " << pageCount;
+			drawText(left, pageButton.y - smallSize * 0.85f, page.str(), smallSize,
+				{0.86f, 0.84f, 0.78f, 1.f});
 		}
 
 		if (glui::drawButton(ui.renderer2d, pageButton, Colors_White,
@@ -166,6 +231,7 @@ void renderFieldGuideUi(UiENgine &ui, int w, int h, bool insideInventory,
 			platform::isLMouseReleased()))
 		{
 			showGuideCrafts = false;
+			recipeBookPage = 0;
 		}
 	}
 }
@@ -176,11 +242,12 @@ void UiENgine::renderGameUIWithFieldGuide(float deltaTime,
 	int &currentInventoryTab, bool isCreative,
 	unsigned short &selectedItem, Life &playerHealth, ProgramData &programData,
 	LocalPlayer &player, int &craftingSlider, int &outCraftingRecepieGlobalIndex,
-	bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock)
+	bool showUI, std::uint16_t interactingBlock, ChestBlock *chestBlock,
+	FurnaceBlock *furnaceBlock)
 {
 	renderGameUI(deltaTime, w, h, itemSelected, inventory, blocksLoader,
 		insideInventory, cursorItemIndex, currentInventoryTab, isCreative,
 		selectedItem, playerHealth, programData, player, craftingSlider,
-		outCraftingRecepieGlobalIndex, showUI, interactingBlock, chestBlock);
-	renderFieldGuideUi(*this, w, h, insideInventory, currentInventoryTab);
+		outCraftingRecepieGlobalIndex, showUI, interactingBlock, chestBlock, furnaceBlock);
+	renderFieldGuideUi(*this, w, h, insideInventory, currentInventoryTab, inventory);
 }

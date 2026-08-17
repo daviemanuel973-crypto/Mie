@@ -41,6 +41,9 @@ int main()
 		std::ofstream seed(root / "New World" / "seed.txt");
 		seed << "9876";
 	}
+	WorldDifficultySettings hardcore;
+	hardcore.hardcore = true;
+	REQUIRE(saveWorldDifficultySettings(root / "New World", hardcore));
 	const auto now = std::filesystem::file_time_type::clock::now();
 	std::filesystem::last_write_time(root / "Older World", now - std::chrono::hours(2), filesystemError);
 	std::filesystem::last_write_time(root / "New World", now - std::chrono::hours(1), filesystemError);
@@ -65,7 +68,12 @@ int main()
 	REQUIRE(older && newer);
 	REQUIRE(older->hasSeed && older->seed == 12345);
 	REQUIRE(older->hasGeneratedWorld);
+	REQUIRE(!older->hasExplicitDifficulty);
+	REQUIRE(older->difficultySettings.difficulty == WorldDifficulty::Normal);
 	REQUIRE(newer->hasSeed && newer->seed == 9876);
+	REQUIRE(newer->hasExplicitDifficulty);
+	REQUIRE(newer->difficultySettings.hardcore);
+	REQUIRE(newer->difficultySettings.difficulty == WorldDifficulty::Hard);
 	REQUIRE(markWorldPlayed(root, "Older World", &error));
 	REQUIRE(std::filesystem::exists(root / "Older World" / ".last_played"));
 	worlds = loadWorldCatalog(root, &error);

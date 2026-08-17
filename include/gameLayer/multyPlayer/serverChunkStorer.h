@@ -149,6 +149,7 @@ struct ServerChunkStorer
 	Block *getBlockSafe(glm::ivec3 pos);
 
 	ChestBlock *getChestBlock(glm::ivec3 pos, SavedChunk *&c);
+	FurnaceBlock *getFurnaceBlock(glm::ivec3 pos, SavedChunk *&c);
 
 
 	Block *getBlockSafeAndChunk(glm::ivec3 pos, SavedChunk *&c);

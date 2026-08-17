@@ -16,7 +16,7 @@ CraftingRecepie recepie(Item result, std::array<Item, I> items, bool applyItemCr
 		ret.result = result;
 	}
 
-	for (int i = 0; i < sizeof(items) / sizeof(items[0]); i++)
+	for (std::size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++)
 	{
 		ret.items[i] = items[i];
 	}
@@ -161,12 +161,17 @@ static CraftingRecepie recepies[] =
 static_assert(sizeof(recepies) / sizeof(recepies[0]) == 103,
 	"The shipped v0.7 executable contains exactly 103 crafting recipes");
 
+int getCraftingRecipeCount()
+{
+	return static_cast<int>(sizeof(recepies) / sizeof(recepies[0]));
+}
+
 
 std::vector<CraftingRecepieIndex> getAllPossibleRecepies(PlayerInventory &playerInventory, int craftingStation)
 {
 	std::vector<CraftingRecepieIndex> rez;
 	rez.reserve(sizeof(recepies) / sizeof(recepies[0]));
-	for (int i = 0; i < sizeof(recepies) / sizeof(recepies[0]); i++)
+	for (int i = 0; i < getCraftingRecipeCount(); i++)
 	{
 		if (canItemBeCrafted(recepies[i], playerInventory))
 		{
@@ -188,8 +193,66 @@ std::vector<CraftingRecepieIndex> getAllPossibleRecepies(PlayerInventory &player
 bool recepieExists(int recepieIndex)
 {
 	if (recepieIndex < 0) { return 0; }
-	if (recepieIndex >= sizeof(recepies) / sizeof(recepies[0])) { return 0; }
+	if (recepieIndex >= getCraftingRecipeCount()) { return 0; }
 	return 1;
+}
+
+namespace
+{
+	bool knowsAnyMatchingWood(const RecipeDiscovery &discovery, bool logs)
+	{
+		for (std::uint16_t type = 1; type < BlockTypes::BlocksCount; ++type)
+		{
+			if (!discovery.knowsType(type)) { continue; }
+			if (logs ? isGuideWoodLogType(type) : isWoodPlank(type)) { return true; }
+		}
+		return false;
+	}
+
+	bool ingredientIsDiscovered(const CraftingRecepie &recepie, const Item &ingredient,
+		const RecipeDiscovery &discovery)
+	{
+		if (discovery.knowsType(ingredient.type)) { return true; }
+		if (!recepie.anyWood) { return false; }
+		if (isWoodPlank(ingredient.type)) { return knowsAnyMatchingWood(discovery, false); }
+		if (isGuideWoodLogType(ingredient.type)) { return knowsAnyMatchingWood(discovery, true); }
+		return false;
+	}
+}
+
+bool isCraftingRecipeDiscovered(int recepieIndex, const RecipeDiscovery &discovery)
+{
+	if (!recepieExists(recepieIndex)) { return false; }
+	const CraftingRecepie &recepie = recepies[recepieIndex];
+	for (const Item &ingredient : recepie.items)
+	{
+		if (ingredient.type == 0) { break; }
+		if (!ingredientIsDiscovered(recepie, ingredient, discovery)) { return false; }
+	}
+	return true;
+}
+
+std::vector<CraftingRecepieIndex> getDiscoveredCraftingRecipes(const RecipeDiscovery &discovery)
+{
+	std::vector<CraftingRecepieIndex> result;
+	result.reserve(getCraftingRecipeCount());
+	for (int index = 0; index < getCraftingRecipeCount(); ++index)
+	{
+		if (isCraftingRecipeDiscovered(index, discovery))
+		{
+			result.push_back({recepies[index], index});
+		}
+	}
+	return result;
+}
+
+const char *getCraftingRecipeStationName(const CraftingRecepie &recepie)
+{
+	if (recepie.requiresWorkBench) { return "WORKBENCH"; }
+	if (recepie.requiresFurnace) { return "FURNACE"; }
+	if (recepie.requiresGoblin) { return "GOBLIN STATION"; }
+	if (recepie.requiresCookingPot) { return "COOKING POT"; }
+	return "HAND CRAFTING";
 }
 
 
@@ -214,9 +277,9 @@ namespace
 bool canItemBeCrafted(CraftingRecepie &recepie, PlayerInventory &inventory)
 {
 	Item neededItems[sizeof(recepie.items) / sizeof(recepie.items[0])];
-	for (int i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++) { neededItems[i] = recepie.items[i]; }
+	for (std::size_t i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++) { neededItems[i] = recepie.items[i]; }
 
-	for (int i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++)
+	for (std::size_t i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++)
 	{
 		if (neededItems[i].type == 0) { break; }
 		for (int j = 0; j < PlayerInventory::INVENTORY_CAPACITY; j++)
@@ -234,7 +297,7 @@ bool canItemBeCrafted(CraftingRecepie &recepie, PlayerInventory &inventory)
 		}
 	}
 
-	for (int i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++)
+	for (std::size_t i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++)
 	{
 		if (neededItems[i].type != 0) { return false; }
 	}
@@ -245,9 +308,9 @@ bool canItemBeCrafted(CraftingRecepie &recepie, PlayerInventory &inventory)
 void craftItemUnsafe(CraftingRecepie &recepie, PlayerInventory &inventory)
 {
 	Item neededItems[sizeof(recepie.items) / sizeof(recepie.items[0])];
-	for (int i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++) { neededItems[i] = recepie.items[i]; }
+	for (std::size_t i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++) { neededItems[i] = recepie.items[i]; }
 
-	for (int i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++)
+	for (std::size_t i = 0; i < sizeof(recepie.items) / sizeof(recepie.items[0]); i++)
 	{
 		if (neededItems[i].type == 0) { break; }
 		for (int j = 0; j < PlayerInventory::INVENTORY_CAPACITY; j++)

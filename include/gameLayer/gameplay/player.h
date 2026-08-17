@@ -6,6 +6,7 @@
 #include <gl2d/gl2d.h>
 #include <gameplay/life.h>
 #include <gameplay/gameplayRules.h>
+#include <gameplay/worldDifficulty.h>
 #include <gameplay/effects.h>
 
 #define PLAYER_DEFAULT_LIFE Life(100)
@@ -120,6 +121,11 @@ struct PlayerServer: public ServerEntity<Player>
 	void applyDamageOrLife(short difference)
 	{
 		if (otherPlayerSettings.gameMode == OtherPlayerSettings::CREATIVE) { return; }
+		if (difference < 0)
+		{
+			difference = scaleIncomingDamageForDifficulty(difference,
+				getServerWorldDifficultySettings());
+		}
 
 		int life = newLife.life;
 		life += difference;
