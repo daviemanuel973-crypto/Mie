@@ -1,0 +1,48 @@
+name: Attach Mie v0.8.0 Flatpak to Release
+
+on:
+  push:
+    branches:
+      - agent/v0.8.0-release-tags
+    paths:
+      - '.github/workflows/attach-v0.8.0-flatpak.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  attach-flatpak:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.8.0
+      SOURCE_RUN_ID: '32028394884'
+      ARTIFACT_NAME: Mie-Survival-v0.8.0-Linux-x86_64-Flatpak
+      RELEASE_FILE: Mie-Survival-v0.8.0-Linux-x86_64.flatpak
+    steps:
+      - name: Download validated Flatpak artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$ARTIFACT_NAME" \
+            --dir release-assets
+
+          source_file="$(find release-assets -type f -name '*.flatpak' -print -quit)"
+          test -n "$source_file"
+          mv "$source_file" "release-assets/$RELEASE_FILE"
+          sha256sum "release-assets/$RELEASE_FILE" > "release-assets/$RELEASE_FILE.sha256"
+
+      - name: Attach Flatpak and checksum to v0.8.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$RELEASE_TAG" \
+            "release-assets/$RELEASE_FILE" \
+            "release-assets/$RELEASE_FILE.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
