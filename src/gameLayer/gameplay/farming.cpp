@@ -99,7 +99,11 @@ namespace
 		cachedPlots.clear();
 
 		const std::string path = farmSavePath(worldSavePath);
-		if (!std::filesystem::exists(path))
+		// safeSave treats this as a base name and persists two checksum-protected
+		// copies as <base>1.bin and <base>2.bin. Checking only the base path makes
+		// every fresh process incorrectly look like it has no farming data.
+		if (!std::filesystem::exists(path + "1.bin") &&
+			!std::filesystem::exists(path + "2.bin"))
 		{
 			cacheLoaded = true;
 			return true;
