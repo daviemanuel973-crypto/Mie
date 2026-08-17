@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.8.0" CACHE STRING "Mie Survival semantic version")
+set(OURCRAFT_VERSION "0.9.0" CACHE STRING "Mie Survival semantic version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
@@ -339,6 +339,18 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
 	add_test(NAME recipe-book-discovery COMMAND recipeBookTests)
 
+	add_executable(farmingTests
+		tests/farmingTests.cpp
+		src/gameLayer/gameplay/farming.cpp)
+	target_include_directories(farmingTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/safeSave/include/")
+	target_link_libraries(farmingTests PRIVATE safeSave glm)
+	add_test(NAME farming-persistence COMMAND farmingTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -355,5 +367,6 @@ if (BUILD_TESTING)
 		furnace-block-runtime
 		recipe-discovery-persistence
 		recipe-book-discovery
+		farming-persistence
 		PROPERTIES TIMEOUT 60)
 endif()
