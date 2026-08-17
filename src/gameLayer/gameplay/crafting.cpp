@@ -1,5 +1,6 @@
 #include <gameplay/crafting.h>
 #include <gameplay/fieldGuide.h>
+#include <gameplay/itemDurability.h>
 
 
 template<long long I>
@@ -156,10 +157,19 @@ static CraftingRecepie recepies[] =
 	recepie<1>(Item(ItemTypes::goldHelmet, 1), {Item(ItemTypes::goldIngot, 6)}).setRequiresWorkBench(),
 	recepie<1>(Item(ItemTypes::goldChestPlate, 1), {Item(ItemTypes::goldIngot, 8)}).setRequiresWorkBench(),
 	recepie<1>(Item(ItemTypes::goldBoots, 1), {Item(ItemTypes::goldIngot, 5)}).setRequiresWorkBench(),
+
+	// v0.9 append-only recipes. Keeping these after the 103 shipped recipes
+	// preserves every legacy recipe index used by network crafting packets.
+	recepie<2>(Item(ItemTypes::bedroll, 1), {Item(ItemTypes::cloth, 6), Item(BlockTypes::hayBalde, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(ItemTypes::bronzePickaxe, 1), {Item(ItemTypes::bronzePickaxe, 1), Item(ItemTypes::bronzeIngot, 1)}).setRequiresWorkBench().setRepairsDurableItem(),
+	recepie<2>(Item(ItemTypes::bronzeAxe, 1), {Item(ItemTypes::bronzeAxe, 1), Item(ItemTypes::bronzeIngot, 1)}).setRequiresWorkBench().setRepairsDurableItem(),
+	recepie<2>(Item(ItemTypes::bronzeShovel, 1), {Item(ItemTypes::bronzeShovel, 1), Item(ItemTypes::bronzeIngot, 1)}).setRequiresWorkBench().setRepairsDurableItem(),
+	recepie<2>(Item(ItemTypes::bronzeSword, 1), {Item(ItemTypes::bronzeSword, 1), Item(ItemTypes::bronzeIngot, 1)}).setRequiresWorkBench().setRepairsDurableItem(),
 };
 
-static_assert(sizeof(recepies) / sizeof(recepies[0]) == 103,
-	"The shipped v0.7 executable contains exactly 103 crafting recipes");
+constexpr int LegacyCraftingRecipeCount = 103;
+static_assert(sizeof(recepies) / sizeof(recepies[0]) == 108,
+	"v0.9 crafting recipes changed unexpectedly");
 
 int getCraftingRecipeCount()
 {
@@ -271,6 +281,24 @@ namespace
 		if (isGuideWoodLogType(needed.type) && isGuideWoodLogType(available.type)) { return true; }
 		return false;
 	}
+
+	bool matchesRepairRule(const CraftingRecepie &recepie, const Item &needed, const Item &available)
+	{
+		if (!recepie.repairsDurableItem || needed.type != available.type ||
+			!itemUsesDurability(needed.type))
+		{
+			return false;
+		}
+		return getRemainingItemDurability(available.type, available.metaData) <
+			getMaximumItemDurability(available.type);
+	}
+
+	bool ingredientMatches(const CraftingRecepie &recepie, Item &needed, Item &available)
+	{
+		return areItemsTheSame(available, needed) ||
+			matchesAnyWoodRule(recepie, needed, available) ||
+			matchesRepairRule(recepie, needed, available);
+	}
 }
 
 
@@ -284,8 +312,7 @@ bool canItemBeCrafted(CraftingRecepie &recepie, PlayerInventory &inventory)
 		if (neededItems[i].type == 0) { break; }
 		for (int j = 0; j < PlayerInventory::INVENTORY_CAPACITY; j++)
 		{
-			const bool allowedFromOtherRules = matchesAnyWoodRule(recepie, neededItems[i], inventory.items[j]);
-			if (areItemsTheSame(inventory.items[j], neededItems[i]) || allowedFromOtherRules)
+			if (ingredientMatches(recepie, neededItems[i], inventory.items[j]))
 			{
 				if (neededItems[i].counter <= inventory.items[j].counter)
 				{
@@ -315,8 +342,7 @@ void craftItemUnsafe(CraftingRecepie &recepie, PlayerInventory &inventory)
 		if (neededItems[i].type == 0) { break; }
 		for (int j = 0; j < PlayerInventory::INVENTORY_CAPACITY; j++)
 		{
-			const bool allowedFromOtherRules = matchesAnyWoodRule(recepie, neededItems[i], inventory.items[j]);
-			if (areItemsTheSame(inventory.items[j], neededItems[i]) || allowedFromOtherRules)
+			if (ingredientMatches(recepie, neededItems[i], inventory.items[j]))
 			{
 				if (neededItems[i].counter == inventory.items[j].counter)
 				{
