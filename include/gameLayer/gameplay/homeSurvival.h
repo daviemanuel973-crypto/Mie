@@ -4,9 +4,12 @@
 
 #include <cmath>
 
+struct ServerChunkStorer;
+struct WorldSaver;
+
 // Per-player v0.9 home/respawn state. It deliberately carries no block ID:
-// the chosen home marker is gameplay/UI policy, while persistence only needs a
-// safe world-space anchor. This keeps v0.7/v0.8 block IDs stable.
+// the bedroll is a portable item and persistence only needs a safe world-space
+// anchor. This keeps v0.7/v0.8 block IDs stable.
 struct HomeRespawnState
 {
 	bool hasHome = false;
@@ -37,3 +40,14 @@ struct HomeRespawnState
 		return true;
 	}
 };
+
+// Bedroll use is validated server-side against loaded collision data. The
+// stored anchor is therefore known-safe at the moment it is created.
+bool trySetHomeRespawn(HomeRespawnState &state, glm::dvec3 playerPosition,
+	ServerChunkStorer &chunkStorer);
+
+// If the home chunk is still loaded, revalidate/adjust the anchor. If it is
+// unloaded, trust the previously validated anchor so a distant death can still
+// return the player home; chunk streaming will then load that area normally.
+glm::dvec3 resolveHomeOrWorldRespawn(const HomeRespawnState &state,
+	ServerChunkStorer &chunkStorer, WorldSaver &worldSaver);
