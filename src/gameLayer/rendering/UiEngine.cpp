@@ -857,6 +857,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 						else if (currentInventoryTab == INVENTORY_TAB_CRAFTING)
 						{
 							auto allItems = getAllPossibleRecepies(inventory, craftingStation);
+							const int recipeCount = static_cast<int>(allItems.size());
 
 							glui::Frame insideUpperPart(glui::Box().xCenter().yTopPerc(0.1).
 								xDimensionPercentage(0.90).yDimensionPercentage(0.45)());
@@ -882,17 +883,11 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 
 							constexpr int itemsRowCount = 9;
 
-							if (allItems.size())
+							if (recipeCount > 0)
 							{
 								int currentPos = craftingSlider;
 								craftingSlider -= platform::getScroll();
-								int minVal = 0;
-								if (allItems.size() <= itemsRowCount-2)
-								{
-									minVal = -(allItems.size() - 2);
-								}
-
-								craftingSlider = glm::clamp(craftingSlider, -1, std::max((int)allItems.size() - 2, minVal));
+								craftingSlider = glm::clamp(craftingSlider, -1, recipeCount - 2);
 
 								if (currentPos != craftingSlider && platform::getScroll())
 								{
@@ -900,16 +895,17 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 								}
 							}
 
-							if (allItems.size())
+							if (recipeCount > 0)
 							{
 								
 								int start = craftingSlider;
+								const int selectedIndex = start + 1;
 
 								std::optional<int> currentIndexSelected;
 
 								auto doOneRender = [&](int i, glm::vec4 color = Colors_White)
 								{
-									if (allItems.size() > i)
+									if (i >= 0 && i < recipeCount)
 									{
 										glm::ivec4 itemBox;
 										if (i >= (start + itemsRowCount))
@@ -946,7 +942,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 
 								for (int i = start; i < start + itemsRowCount * 2; i++)
 								{
-									if (i != start + 1)
+									if (i != selectedIndex)
 									{
 										doOneRender(i, Colors_White);
 									}
@@ -966,33 +962,25 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 									{
 										//cursorItemIndex = i;
 										cursorItemIndexBox = itemBox;
-										currentItemHovered = allItems[start + 1].recepie.result;
+										if (selectedIndex >= 0 && selectedIndex < recipeCount)
+										{
+											currentItemHovered = allItems[selectedIndex].recepie.result;
+											outCraftingRecepieGlobalIndex = allItems[selectedIndex].index;
+										}
 										renderer2d.renderRectangle(shrinkRectanglePercentage(itemBox, -0.3 + (0.3f / 4.f)),
 											{0.7,0.7,0.7,0.5});
-
-										//crafting selected
-										if (allItems.size() > start + 1)
-										{
-											outCraftingRecepieGlobalIndex = allItems[start + 1].index;
-										}
 									}
 
 								}
 
-								doOneRender(start + 1, {0,1,1,1});
+								doOneRender(selectedIndex, {0,1,1,1});
 
 								if (currentIndexSelected)
 								{
-									if (platform::isLMousePressed() && *currentIndexSelected != start + 1)
+									if (platform::isLMousePressed() && *currentIndexSelected != selectedIndex)
 									{
-										craftingSlider -= (start + 1) - *currentIndexSelected;
-
-										int minVal = 0;
-										if (allItems.size() <= 7)
-										{
-											minVal = -(allItems.size() - 2);
-										}
-										craftingSlider = glm::clamp(craftingSlider, -1, std::max((int)allItems.size() + 7 - 9, minVal));
+										craftingSlider -= selectedIndex - *currentIndexSelected;
+										craftingSlider = glm::clamp(craftingSlider, -1, recipeCount - 2);
 									}
 								}
 
@@ -1033,7 +1021,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 
 									int index = craftingSlider + 1;
 
-									if (allItems.size() > index)
+									if (index >= 0 && index < recipeCount)
 									{
 										
 										//renderer2d.renderRectangle(craftingItems, itemsBarInventory);
@@ -1363,7 +1351,7 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 									newBox = shrinkRectanglePercentageMoveDown(newBox, 0.3);
 									renderer2d.renderRectangle(newBox, t, Colors_White,
 										{}, 0, {0,1,1,0.5});
-								}
+							}
 							}
 
 
