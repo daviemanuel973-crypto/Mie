@@ -1,0 +1,40 @@
+name: Apply v0.9.3.1 CI compatibility fix
+
+on:
+  push:
+    branches:
+      - agent/v0.9.3.1-data-integrity
+    paths:
+      - tools/apply_v0931_ci_fix.py
+      - .github/workflows/apply-v0931-ci-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0.9.3.1-data-integrity
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply guarded CI patch
+        run: python tools/apply_v0931_ci_fix.py
+      - name: Validate workflow diff
+        run: git diff --check
+      - name: Commit CI compatibility fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            .github/workflows/linux-flatpak-ci.yml \
+            .github/workflows/windows-msvc-ci.yml \
+            .github/workflows/publish-windows-release.yml
+          git commit -m "ci: support v0.9.3.1 hotfix versioning"
+          git push origin HEAD:agent/v0.9.3.1-data-integrity
