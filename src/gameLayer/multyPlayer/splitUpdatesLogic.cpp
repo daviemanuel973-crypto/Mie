@@ -7,6 +7,7 @@
 #include <platform/platformTools.h>
 #include <profilerLib.h>
 #include <iostream>
+#include <chrono>
 
 struct Client;
 
@@ -50,7 +51,7 @@ int tryTakeTask()
 
 	for (int i = 0; i < threadPool.taskTaken.size(); i++)
 	{
-		if (!threadPool.taskTaken[i].exchange(true)) // If the flag was not set
+		if (!threadPool.taskTaken[i].exchange(true))
 		{
 			return i;
 		}
@@ -96,9 +97,7 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 
 		for (auto i : chunkCache.savedChunks)
 		{
-			if (!i.second->otherData.shouldUnload
-				//&& i.second->otherData.withinSimulationDistance //todo not implemented yet...
-				)
+			if (!i.second->otherData.shouldUnload)
 			{
 
 				auto find = visited.find(i.first);
@@ -124,7 +123,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 					toLook.push_back({i.first + glm::ivec2(1,-1)});
 					toLook.push_back({i.first + glm::ivec2(-1,-1)});
 
-					//start BFS
 					while (!toLook.empty())
 					{
 						auto el = toLook.back();
@@ -141,9 +139,7 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 							auto foundChunk = chunkCache.savedChunks.find(el);
 							if (foundChunk != chunkCache.savedChunks.end())
 							{
-								if (!foundChunk->second->otherData.shouldUnload
-									//&& foundChunk->second->otherData.withinSimulationDistance
-									)
+								if (!foundChunk->second->otherData.shouldUnload)
 								{
 									visited.insert({el, currentIndex});
 
@@ -182,7 +178,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 		threadPool.taskTaken.resize(chunkRegionsData.size());
 		for (auto &i : threadPool.taskTaken) { i = 0; }
 
-		//weak threads up
 	#pragma region set threads count
 		{
 
@@ -262,7 +257,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 		serverProfiler.endSubProfile("Prepare tasks");
 
 
-		//start race
 		threadPool.setThrerIsWork();
 
 		auto rez = pl.end();
@@ -511,15 +505,23 @@ void ThreadPool::markWorkFinished(int index)
 
 void ThreadPool::waitForEveryoneToFinish()
 {
-	std::unique_lock<std::mutex> lock(workMutex);
-	workFinished.wait(lock, [&]()
+	// Some users of ThreadPool (notably the legacy chunk baker) still clear the
+	// atomic flag directly. Sleep briefly between checks so the owner thread does
+	// not burn a core, while remaining compatible with those workers.
+	for (;;)
 	{
+		bool allFinished = true;
 		for (int i = 0; i < currentCounter; i++)
 		{
-			if (threIsWork[i].load()) { return false; }
+			if (threIsWork[i].load())
+			{
+				allFinished = false;
+				break;
+			}
 		}
-		return true;
-	});
+		if (allFinished) { return; }
+		std::this_thread::sleep_for(std::chrono::microseconds(100));
+	}
 }
 
 void ThreadPool::cleanup()
