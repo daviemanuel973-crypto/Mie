@@ -1,6 +1,7 @@
 #include <multyPlayer/playerPersistence.h>
 
 #include <gameplay/player.h>
+#include <gameplay/worldGameMode.h>
 #include <platformTools.h>
 #include <safeSave.h>
 
@@ -28,6 +29,14 @@ namespace
 	{
 		return (std::filesystem::path(worldSavePath) / "players" /
 			("player_" + identity.toString())).string();
+	}
+
+	void applyDefaultWorldGameMode(const std::string &worldSavePath, PlayerServer &player)
+	{
+		WorldGameModeSettings settings;
+		loadWorldGameModeSettings(std::filesystem::path(worldSavePath).parent_path(), settings);
+		player.otherPlayerSettings.gameMode = settings.mode == WorldGameMode::Creative
+			? OtherPlayerSettings::CREATIVE : OtherPlayerSettings::SURVIVAL;
 	}
 
 	PlayerIdentity generatePlayerIdentity()
@@ -109,6 +118,10 @@ bool loadPlayerFromDisk(const std::string &worldSavePath,
 	const PlayerIdentity &identity, PlayerServer &player)
 {
 	if (!identity.isValid()) { return false; }
+
+	// The world selection only initializes players that do not yet have a valid
+	// save. A restored player's persisted game mode below always wins.
+	applyDefaultWorldGameMode(worldSavePath, player);
 
 	std::vector<char> savedData;
 	if (sfs::safeLoad(savedData, getPlayerSavePath(worldSavePath, identity).c_str(), false) != sfs::noError)
