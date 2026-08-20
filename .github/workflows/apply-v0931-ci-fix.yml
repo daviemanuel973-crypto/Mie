@@ -38,3 +38,5 @@ jobs:
             .github/workflows/publish-windows-release.yml
           git commit -m "ci: support v0.9.3.1 hotfix versioning"
           git push origin HEAD:agent/v0.9.3.1-data-integrity
+
+# Registered in-branch before this activation commit so the push event can invoke it.
