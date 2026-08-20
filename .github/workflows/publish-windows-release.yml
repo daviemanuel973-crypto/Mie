@@ -20,12 +20,12 @@ jobs:
         shell: pwsh
         run: |
           if ("${{ github.ref_type }}" -ne "tag") {
-            throw "Publish Windows Release must run from an existing vX.Y.Z tag"
+            throw "Publish Windows Release must run from an existing vX.Y.Z or vX.Y.Z.W tag"
           }
           $sourceVersion = (Get-Content "VERSION" -Raw).Trim()
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart('v')
-          if ($version -notmatch '^\d+\.\d+\.\d+([+-][0-9A-Za-z.-]+)?$') {
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?([+-][0-9A-Za-z.-]+)?$') {
             throw "Invalid semantic release version: $version"
           }
           if ($sourceVersion -ne $version) {
@@ -47,7 +47,7 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build --config Release --parallel 2
-          ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery)$'
+          ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|entity-id-allocator)$'
 
       - name: Stage Windows package
         shell: pwsh
