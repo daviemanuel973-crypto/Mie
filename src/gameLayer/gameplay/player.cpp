@@ -12,38 +12,29 @@ void Player::flyFPS(glm::vec3 direction, glm::vec3 lookDirection)
 {
 	lookDirection.y = 0;
 	float l = glm::length(lookDirection);
-
 	if (!l) { return; }
-
 	lookDirection /= l;
 
-	//forward
 	float forward = -direction.z;
 	float leftRight = direction.x;
 	float upDown = direction.y;
 
 	glm::vec3 move = {};
-
 	move += glm::vec3(0, 1, 0) * upDown;
 	move += glm::normalize(glm::cross(lookDirection, glm::vec3(0, 1, 0))) * leftRight;
 	move += lookDirection * forward;
-
-	//applyImpulse(this->forces, move);
 	this->position += move;
 }
-
 
 void Player::moveFPS(glm::vec3 direction, glm::vec3 lookDirection, float deltaTime)
 {
 	lookDirection.y = 0;
 	lookDirection = glm::normalize(lookDirection);
 
-	//forward
 	float forward = -direction.z;
 	float leftRight = direction.x;
 
 	glm::vec3 move = {};
-
 	move += glm::normalize(glm::cross(lookDirection, glm::vec3(0, 1, 0))) * leftRight;
 	move += lookDirection * forward;
 
@@ -61,8 +52,6 @@ void Player::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter
 	const bool climbing = !fly && submersion <= 0.f && isOnClimbable(chunkGetter);
 	if (submersion > 0.f)
 	{
-		// Water reduces gravity, damps momentum and provides enough buoyancy to
-		// stop a fully submerged player from being pinned to a river bed.
 		const float horizontalDrag = std::exp(-2.6f * submersion * deltaTime);
 		const float verticalDrag = std::exp(-1.8f * submersion * deltaTime);
 		forces.velocity.x *= horizontalDrag;
@@ -132,8 +121,6 @@ void Player::swimUp(decltype(chunkGetterSignature) *chunkGetter)
 	const float submersion = getWaterSubmersion(chunkGetter);
 	if (submersion <= 0.f) { return; }
 
-	// Keep enough upward force at the water surface to climb onto a one-block
-	// river bank while Jump is held. Player::update caps the resulting speed.
 	forces.acceleration.y += 38.f * std::max(0.45f, submersion);
 	forces.velocity.y = std::min(forces.velocity.y, 7.f);
 }
@@ -171,9 +158,6 @@ glm::vec3 Player::getMaxColliderSize()
 	return glm::vec3(0.8, 1.8, 0.8);
 }
 
-
-
-//todo move update here
 void PlayerClient::update(float deltaTime, decltype(chunkGetterSignature) *chunkGetter)
 {
 	entityBuffered.update(deltaTime, chunkGetter);
@@ -181,10 +165,7 @@ void PlayerClient::update(float deltaTime, decltype(chunkGetterSignature) *chunk
 
 void PlayerClient::setEntityMatrix(glm::mat4 *skinningMatrix)
 {
-
-	//skinningMatrix[0] = skinningMatrix[0] * glm::toMat4(
-	//	glm::quatLookAt(glm::normalize(entityBuffered.lookDirectionAnimation), glm::vec3(0, 1, 0)));
-
+	(void)skinningMatrix;
 }
 
 int PlayerClient::getTextureIndex()
@@ -201,7 +182,6 @@ void PlayerServer::kill()
 	notIncreasedLifeSinceTimeSecconds = 0;
 	interactingWithBlock = 0;
 	revisionNumberInteraction = 0;
-	
 	effectsTimers = {};
 }
 
@@ -213,13 +193,11 @@ float PlayerServer::calculateHealingDelayTime()
 		PlayerInventory::MAX_EQUIPEMENT_SLOTS; i++)
 	{
 		auto item = inventory.getItemFromIndex(i, 0);
-
-		if (item->type == ItemTypes::bandage)
+		if (item && item->type == ItemTypes::bandage)
 		{
 			rez -= 5;
 		}
 	}
-
 
 	return std::max(rez, 0.f);
 }
@@ -229,15 +207,28 @@ float PlayerServer::calculateHealingRegenTime()
 	return BASE_HEALTH_REGEN_TIME;
 }
 
+short PlayerServer::getKnockBackResistance()
+{
+	return getPlayerStats(inventory).knockBackResistance;
+}
+
 EntityStats getPlayerStats(PlayerInventory &inventory)
 {
 	EntityStats rez;
 
-	//base player stats
-	rez.armour = 0;
+	// Base player modifier. Equipment is aggregated here so all systems consume
+	// one authoritative view of movement/combat/utility stats.
 	rez.runningSpeed = 8;
 
+	for (int i = PlayerInventory::EQUIPEMENT_START_INDEX;
+		i < PlayerInventory::EQUIPEMENT_START_INDEX + PlayerInventory::MAX_EQUIPEMENT_SLOTS; ++i)
+	{
+		Item *item = inventory.getItemFromIndex(i, 0);
+		if (!item || !item->type) { continue; }
+		EntityStats itemStats = item->getItemStats();
+		rez.add(itemStats);
+	}
 
-
+	rez.normalize();
 	return rez;
 }
