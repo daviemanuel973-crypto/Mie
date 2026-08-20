@@ -16,6 +16,8 @@
 #include <errorReporting.h>
 #include <biome.h>
 #include <multyPlayer/chunkSaver.h>
+#include <multyPlayer/serverChunkStorer.h>
+#include <multyPlayer/serverActionValidation.h>
 #include <worldGenerator.h>
 #include <fstream>
 #include <sstream>
@@ -211,6 +213,54 @@ void sendPlayerExitInteraction(Client &client, unsigned char revisionNumber)
 	sendPacket(client.peer, packet,
 		(char *)&packetData, sizeof(Packet_RecieveExitBlockInteraction),
 		true, channelChunksAndBlocks);
+}
+
+namespace
+{
+	bool blockActionPositionIsValidForClient(const Client &client, const glm::ivec3 &position)
+	{
+		return mie::serverValidation::isServerBlockActionPositionValid(
+			client.playerData.entity.position, position);
+	}
+
+	void sendAuthoritativeBlockState(Client &client, const glm::ivec3 &position)
+	{
+		if (!mie::serverValidation::isWorldBlockPositionSane(position)) { return; }
+
+		Block *block = getServerChunkStorer().getBlockSafe(position);
+		if (!block) { return; }
+
+		Packet packet = {};
+		packet.header = headerPlaceBlocks;
+
+		Packet_PlaceBlocks packetData = {};
+		packetData.blockPos = position;
+		packetData.blockInfo = *block;
+
+		sendPacket(client.peer, packet,
+			reinterpret_cast<const char *>(&packetData), sizeof(packetData),
+			true, channelChunksAndBlocks);
+	}
+
+	void rejectBlockMutation(Client &client, const EventId &eventId,
+		const glm::ivec3 &position, bool resyncInventory)
+	{
+		computeRevisionStuff(client, false, eventId);
+		if (resyncInventory)
+		{
+			sendPlayerInventoryAndIncrementRevision(client);
+		}
+		sendAuthoritativeBlockState(client, position);
+	}
+
+	bool isSpawnEggItem(unsigned short itemType)
+	{
+		return itemType == ItemTypes::pigSpawnEgg ||
+			itemType == ItemTypes::zombieSpawnEgg ||
+			itemType == ItemTypes::catSpawnEgg ||
+			itemType == ItemTypes::goblinSpawnEgg ||
+			itemType == ItemTypes::scareCrowSpawnEgg;
+	}
 }
 
 void updatePlayerEffects(Client &client)
@@ -490,15 +540,14 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerClientDroppedChunk:
 		{
-			Packet_ClientDroppedChunk packetData = *(Packet_ClientDroppedChunk *)data;
-
-			if (sizeof(Packet_ClientDroppedChunk) != size)
+			if (!data || size != sizeof(Packet_ClientDroppedChunk))
 			{
-				//todo hard reset on fail
 				reportError("corrupted packet or something Packet_ClientDroppedChunk");
 				break;
 			}
 
+			const Packet_ClientDroppedChunk packetData =
+				*reinterpret_cast<const Packet_ClientDroppedChunk *>(data);
 			connection->second.loadedChunks.erase(packetData.chunkPos);
 
 			break;
@@ -506,7 +555,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerClientDroppedAllChunks:
 		{
-		
+			if (size != 0) { break; }
 			connection->second.loadedChunks.clear();
 
 			break;
@@ -514,7 +563,21 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerPlaceBlock:
 		{
-			Packet_ClientPlaceBlock packetData = *(Packet_ClientPlaceBlock *)data;
+			if (!data || size != sizeof(Packet_ClientPlaceBlock))
+			{
+				reportError("corrupted packet or something Packet_ClientPlaceBlock");
+				break;
+			}
+
+			const Packet_ClientPlaceBlock packetData =
+				*reinterpret_cast<const Packet_ClientPlaceBlock *>(data);
+			if (!blockActionPositionIsValidForClient(connection->second, packetData.blockPos))
+			{
+				rejectBlockMutation(connection->second, packetData.eventId,
+					packetData.blockPos, true);
+				break;
+			}
+
 			serverTask.t.taskType = Task::placeBlock;
 			serverTask.t.pos = {packetData.blockPos};
 			serverTask.t.blockType = {packetData.blockType};
@@ -528,7 +591,21 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerPlaceBlockForce:
 		{
-			Packet_ClientPlaceBlockForce packetData = *(Packet_ClientPlaceBlockForce *)data;
+			if (!data || size != sizeof(Packet_ClientPlaceBlockForce))
+			{
+				reportError("corrupted packet or something Packet_ClientPlaceBlockForce");
+				break;
+			}
+
+			const Packet_ClientPlaceBlockForce packetData =
+				*reinterpret_cast<const Packet_ClientPlaceBlockForce *>(data);
+			if (!blockActionPositionIsValidForClient(connection->second, packetData.blockPos))
+			{
+				rejectBlockMutation(connection->second, packetData.eventId,
+					packetData.blockPos, false);
+				break;
+			}
+
 			serverTask.t.taskType = Task::placeBlockForce;
 			serverTask.t.pos = packetData.blockPos;
 			serverTask.t.block = packetData.block;
@@ -542,10 +619,19 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		{
 			if (!data || size != sizeof(Packet_ClientBreakBlock))
 			{
+				reportError("corrupted packet or something Packet_ClientBreakBlock");
 				break;
 			}
 
-			Packet_ClientBreakBlock packetData = *(Packet_ClientBreakBlock *)data;
+			const Packet_ClientBreakBlock packetData =
+				*reinterpret_cast<const Packet_ClientBreakBlock *>(data);
+			if (!blockActionPositionIsValidForClient(connection->second, packetData.blockPos))
+			{
+				rejectBlockMutation(connection->second, packetData.eventId,
+					packetData.blockPos, true);
+				break;
+			}
+
 			serverTask.t.taskType = Task::breakBlock;
 			serverTask.t.pos = {packetData.blockPos};
 			serverTask.t.eventId = packetData.eventId;
@@ -630,7 +716,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		//todo inventory revision here
 		case headerClientDroppedItem:
 		{
-			if (size != sizeof(Packet_ClientDroppedItem))
+			if (!data || size != sizeof(Packet_ClientDroppedItem))
 			{
 				//error checking + kick clients that send corrupted data? hard reset
 				reportError("corrupted packet or something Packet_ClientDroppedItem");
@@ -658,10 +744,10 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		//inventory stuff
 		case headerClientMovedItem:
 		{
-			if (size != sizeof(Packet_ClientMovedItem))
+			if (!data || size != sizeof(Packet_ClientMovedItem))
 			{
 				//todo hard reset on errors.
-				reportError("corrupted packet or something Packet_ClientDroppedItem");
+				reportError("corrupted packet or something Packet_ClientMovedItem");
 				break;
 			}
 			Packet_ClientMovedItem *packetData = (Packet_ClientMovedItem *)data;
@@ -680,7 +766,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		case headerClientCraftedItem:
 		{
 
-			if (size != sizeof(Packet_ClientCraftedItem))
+			if (!data || size != sizeof(Packet_ClientCraftedItem))
 			{
 				//todo hard reset on errors.
 				reportError("corrupted packet or something Packet_ClientCraftedItem");
@@ -699,7 +785,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerClientOverWriteItem:
 		{
-			if (size < sizeof(Packet_ClientOverWriteItem))
+			if (!data || size < sizeof(Packet_ClientOverWriteItem))
 			{
 				break;
 			}
@@ -713,7 +799,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 			int metaDataSize = packetData->metadataSize;
 
-			if (size - sizeof(Packet_ClientOverWriteItem) != metaDataSize)
+			if (size - sizeof(Packet_ClientOverWriteItem) != static_cast<size_t>(metaDataSize))
 			{
 				//todo hard reset on errors.
 				break;
@@ -729,7 +815,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerClientSwapItems:
 		{
-			if (size != sizeof(Packet_ClientSwapItems))
+			if (!data || size != sizeof(Packet_ClientSwapItems))
 			{
 				break; //todo hard reset stuff everywhere
 			}
@@ -749,12 +835,30 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		case headerClientUsedItem:
 		{
 
-			if (size != sizeof(Packet_ClientUsedItem))
+			if (!data || size != sizeof(Packet_ClientUsedItem))
 			{
 				break;
 			}
 
 			Packet_ClientUsedItem *packetData = (Packet_ClientUsedItem *)data;
+			Item requestedItem(packetData->itemType);
+			const bool mutatesBlock = requestedItem.isPaint();
+			const bool positionalServerUse = mutatesBlock || isSpawnEggItem(packetData->itemType);
+			if (positionalServerUse &&
+				!blockActionPositionIsValidForClient(connection->second, packetData->position))
+			{
+				if (mutatesBlock)
+				{
+					rejectBlockMutation(connection->second, packetData->eventId,
+						packetData->position, true);
+				}
+				else
+				{
+					sendPlayerInventoryNotIncrementRevision(connection->second);
+				}
+				break;
+			}
+
 			serverTask.t.taskType = Task::clientUsedItem;
 			serverTask.t.from = packetData->from;
 			serverTask.t.itemType = packetData->itemType;
@@ -769,12 +873,18 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		case headerClientInteractWithBlock:
 		{
 
-			if (size != sizeof(Packet_ClientInteractWithBlock))
+			if (!data || size != sizeof(Packet_ClientInteractWithBlock))
 			{
 				break;
 			}
 
 			Packet_ClientInteractWithBlock *packetData = (Packet_ClientInteractWithBlock *)data;
+			if (!blockActionPositionIsValidForClient(connection->second, packetData->blockPos))
+			{
+				sendPlayerExitInteraction(connection->second, packetData->interactionCounter);
+				break;
+			}
+
 			serverTask.t.taskType = Task::clientInteractedWithBlock;
 			serverTask.t.blockType = packetData->blockType;
 			serverTask.t.pos = packetData->blockPos;
@@ -786,7 +896,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerRecieveExitBlockInteraction:
 		{
-			if (size != sizeof(Packet_RecieveExitBlockInteraction))
+			if (!data || size != sizeof(Packet_RecieveExitBlockInteraction))
 			{
 				break;
 			}
@@ -802,7 +912,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerSendPlayerSkin:
 		{
-			if (size > 4 * PLAYER_SKIN_SIZE * PLAYER_SKIN_SIZE) { break; }
+			if (!data || size > 4 * PLAYER_SKIN_SIZE * PLAYER_SKIN_SIZE) { break; }
 
 			connection->second.skinData.resize(size);
 			memcpy(connection->second.skinData.data(), data, size);
@@ -833,7 +943,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerAttackEntity:
 		{
-			if (size != sizeof(Packet_AttackEntity))
+			if (!data || size != sizeof(Packet_AttackEntity))
 			{
 				break;
 			}
@@ -867,7 +977,6 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 			{
 				break;
 			}
-
 			serverTask.t.taskType = Task::clientWantsToRespawn;
 			serverTasks.push_back(serverTask);
 			break;
@@ -875,7 +984,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerClientDamageLocally:
 		{
-			if (size != sizeof(Packet_ClientDamageLocally))
+			if (!data || size != sizeof(Packet_ClientDamageLocally))
 			{
 				break;
 			}
@@ -894,7 +1003,6 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 			{
 				break;
 			}
-
 			serverTask.t.taskType = Task::clientRecievedDamageLocallyAndDied;
 			serverTasks.push_back(serverTask);
 			break;
@@ -903,11 +1011,9 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		case headerSendChat:
 		{
 
-			if (size == 0) { break; }
+			if (!data || size == 0) { break; }
 			if (size > 260) { break; } //we ignore messages that are too big.
 			data[size - 1] = 0; //making sure the packet is null terminated!
-
-			//std::cout << "Chat: " << (char *)data << "\n";
 
 			if (size > 1 && data[0] == '/')
 			{
@@ -935,12 +1041,16 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerClientChangeBlockData:
 		{
-			int a = 0;
-			//todo a hard reset if this fails because it has to do with block syncs
-			if (size < sizeof(Packet_ClientChangeBlockData)) { break; }
+			if (!data || size < sizeof(Packet_ClientChangeBlockData)) { break; }
 
 			Packet_ClientChangeBlockData *blockData = (Packet_ClientChangeBlockData*)data;
 			if (blockData->blockDataHeader.dataSize != size - sizeof(Packet_ClientChangeBlockData)) { break; }
+			if (!blockActionPositionIsValidForClient(connection->second, blockData->blockDataHeader.pos))
+			{
+				rejectBlockMutation(connection->second, blockData->eventId,
+					blockData->blockDataHeader.pos, false);
+				break;
+			}
 
 			serverTask.t.taskType = Task::clientChangedBlockData;
 			serverTask.t.eventId = blockData->eventId;
@@ -1004,20 +1114,17 @@ void calculatePendingPacketsMetrics()
 
 		enet_uint16 lastSent = peer->outgoingReliableSequenceNumber;
 		ENetListNode *current = peer->sentReliableCommands.sentinel.next;
-		// Iterate over the list until the sentinel node is reached
-			while (current != &peer->sentReliableCommands.sentinel)
+		while (current != &peer->sentReliableCommands.sentinel)
+		{
+			ENetOutgoingCommand *command = (ENetOutgoingCommand *)current;
+
+			if (command->reliableSequenceNumber > 0)
 			{
-				ENetOutgoingCommand *command = (ENetOutgoingCommand *)current;
-
-				// Count reliable commands (reliableSequenceNumber > 0 indicates a reliable command)
-				if (command->reliableSequenceNumber > 0)
-				{
-					++pendingReliableCount;
-				}
-
-				// Move to the next node in the list
-				current = current->next;
+				++pendingReliableCount;
 			}
+
+			current = current->next;
+		}
 
 		totalSize += peer->totalWaitingData;
 	}
@@ -1033,23 +1140,13 @@ void enetServerFunction(std::string path)
 
 	//todo load from file or something
 	entityIds.create();
-	//if (!worldSaver.loadEntityId(entityId))
-	//{
-	//	//todo try to fix corupted data here.
-	//	entityId = RESERVED_CLIENTS_ID + 1;
-	//}else
-	//if (entityId < RESERVED_CLIENTS_ID + 1)
-	//{
-	//	entityId = RESERVED_CLIENTS_ID + 1;
-	//}
-
 
 	StructuresManager structuresManager;
 	BiomesManager biomesManager;
 	WorldSaver worldSaver;
 	serverProfiler = Profiler{};
 
-	worldSaver.savePath = USER_CONTENT_PATH "worlds/"; //"saves/";
+	worldSaver.savePath = USER_CONTENT_PATH "worlds/";
 	worldSaver.savePath += path + "/world";
 	WorldDifficultySettings difficultySettings;
 	const auto worldRoot = std::filesystem::path(USER_CONTENT_PATH "worlds/") / path;
@@ -1071,7 +1168,6 @@ void enetServerFunction(std::string path)
 		if (err) 
 		{ 
 			std::cout << err << "\n";
-			//todo error report and close this thing gracefully please
 			exit(0); 
 		}
 	}
@@ -1080,11 +1176,11 @@ void enetServerFunction(std::string path)
 	
 	if (!structuresManager.loadAllStructures())
 	{
-		exit(0); //todo error out
+		exit(0);
 	}
 	if (!biomesManager.loadAllBiomes())
 	{
-		exit(0); //todo error out
+		exit(0);
 	}
 
 	WorldGenerator wg;
@@ -1092,7 +1188,6 @@ void enetServerFunction(std::string path)
 	ENetEvent event = {};
 
 
-	//todo will remove later!
 	std::ifstream seedFile(std::string(USER_CONTENT_PATH "worlds/") + path + "/seed.txt");
 	if (!seedFile.is_open())
 	{
@@ -1111,7 +1206,7 @@ void enetServerFunction(std::string path)
 			else
 			{
 				std::cout << "NOISE LOADING ERROR";
-				exit(0); //todo error out
+				exit(0);
 			}
 			worldSettingsFile.close();
 		}
@@ -1142,18 +1237,15 @@ void enetServerFunction(std::string path)
 			else
 			{
 				std::cout << "NOISE LOADING ERROR";
-				exit(0); //todo error out
+				exit(0);
 			}
 			f.close();
 		}
 		else
 		{
-			exit(0); //todo error out
+			exit(0);
 		}
 	}
-
-
-
 
 
 	auto start = std::chrono::high_resolution_clock::now();
@@ -1168,7 +1260,6 @@ void enetServerFunction(std::string path)
 	serverTasks.reserve(100);
 
 
-	//run the server for one tick
 	serverWorkerUpdate(wg, structuresManager, biomesManager,
 		worldSaver, serverTasks, (1.f/targetTicksPerSeccond) + 0.01, serverProfiler);
 
@@ -1184,9 +1275,6 @@ void enetServerFunction(std::string path)
 		serverProfiler.startFrame();
 
 		auto settings = getServerSettingsCopy();
-
-		//int waitTimer = ((1.f/settings.targetTicksPerSeccond)-tickTimer) * 1000;
-		//waitTimer = std::max(std::min(waitTimer-1, 10), 0);
 		
 		serverProfiler.startSubProfile("Recieve Network Updates");
 		int waitTime = 1;
@@ -1194,7 +1282,6 @@ void enetServerFunction(std::string path)
 		while (((enet_host_service(server, &event, waitTime) > 0) || (waitTime=0, tries-- > 0) ) 
 			&& enetServerRunning)
 		{
-			//we wait only the first time, than we want to let the server update happen.
 			waitTime = 0;
 
 			switch (event.type)
@@ -1252,7 +1339,6 @@ void enetServerFunction(std::string path)
 		{
 
 			sentTimerUpdateTimer -= deltaTime;
-
 			if (sentTimerUpdateTimer < 0)
 			{
 				sentTimerUpdateTimer = 1.f;
@@ -1268,15 +1354,13 @@ void enetServerFunction(std::string path)
 
 			}
 
-
-
 		}
 	#pragma endregion
 
-	serverWorkerUpdate(wg, structuresManager, biomesManager,
-		worldSaver, serverTasks, deltaTime, serverProfiler);
+		serverWorkerUpdate(wg, structuresManager, biomesManager,
+			worldSaver, serverTasks, deltaTime, serverProfiler);
 
-	calculatePendingPacketsMetrics();
+		calculatePendingPacketsMetrics();
 
 		serverProfiler.endFrame();
 	}
