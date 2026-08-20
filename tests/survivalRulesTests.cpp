@@ -3,6 +3,7 @@
 #include <gameplay/entityId.h>
 #include <gameplay/environmentMotion.h>
 #include <gameplay/combatBalance.h>
+#include <multyPlayer/serverActionValidation.h>
 
 #include <cmath>
 #include <cstdlib>
@@ -80,6 +81,21 @@ int main()
 	REQUIRE(std::abs(getKnockBackResistanceMultiplier(100.f)) < 0.0001f);
 	REQUIRE(std::abs(getKnockBackResistanceMultiplier(-100.f) - 2.f) < 0.0001f);
 	REQUIRE(std::abs(getKnockBackResistanceMultiplier(-1000.f) - 4.f) < 0.0001f);
+
+	// v0.9.3: the server must never accept block actions at arbitrary distance
+	// or outside the valid world height. Normal 20-block client raycasts remain valid.
+	using namespace mie::serverValidation;
+	REQUIRE(isWorldBlockPositionSane({-250000, 0, 125000}));
+	REQUIRE(isWorldBlockPositionSane({0, CHUNK_HEIGHT - 1, 0}));
+	REQUIRE(!isWorldBlockPositionSane({0, -1, 0}));
+	REQUIRE(!isWorldBlockPositionSane({0, CHUNK_HEIGHT, 0}));
+	REQUIRE(!isWorldBlockPositionSane({30000001, 64, 0}));
+	REQUIRE(isBlockActionWithinReach({0.0, 64.0, 0.0}, {20, 64, 0}));
+	REQUIRE(isBlockActionWithinReach({0.0, 64.0, 0.0}, {21, 64, 0}));
+	REQUIRE(!isBlockActionWithinReach({0.0, 64.0, 0.0}, {30, 64, 0}));
+	REQUIRE(!isBlockActionWithinReach({NAN, 64.0, 0.0}, {0, 64, 0}));
+	REQUIRE(isServerBlockActionPositionValid({-100.0, 80.0, -100.0}, {-100, 80, -100}));
+	REQUIRE(!isServerBlockActionPositionValid({0.0, 64.0, 0.0}, {0, CHUNK_HEIGHT, 0}));
 
 	std::cout << "Survival rule tests passed.\n";
 	return 0;
