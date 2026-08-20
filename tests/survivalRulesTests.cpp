@@ -4,6 +4,7 @@
 #include <gameplay/environmentMotion.h>
 #include <gameplay/combatBalance.h>
 #include <multyPlayer/serverActionValidation.h>
+#include <multyPlayer/dataIntegrity.h>
 
 #include <cmath>
 #include <cstdlib>
@@ -96,6 +97,29 @@ int main()
 	REQUIRE(!isBlockActionWithinReach({NAN, 64.0, 0.0}, {0, 64, 0}));
 	REQUIRE(isServerBlockActionPositionValid({-100.0, 80.0, -100.0}, {-100, 80, -100}));
 	REQUIRE(!isServerBlockActionPositionValid({0.0, 64.0, 0.0}, {0, CHUNK_HEIGHT, 0}));
+
+	// v0.9.3.1: entities that step beyond an unloaded streaming boundary are
+	// retained inside the last authoritative chunk instead of being discarded.
+	const glm::ivec2 retainedChunk{2, -3};
+	const glm::dvec3 escapedPosition{
+		static_cast<double>((retainedChunk.x + 1) * CHUNK_SIZE) + 4.0,
+		64.0,
+		static_cast<double>(retainedChunk.y * CHUNK_SIZE) - 4.0};
+	const glm::dvec3 clampedPosition = mie::dataIntegrity::clampEntityPositionToChunk(
+		escapedPosition, retainedChunk);
+	REQUIRE(determineChunkThatIsEntityIn(clampedPosition) == retainedChunk);
+
+	REQUIRE(mie::dataIntegrity::isDroppedItemSpawnPositionValid(
+		{0.0, 64.0, 0.0}, {3.0, 64.0, 2.0}));
+	REQUIRE(!mie::dataIntegrity::isDroppedItemSpawnPositionValid(
+		{0.0, 64.0, 0.0}, {20.0, 64.0, 0.0}));
+	REQUIRE(!mie::dataIntegrity::isDroppedItemSpawnPositionValid(
+		{0.0, 64.0, 0.0}, {NAN, 64.0, 0.0}));
+
+	const auto collisionQuery = mie::dataIntegrity::makeBlockPlacementCollisionQuery(
+		{128.0, 70.0, -64.0}, {0.8f, 1.8f, 0.8f}, {4, 70, 9});
+	REQUIRE(collisionQuery.entityPosition == glm::dvec3(128.0, 70.0, -64.0));
+	REQUIRE(collisionQuery.blockPosition == glm::ivec3(4, 70, 9));
 
 	std::cout << "Survival rule tests passed.\n";
 	return 0;

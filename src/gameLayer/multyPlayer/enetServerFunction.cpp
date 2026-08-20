@@ -32,6 +32,7 @@
 #include <unordered_set>
 #include <cmath>
 #include <algorithm>
+#include <multyPlayer/entityIdAllocator.h>
 
 //todo add to a struct
 ENetHost *server = 0;
@@ -41,6 +42,7 @@ std::unordered_set<ENetPeer *> pendingConnections;
 static std::thread enetServerThread;
 
 EntityIdHolder entityIds;
+static PersistentEntityIdAllocator persistentEntityIds;
 
 
 std::uint64_t getEntityIdAndIncrement(WorldSaver &worldSaver, int entityType)
@@ -48,25 +50,20 @@ std::uint64_t getEntityIdAndIncrement(WorldSaver &worldSaver, int entityType)
 	permaAssert(entityType < EntitiesTypesCount);
 	permaAssert(entityType >= 0);
 
-	std::uint64_t id = entityIds.entityIds[entityType];
-	entityIds.entityIds[entityType]++;
-
-	permaAssertComment(id < (0x00FFFFFF'FFFFFFFF), "Server ran out of ids somehow...");
-
-	id |= ((std::uint64_t)((unsigned char)entityType)) << 56;
-
-	//TODO!
-	//worldSaver.saveEntityId(entityId);
-
-	return id;
+	const std::uint64_t rawId = persistentEntityIds.allocate(worldSaver.savePath,
+		static_cast<unsigned int>(entityType));
+	permaAssertComment(rawId != 0 && rawId < 0x00FFFFFFFFFFFFFFULL,
+		"Server could not reserve a persistent entity ID");
+	entityIds.entityIds[entityType] = std::max(entityIds.entityIds[entityType], rawId + 1);
+	return rawId | (static_cast<std::uint64_t>(static_cast<unsigned char>(entityType)) << 56);
 }
 
 std::uint64_t getCurrentEntityId(int entityType)
 {
 	permaAssert(entityType < EntitiesTypesCount);
 	permaAssert(entityType >= 0);
-
-	return entityIds.entityIds[entityType];
+	return std::max(entityIds.entityIds[entityType],
+		persistentEntityIds.peek(static_cast<unsigned int>(entityType)));
 }
 
 void reserveEntityId(std::uint64_t entityId)
@@ -74,10 +71,10 @@ void reserveEntityId(std::uint64_t entityId)
 	const unsigned int entityType = getEntityTypeFromEID(entityId);
 	if (entityType >= EntitiesTypesCount) { return; }
 	const std::uint64_t rawId = getOnlyIdFromEID(entityId);
-	if (rawId >= entityIds.entityIds[entityType] && rawId < 0x00FFFFFFFFFFFFFFULL)
-	{
-		entityIds.entityIds[entityType] = rawId + 1;
-	}
+	if (rawId >= 0x00FFFFFFFFFFFFFFULL) { return; }
+
+	persistentEntityIds.observe(entityId);
+	entityIds.entityIds[entityType] = std::max(entityIds.entityIds[entityType], rawId + 1);
 }
 
 void broadCastNotLocked(Packet p, void *data, size_t size, ENetPeer *peerToIgnore, 

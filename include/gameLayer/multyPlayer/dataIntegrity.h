@@ -40,4 +40,18 @@ namespace mie::dataIntegrity
 		const glm::dvec3 delta = dropPosition - playerPosition;
 		return glm::dot(delta, delta) <= MaximumDroppedItemDistance * MaximumDroppedItemDistance;
 	}
+
+	struct BlockPlacementCollisionQuery
+	{
+		glm::dvec3 entityPosition = {};
+		glm::vec3 colliderSize = {};
+		glm::ivec3 blockPosition = {};
+	};
+
+	inline BlockPlacementCollisionQuery makeBlockPlacementCollisionQuery(
+		const glm::dvec3 &entityPosition, const glm::vec3 &colliderSize,
+		const glm::ivec3 &blockPosition)
+	{
+		return {entityPosition, colliderSize, blockPosition};
+	}
 }

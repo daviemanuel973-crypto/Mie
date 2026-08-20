@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current development version: v0.9.2**
+**Current development version: v0.9.3.1**
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -19,6 +19,20 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.9.3.1 data-integrity hotfix
+
+v0.9.3.1 is a corrective release for persistence and authoritative-world integrity. It adds no new content.
+
+- Persisted entity sidecars are restored only for chunks whose terrain was actually restored from disk.
+- Entity and block-data sidecars use transactional temp/backup writes; failed writes stay dirty and block chunk unload until persistence succeeds.
+- Non-player entities are retained at the last loaded chunk boundary instead of disappearing when simulation outruns streaming.
+- Player item drops are validated against the authoritative player position and consume inventory only after the server-side dropped entity is created.
+- Entity IDs reserve persistent high-water ranges before reuse, with backup recovery and a high migration floor for legacy worlds.
+- Placed-block collision checks now keep the target block position separate from the entity position.
+- Save IDs, item/block IDs and multiplayer packet layouts remain unchanged from v0.9.3.
+
+See [`docs/V0.9.3.1_DATA_INTEGRITY.md`](docs/V0.9.3.1_DATA_INTEGRITY.md).
 
 ## v0.9.2 gameplay & performance
 

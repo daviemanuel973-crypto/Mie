@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <multyPlayer/doHittingThings.h>
 #include <gameplay/lootTables.h>
+#include <multyPlayer/dataIntegrity.h>
 
 template<class T>
 void genericCheckEntitiesForCollisions(T &container, std::vector<ColidableEntry> &ret, glm::dvec3 position,
@@ -227,6 +228,8 @@ SavedChunk *ServerChunkStorer::getOrCreateChunk(int posX, int posZ,
 		//std::cout << "Loaded!\n";
 
 		worldSaver.loadBlockData(*rez);
+		worldSaver.loadEntityData(rez->entityData, pos);
+		indexEntityChunkPositionsForChunk(*rez);
 		if (rez->normalize())
 		{
 			rez->otherData.dirty = true;
@@ -277,11 +280,9 @@ SavedChunk *ServerChunkStorer::getOrCreateChunk(int posX, int posZ,
 
 #pragma region load entities
 
-	for (auto &c : newCreatedChunks)
-	{
-		worldSaver.loadEntityData(c.second->entityData, c.first);
-		indexEntityChunkPositionsForChunk(*c.second);
-	}
+	// Persisted entity sidecars are restored only when their chunk geometry was
+	// successfully restored above. Freshly generated chunks must never revive a
+	// stale .entity file left behind by a missing/corrupt chunk.
 
 #pragma endregion
 
@@ -1490,125 +1491,127 @@ void ServerChunkStorer::cleanup()
 
 bool ServerChunkStorer::saveNextChunk(WorldSaver &worldSaver, int count, int entitySaver)
 {
-	int blockDataCounter = count + 1; //we can afford to save a little more blockData stuff
+	int blockDataCounter = count + 1;
+	bool succeeded = false;
 
-	bool succeeded = 0;
-	for (auto &c : savedChunks)
+	for (auto &entry : savedChunks)
 	{
-		if (c.second->otherData.dirty && count > 0)
-		{
-			//std::cout << "Saved next chunk!\n";
-			saveChunk(worldSaver, c.second);
+		SavedChunk *chunk = entry.second;
+		if (!chunk) { continue; }
 
-			if (c.second->otherData.dirtyBlockData)
+		if (chunk->otherData.dirty && count > 0)
+		{
+			saveChunk(worldSaver, chunk);
+			if (!chunk->otherData.dirty)
 			{
-				saveChunkBlockData(worldSaver, c.second);
-				blockDataCounter--;
+				succeeded = true;
+				--count;
 			}
-
-			succeeded = true;
-
-			count--;
 		}
-		else if (c.second->otherData.dirtyEntity && entitySaver > 0)
+
+		if (chunk->otherData.dirtyEntity && entitySaver > 0)
 		{
-			worldSaver.saveEntitiesForChunk(*c.second);
-			c.second->otherData.dirtyEntity = 0;
-			succeeded = true;
+			if (worldSaver.saveEntitiesForChunk(*chunk))
+			{
+				chunk->otherData.dirtyEntity = false;
+				succeeded = true;
+				--entitySaver;
+			}
+		}
 
-			entitySaver--;
-		}
-		else if (c.second->otherData.dirtyBlockData && blockDataCounter > 0)
+		if (chunk->otherData.dirtyBlockData && blockDataCounter > 0)
 		{
-			saveChunkBlockData(worldSaver, c.second);
-			blockDataCounter--;
-			succeeded = true;
+			if (worldSaver.saveChunkBlockData(*chunk))
+			{
+				chunk->otherData.dirtyBlockData = false;
+				succeeded = true;
+				--blockDataCounter;
+			}
 		}
-		else if(count <= 0 && entitySaver <= 0 && blockDataCounter <= 0)
-		{ break; }
+
+		if (count <= 0 && entitySaver <= 0 && blockDataCounter <= 0) { break; }
 	}
 
 	return succeeded;
 }
 
-
-
-void ServerChunkStorer::saveChunk(WorldSaver &worldSaver, SavedChunk *savedChunks)
+void ServerChunkStorer::saveChunk(WorldSaver &worldSaver, SavedChunk *savedChunk)
 {
-	const bool savedChunkData = worldSaver.saveChunk(savedChunks->chunk);
-	worldSaver.saveEntitiesForChunk(*savedChunks);
-	// Keep failed writes dirty so the normal per-tick saver retries them.
-	if (savedChunkData) { savedChunks->otherData.dirty = false; }
-	savedChunks->otherData.dirtyEntity = false;
+	const bool savedChunkData = worldSaver.saveChunk(savedChunk->chunk);
+	const bool savedEntities = worldSaver.saveEntitiesForChunk(*savedChunk);
+	if (savedChunkData) { savedChunk->otherData.dirty = false; }
+	if (savedEntities) { savedChunk->otherData.dirtyEntity = false; }
+	else { savedChunk->otherData.dirtyEntity = true; }
 }
 
-void ServerChunkStorer::saveChunkBlockData(WorldSaver &worldSaver, SavedChunk *savedChunks)
+void ServerChunkStorer::saveChunkBlockData(WorldSaver &worldSaver, SavedChunk *savedChunk)
 {
-	worldSaver.saveChunkBlockData(*savedChunks);
-	savedChunks->otherData.dirtyBlockData = false;
+	if (worldSaver.saveChunkBlockData(*savedChunk))
+	{
+		savedChunk->otherData.dirtyBlockData = false;
+	}
 }
-
-
 
 void ServerChunkStorer::saveAllChunks(WorldSaver &worldSaver)
 {
-	for (auto &c : savedChunks)
+	for (auto &entry : savedChunks)
 	{
-		if (c.second->otherData.dirty)
-		{
-			//std::cout << "Saved chunk\n";
-			saveChunk(worldSaver, c.second);
-		}
-		else
-		{
-			//std::cout << "Saved entities\n";
-			worldSaver.saveEntitiesForChunk(*c.second);
-			c.second->otherData.dirtyEntity = false;
-		}
+		SavedChunk *chunk = entry.second;
+		if (!chunk) { continue; }
+		if (chunk->otherData.dirty) { saveChunk(worldSaver, chunk); }
+		else if (worldSaver.saveEntitiesForChunk(*chunk)) { chunk->otherData.dirtyEntity = false; }
+		else { chunk->otherData.dirtyEntity = true; }
+
+		if (chunk->otherData.dirtyBlockData) { saveChunkBlockData(worldSaver, chunk); }
 	}
 }
 
 int ServerChunkStorer::unloadChunksThatNeedUnloading(WorldSaver &worldSaver, int count)
 {
-	//todo optimize, this seems to take an unnecessarily long time
 	int unloaded = 0;
 	for (auto it = savedChunks.begin(); it != savedChunks.end(); )
 	{
-		auto &c = *it;
-		if (c.second->otherData.shouldUnload)
+		auto &entry = *it;
+		SavedChunk *chunk = entry.second;
+		if (!chunk || !chunk->otherData.shouldUnload)
 		{
+			++it;
+			continue;
+		}
 
-			removeEntityChunkPositionsForChunk(*c.second);
-
-			if (c.second->otherData.dirty)
-			{
-				saveChunk(worldSaver, c.second);
-				if (c.second->otherData.dirty)
-				{
-					// Do not discard an unsaved chunk. Leave it loaded and retry later.
-					++it;
-					continue;
-				}
-			}
-			else
-			{
-				// Entity state can change without block data becoming dirty.
-				worldSaver.saveEntitiesForChunk(*c.second);
-				c.second->otherData.dirtyEntity = false;
-			}
-
-			delete c.second;
-			it = savedChunks.erase(it); // Erase the element
-
-			unloaded++;
-			if (unloaded >= count) break;
+		if (chunk->otherData.dirty)
+		{
+			saveChunk(worldSaver, chunk);
 		}
 		else
 		{
-			it++;
+			// Entity motion/state can change even when block data did not.
+			if (worldSaver.saveEntitiesForChunk(*chunk)) { chunk->otherData.dirtyEntity = false; }
+			else { chunk->otherData.dirtyEntity = true; }
 		}
-	}
 
+		if (chunk->otherData.dirtyEntity)
+		{
+			if (worldSaver.saveEntitiesForChunk(*chunk)) { chunk->otherData.dirtyEntity = false; }
+		}
+		if (chunk->otherData.dirtyBlockData)
+		{
+			saveChunkBlockData(worldSaver, chunk);
+		}
+
+		if (chunk->otherData.dirty || chunk->otherData.dirtyEntity || chunk->otherData.dirtyBlockData)
+		{
+			++it;
+			continue;
+		}
+
+		// Never remove index entries before every pending persistence write succeeds.
+		removeEntityChunkPositionsForChunk(*chunk);
+		delete chunk;
+		it = savedChunks.erase(it);
+		++unloaded;
+		if (unloaded >= count) { break; }
+	}
 	return unloaded;
 }
 
@@ -1634,11 +1637,13 @@ std::uint64_t genericCheckEntitiesForCollisionWithBlock(T &container, glm::ivec3
 
 		for (auto &e : container)
 		{
-			glm::dvec3 position = e.second.getPosition();
+			glm::dvec3 entityPosition = e.second.getPosition();
 
-			if constexpr (hasGetColliderOffset<decltype(e.second.entity)>) { position += e.second.entity.getColliderOffset(); }
+			if constexpr (hasGetColliderOffset<decltype(e.second.entity)>) { entityPosition += e.second.entity.getColliderOffset(); }
 
-			auto rez = boxColideBlock(position, e.second.entity.getColliderSize(), position);
+			const auto query = mie::dataIntegrity::makeBlockPlacementCollisionQuery(
+				entityPosition, e.second.entity.getColliderSize(), position);
+			auto rez = boxColideBlock(query.entityPosition, query.colliderSize, query.blockPosition);
 			
 			if (rez)
 			{

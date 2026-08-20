@@ -13,6 +13,7 @@
 #include <gameplay/food.h>
 #include <gameplay/worldDifficulty.h>
 #include <gameplay/itemDurability.h>
+#include <multyPlayer/dataIntegrity.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
@@ -1037,6 +1038,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								serverAllows = 0;
 							}
 
+							if (!mie::dataIntegrity::isDroppedItemSpawnPositionValid(
+								client->playerData.entity.position, i.t.doublePos))
+							{
+								serverAllows = false;
+							}
+
 
 							if (
 								getEntityTypeFromEID(i.t.entityId) != EntityType::droppedItems ||
@@ -1064,22 +1071,28 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 							auto newId = getEntityIdAndIncrement(worldSaver, EntityType::droppedItems);
 
-							if (computeRevisionStuff(*client, true && serverAllows, i.t.eventId,
+							if (computeRevisionStuff(*client, serverAllows, i.t.eventId,
 								&i.t.entityId, &newId))
 							{
-
-								//todo get or create chunk here, so we create a function that cant fail.
-								spawnDroppedItemEntity(chunkCache,
+								const bool spawned = spawnDroppedItemEntity(chunkCache,
 									worldSaver, i.t.blockCount, i.t.blockType, &from->metaData,
 									i.t.doublePos, i.t.motionState, newId,
 									computeRestantTimer(i.t.timer, getTimer()));
 
-								//std::cout << "restant: " << newEntity.restantTime << "\n";
-
-								//substract item from inventory
-								from->counter -= i.t.blockCount;
-								if (!from->counter) { *from = {}; }
-
+								if (spawned)
+								{
+									// Consume inventory only after the authoritative entity exists.
+									from->counter -= i.t.blockCount;
+									if (!from->counter) { *from = {}; }
+								}
+								else
+								{
+									serverAllows = false;
+								}
+							}
+							else
+							{
+								serverAllows = false;
 							}
 
 							if (!serverAllows)
@@ -2667,19 +2680,16 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							}
 							else
 							{
-								//std::cout << "Not Found!\n";
-
-								//the entity left the region, we move it out,
-								// so we save it to disk or to other chunks
-
-								auto found = chunkCache.entityChunkPositions.find(e.first);
-								if (found != chunkCache.entityChunkPositions.end())
-								{
-									chunkCache.entityChunkPositions.erase(found);
-								}
-
-								orphanContainer.insert(
-									{e.first, e.second});
+								// Do not let a simulated entity fall out of the loaded world and then
+								// disappear when the per-region orphan container is destroyed. Keep it
+								// inside the last authoritative loaded chunk until streaming catches up.
+								const glm::dvec3 clampedPosition = mie::dataIntegrity::clampEntityPositionToChunk(
+									e.second.getPosition(), initialChunk);
+								e.second.entity.position = clampedPosition;
+								e.second.entity.lastPosition = clampedPosition;
+								chunkCache.entityChunkPositions[e.first] = initialChunk;
+								++it;
+								continue;
 							}
 
 

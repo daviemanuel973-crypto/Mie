@@ -63,6 +63,171 @@ void saveAllEntitiesIntoOpenFile(std::ofstream &f, EntityData &entityData)
 
 }
 
+namespace
+{
+	std::string sidecarBackupPath(const std::string &fileName)
+	{
+		return fileName + ".bak";
+	}
+
+	std::string sidecarTempPath(const std::string &fileName)
+	{
+		return fileName + ".tmp";
+	}
+
+	bool removeSidecarAndBackup(const std::string &fileName)
+	{
+		bool success = true;
+		for (const std::string candidate : {fileName, sidecarBackupPath(fileName), sidecarTempPath(fileName)})
+		{
+			std::error_code error;
+			std::filesystem::remove(candidate, error);
+			if (error) { success = false; }
+		}
+		return success;
+	}
+
+	bool promoteSidecarTempFile(const std::string &tempFile, const std::string &fileName)
+	{
+		const std::string backupFile = sidecarBackupPath(fileName);
+		std::error_code error;
+		std::filesystem::remove(backupFile, error);
+		error.clear();
+
+		const bool hadPrimary = std::filesystem::exists(fileName, error) && !error;
+		error.clear();
+		if (hadPrimary)
+		{
+			std::filesystem::rename(fileName, backupFile, error);
+			if (error)
+			{
+				std::filesystem::remove(tempFile, error);
+				return false;
+			}
+		}
+
+		std::filesystem::rename(tempFile, fileName, error);
+		if (!error) { return true; }
+
+		std::error_code cleanupError;
+		std::filesystem::remove(tempFile, cleanupError);
+		if (hadPrimary && !std::filesystem::exists(fileName, cleanupError))
+		{
+			cleanupError.clear();
+			std::filesystem::rename(backupFile, fileName, cleanupError);
+		}
+		return false;
+	}
+
+	bool writeSidecarAtomically(const std::string &fileName,
+		const unsigned char *data, std::size_t size)
+	{
+		const std::string tempFile = sidecarTempPath(fileName);
+		{
+			std::ofstream file(tempFile, std::ios::binary | std::ios::trunc);
+			if (!file.is_open()) { return false; }
+			if (size) { file.write(reinterpret_cast<const char *>(data), static_cast<std::streamsize>(size)); }
+			file.flush();
+			if (!file.good())
+			{
+				file.close();
+				std::error_code error;
+				std::filesystem::remove(tempFile, error);
+				return false;
+			}
+		}
+		return promoteSidecarTempFile(tempFile, fileName);
+	}
+
+	enum class EntitySidecarLoadResult
+	{
+		missing,
+		loaded,
+		corrupt,
+	};
+
+	EntitySidecarLoadResult loadEntitySidecarCandidate(const std::string &fileName,
+		EntityData &entityData)
+	{
+		std::ifstream f(fileName, std::ios::binary);
+		if (!f.is_open()) { return EntitySidecarLoadResult::missing; }
+
+		for (;;)
+		{
+			if (f.peek() == std::ifstream::traits_type::eof())
+			{
+				return EntitySidecarLoadResult::loaded;
+			}
+
+			Marker marker = 0;
+			if (!readMarker(f, marker) || marker == 0)
+			{
+				return EntitySidecarLoadResult::corrupt;
+			}
+
+			std::uint64_t eid = 0;
+			if (!readEntityId(f, eid) || eid == 0)
+			{
+				return EntitySidecarLoadResult::corrupt;
+			}
+
+			bool success = false;
+			switch (marker)
+			{
+			case Markers::droppedItem:
+			{
+				DroppedItemServer item;
+				success = getEntityTypeFromEID(eid) == EntityType::droppedItems &&
+					item.loadFromDisk(f) && entityData.droppedItems.insert({eid, item}).second;
+			}
+			break;
+			case Markers::zombie:
+			{
+				ZombieServer zombie;
+				if (getEntityTypeFromEID(eid) == EntityType::zombies && zombie.loadFromDisk(f))
+				{
+					success = entityData.zombies.insert({eid, std::move(zombie)}).second;
+				}
+			}
+			break;
+			case Markers::pig:
+			{
+				PigServer pig;
+				success = getEntityTypeFromEID(eid) == EntityType::pigs && pig.loadFromDisk(f) &&
+					entityData.pigs.insert({eid, pig}).second;
+			}
+			break;
+			case Markers::cat:
+			{
+				CatServer cat;
+				success = getEntityTypeFromEID(eid) == EntityType::cats && cat.loadFromDisk(f) &&
+					entityData.cats.insert({eid, cat}).second;
+			}
+			break;
+			case Markers::goblin:
+			{
+				GoblinServer goblin;
+				success = getEntityTypeFromEID(eid) == EntityType::goblins && goblin.loadFromDisk(f) &&
+					entityData.goblins.insert({eid, goblin}).second;
+			}
+			break;
+			case Markers::scareCrow:
+			{
+				ScareCrowServer scareCrow;
+				success = getEntityTypeFromEID(eid) == EntityType::scareCrow && scareCrow.loadFromDisk(f) &&
+					entityData.scareCrows.insert({eid, scareCrow}).second;
+			}
+			break;
+			default:
+				return EntitySidecarLoadResult::corrupt;
+			}
+
+			if (!success) { return EntitySidecarLoadResult::corrupt; }
+			reserveEntityId(eid);
+		}
+	}
+}
+
 //todo if the loading chunk fails we should not load the entities there and rather delete those files if exist!!
 bool WorldSaver::loadChunk(ChunkData &c)
 {
@@ -415,42 +580,25 @@ bool WorldSaver::saveChunk(ChunkData &c)
 	*/
 }
 
-void WorldSaver::saveChunkBlockData(SavedChunk &c)
+bool WorldSaver::saveChunkBlockData(SavedChunk &c)
 {
 	const glm::ivec2 pos = {c.chunk.x, c.chunk.z};
-	const glm::ivec2 filePos = (pos);
-
-	std::string fileName;
-	fileName.reserve(256);
-	fileName = savePath;
-	fileName += "/c";
-	fileName += std::to_string(filePos.x);
-	fileName += '_';
-	fileName += std::to_string(filePos.y);
-	fileName += ".block";
+	std::string fileName = savePath + "/c" + std::to_string(pos.x) + '_' +
+		std::to_string(pos.y) + ".block";
 
 	std::vector<unsigned char> data;
 	c.blockData.formatBlockData(data, pos.x, pos.y);
-	
 	if (data.empty())
 	{
-		std::filesystem::remove(fileName);
+		return removeSidecarAndBackup(fileName);
 	}
-	else
+
+	if (!writeSidecarAtomically(fileName, data.data(), data.size()))
 	{
-		std::ofstream f;
-		f.open(fileName, std::ios::binary | std::ios::trunc);
-
-		if (f.is_open())
-		{
-
-			f.write((char *)data.data(), data.size());
-
-			f.close();
-		}
+		std::cout << "Server error saving block sidecar transactionally: " << fileName << "\n";
+		return false;
 	}
-	
-
+	return true;
 }
 
 bool fileIsEmpty(std::ifstream &f)
@@ -461,203 +609,99 @@ bool fileIsEmpty(std::ifstream &f)
 void WorldSaver::loadEntityData(EntityData &entityData,
 	glm::ivec2 chunkPosition)
 {
-	const glm::ivec2 pos = {chunkPosition};
-	const glm::ivec2 filePos = (pos);
+	const glm::ivec2 pos = chunkPosition;
+	const std::string fileName = savePath + "/c" + std::to_string(pos.x) + '_' +
+		std::to_string(pos.y) + ".entity";
 
-	std::string fileName;
-	fileName.reserve(256);
-	fileName = savePath;
-	fileName += "/c";
-	fileName += std::to_string(filePos.x);
-	fileName += '_';
-	fileName += std::to_string(filePos.y);
-	fileName += ".entity";
-
-	std::ifstream f(fileName, std::ios::binary);
-
-	if (f.is_open())
+	EntityData loaded;
+	const auto primaryResult = loadEntitySidecarCandidate(fileName, loaded);
+	if (primaryResult == EntitySidecarLoadResult::loaded)
 	{
-
-		if(!fileIsEmpty(f))
-		while (!f.eof())
-		{
-			Marker m = 0;
-			bool success = 0;
-			if (readMarker(f, m))
-			{
-				if (m != 0)
-				{
-					std::uint64_t eid = 0;
-					if (success = (readEntityId(f, eid) && eid != 0))
-					{
-
-						switch (m)
-						{
-
-						case Markers::droppedItem:
-						{
-							DroppedItemServer item;
-							if (success = (getEntityTypeFromEID(eid) == EntityType::droppedItems &&
-								item.loadFromDisk(f)))
-							{
-								success = entityData.droppedItems.insert({eid,item}).second;
-							}
-						}
-						break;
-
-						case Markers::zombie:
-						{
-							ZombieServer zombie;
-							if (success = (getEntityTypeFromEID(eid) == EntityType::zombies &&
-								zombie.loadFromDisk(f)))
-							{
-								success = entityData.zombies.insert({eid, std::move(zombie)}).second;
-							}
-						}
-						break;
-
-						case Markers::pig:
-						{
-							PigServer pig;
-							if (success = (getEntityTypeFromEID(eid) == EntityType::pigs && pig.loadFromDisk(f)))
-							{
-								success = entityData.pigs.insert({eid, pig}).second;
-							}
-						}
-						break;
-
-						case Markers::cat:
-						{
-							CatServer cat;
-							if (success = (getEntityTypeFromEID(eid) == EntityType::cats && cat.loadFromDisk(f)))
-							{
-								success = entityData.cats.insert({eid, cat}).second;
-							}
-						}
-						break;
-
-						case Markers::goblin:
-						{
-							GoblinServer goblin;
-							if (success = (getEntityTypeFromEID(eid) == EntityType::goblins &&
-								goblin.loadFromDisk(f)))
-							{
-								success = entityData.goblins.insert({eid, goblin}).second;
-							}
-						}
-						break;
-
-						case Markers::scareCrow:
-						{
-							ScareCrowServer scareCrow;
-							if (success = (getEntityTypeFromEID(eid) == EntityType::scareCrow &&
-								scareCrow.loadFromDisk(f)))
-							{
-								success = entityData.scareCrows.insert({eid, scareCrow}).second;
-							}
-						}
-						break;
-
-
-						default:
-						success = false;
-						};
-						if (success) { reserveEntityId(eid); }
-
-
-					}
-				}else
-				{
-					success = false;
-				}
-
-			}
-			else
-			{
-				break;
-			}
-
-			if (!success)
-			{
-				std::cout << "file corupted!\n";
-				break;
-			}
-
-		}
-			
-		f.close();
-
+		entityData = std::move(loaded);
+		return;
 	}
-	
 
+	loaded = {};
+	const auto backupResult = loadEntitySidecarCandidate(sidecarBackupPath(fileName), loaded);
+	if (backupResult == EntitySidecarLoadResult::loaded)
+	{
+		entityData = std::move(loaded);
+		std::cout << "Server warning: recovered entity sidecar from backup for chunk "
+			<< pos.x << ',' << pos.y << ".\n";
+		return;
+	}
 
+	if (primaryResult == EntitySidecarLoadResult::corrupt ||
+		backupResult == EntitySidecarLoadResult::corrupt)
+	{
+		std::cout << "Server warning: entity sidecar corrupted for chunk "
+			<< pos.x << ',' << pos.y << "; starting that chunk with no persisted entities.\n";
+	}
+	entityData = {};
 }
 
 void WorldSaver::loadBlockData(SavedChunk &c)
 {
 	const glm::ivec2 pos = {c.chunk.x, c.chunk.z};
-	const glm::ivec2 filePos = (pos);
+	const std::string fileName = savePath + "/c" + std::to_string(pos.x) + '_' +
+		std::to_string(pos.y) + ".block";
 
-	std::string fileName;
-	fileName.reserve(256);
-	fileName = savePath;
-	fileName += "/c";
-	fileName += std::to_string(filePos.x);
-	fileName += '_';
-	fileName += std::to_string(filePos.y);
-	fileName += ".block";
-
-	std::vector<unsigned char> data;
-	sfs::readEntireFile(data, fileName.c_str());
-	
-	if (data.size())
+	auto tryLoad = [&](const std::string &candidate) -> bool
 	{
-		c.blockData.loadBlockData(data, pos.x, pos.y);
-	}
-	else
-	{
-		c.blockData = {};
-	}
+		std::vector<unsigned char> data;
+		if (sfs::readEntireFile(data, candidate.c_str()) != sfs::noError || data.empty())
+		{
+			return false;
+		}
+		BlocksWithDataHolder loaded;
+		if (!loaded.loadBlockData(data, pos.x, pos.y)) { return false; }
+		c.blockData = std::move(loaded);
+		return true;
+	};
 
+	if (tryLoad(fileName)) { return; }
+	if (tryLoad(sidecarBackupPath(fileName)))
+	{
+		std::cout << "Server warning: recovered block-data sidecar from backup for chunk "
+			<< pos.x << ',' << pos.y << ".\n";
+		return;
+	}
+	c.blockData = {};
 }
 
-void WorldSaver::saveEntitiesForChunk(SavedChunk &c)
+bool WorldSaver::saveEntitiesForChunk(SavedChunk &c)
 {
 	const glm::ivec2 pos = {c.chunk.x, c.chunk.z};
-	const glm::ivec2 filePos = (pos);
+	const std::string fileName = savePath + "/c" + std::to_string(pos.x) + '_' +
+		std::to_string(pos.y) + ".entity";
+	const std::string tempFile = sidecarTempPath(fileName);
 
-	std::string fileName;
-	fileName.reserve(256);
-	fileName = savePath;
-	fileName += "/c";
-	fileName += std::to_string(filePos.x);
-	fileName += '_';
-	fileName += std::to_string(filePos.y);
-	fileName += ".entity";
+	std::ofstream f(tempFile, std::ios::binary | std::ios::trunc);
+	if (!f.is_open()) { return false; }
+	saveAllEntitiesIntoOpenFile(f, c.entityData);
+	const std::streampos written = f.tellp();
+	f.flush();
+	const bool writeSucceeded = f.good();
+	f.close();
 
-	std::ofstream f;
-	f.open(fileName, std::ios::binary | std::ios::trunc);
-
-	if (f.is_open())
+	if (!writeSucceeded || written < std::streampos(0))
 	{
-		saveAllEntitiesIntoOpenFile(f, c.entityData);
-
-		if (f.tellp() == 0)
-		{
-			f.close();
-			f = {};
-
-			std::error_code e;
-			std::filesystem::remove(fileName, e);
-		}
-		else
-		{
-			f.close();
-		}
-
+		std::error_code error;
+		std::filesystem::remove(tempFile, error);
+		return false;
 	}
-
-
+	if (written == std::streampos(0))
+	{
+		std::error_code error;
+		std::filesystem::remove(tempFile, error);
+		return removeSidecarAndBackup(fileName);
+	}
+	if (!promoteSidecarTempFile(tempFile, fileName))
+	{
+		std::cout << "Server error saving entity sidecar transactionally: " << fileName << "\n";
+		return false;
+	}
+	return true;
 }
 
 //todo
