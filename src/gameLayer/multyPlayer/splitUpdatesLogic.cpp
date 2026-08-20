@@ -8,6 +8,7 @@
 #include <profilerLib.h>
 #include <iostream>
 #include <chrono>
+#include <cmath>
 
 struct Client;
 
@@ -32,7 +33,6 @@ Profiler getServerTickProfilerCopy()
 	return gameTickProfiler;
 }
 
-
 int regionsAverageCounter[50] = {};
 int counterPosition = 0;
 
@@ -41,14 +41,12 @@ void workerThread(int index, ThreadPool &threadPool);
 void closeThreadPool()
 {
 	threadPool.cleanup();
-
 	memset(regionsAverageCounter, 0, sizeof(regionsAverageCounter));
 	counterPosition = 0;
 }
 
 int tryTakeTask()
 {
-
 	for (int i = 0; i < threadPool.taskTaken.size(); i++)
 	{
 		if (!threadPool.taskTaken[i].exchange(true))
@@ -67,13 +65,10 @@ int getThredPoolSize()
 #define ENTITY_SET_IN_CHUNKS(X) resetEntitiesInTheirNewChunk(*c.orphanEntities.entityGetter<X>(), [](auto &entityData) { return entityData.template entityGetter<X>(); });
 #define ITERATE_TEST(X) iterateTest(*chunk.second->entityData.entityGetter<X>());
 
-
 void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t currentTimer,
 	ServerChunkStorer &chunkCache, unsigned int seed, std::unordered_map<std::uint64_t, Client> &clients,
 	WorldSaver &worldSaver, std::vector<ServerTask> &waitingTasks, Profiler &serverProfiler)
 {
-
-
 	if (1)
 	{
 		std::minstd_rand rng(seed);
@@ -84,7 +79,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 		::worldSaver = &worldSaver;
 
 		PL::Profiler pl;
-
 		pl.start();
 
 		chunkRegionsData.clear();
@@ -99,19 +93,13 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 		{
 			if (!i.second->otherData.shouldUnload)
 			{
-
 				auto find = visited.find(i.first);
-
 				if (find == visited.end())
 				{
 					chunkRegionsData.push_back({});
-
-					int currentIndex = chunkRegionsData.size() - 1;
-
+					int currentIndex = static_cast<int>(chunkRegionsData.size()) - 1;
 					visited.insert({i.first, currentIndex});
-
-					chunkRegionsData[currentIndex].chunkCache.
-						savedChunks.insert(i);
+					chunkRegionsData[currentIndex].chunkCache.savedChunks.insert(i);
 
 					std::deque<glm::ivec2> toLook;
 					toLook.push_back({i.first + glm::ivec2(1,0)});
@@ -129,7 +117,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 						toLook.pop_back();
 
 						auto found = visited.find(el);
-
 						if (found != visited.end())
 						{
 							permaAssertComment(found->second == currentIndex, "error in the split chunks algorithm");
@@ -137,37 +124,25 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 						else
 						{
 							auto foundChunk = chunkCache.savedChunks.find(el);
-							if (foundChunk != chunkCache.savedChunks.end())
+							if (foundChunk != chunkCache.savedChunks.end() &&
+								!foundChunk->second->otherData.shouldUnload)
 							{
-								if (!foundChunk->second->otherData.shouldUnload)
-								{
-									visited.insert({el, currentIndex});
+								visited.insert({el, currentIndex});
+								chunkRegionsData[currentIndex].chunkCache.savedChunks.insert(*foundChunk);
 
-									chunkRegionsData[currentIndex].chunkCache.
-										savedChunks.insert(*foundChunk);
-
-									toLook.push_back({el + glm::ivec2(1,0)});
-									toLook.push_back({el + glm::ivec2(0,1)});
-									toLook.push_back({el + glm::ivec2(-1,0)});
-									toLook.push_back({el + glm::ivec2(0,-1)});
-									toLook.push_back({el + glm::ivec2(1,1)});
-									toLook.push_back({el + glm::ivec2(-1,1)});
-									toLook.push_back({el + glm::ivec2(1,-1)});
-									toLook.push_back({el + glm::ivec2(-1,-1)});
-								}
-
+								toLook.push_back({el + glm::ivec2(1,0)});
+								toLook.push_back({el + glm::ivec2(0,1)});
+								toLook.push_back({el + glm::ivec2(-1,0)});
+								toLook.push_back({el + glm::ivec2(0,-1)});
+								toLook.push_back({el + glm::ivec2(1,1)});
+								toLook.push_back({el + glm::ivec2(-1,1)});
+								toLook.push_back({el + glm::ivec2(1,-1)});
+								toLook.push_back({el + glm::ivec2(-1,-1)});
 							}
-
 						}
-
-
 					}
-
 				}
-
 			}
-
-
 		}
 
 	#pragma endregion
@@ -180,9 +155,7 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 
 	#pragma region set threads count
 		{
-
-			regionsAverageCounter[counterPosition] = chunkRegionsData.size();
-
+			regionsAverageCounter[counterPosition] = static_cast<int>(chunkRegionsData.size());
 			if (counterPosition == 49)
 			{
 				float average = 0;
@@ -190,11 +163,8 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 				{
 					average += regionsAverageCounter[i];
 				}
-
 				average /= 50;
-
 				int averageInt = std::roundf(average);
-
 				threadPool.setThreadsNumber(averageInt - 1, workerThread);
 				counterPosition = 0;
 			}
@@ -205,13 +175,11 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 		}
 	#pragma endregion
 
-
 		for (auto &c : chunkRegionsData)
 		{
 			c.seed = rng();
 		}
 
-		
 	#pragma region set waiting tasks for each region
 
 		std::unordered_map<std::uint64_t, int> playersRegions;
@@ -219,7 +187,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 		for (int i = 0; i < chunkRegionsData.size(); i++)
 		{
 			auto &cache = chunkRegionsData[i].chunkCache;
-
 			for (auto &c : cache.savedChunks)
 			{
 				if (!c.second->entityData.players.empty())
@@ -231,7 +198,7 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 				}
 			}
 		}
-			
+
 		if (playersRegions.empty() && !waitingTasks.empty())
 		{
 			permaAssertComment(0, "No players in split update logic.cpp");
@@ -239,23 +206,17 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 
 		for (auto &t : waitingTasks)
 		{
-				
 			auto cid = t.cid;
 			permaAssertComment(cid != 0, "Cid can't be 0 in split update logic.cpp");
-
 			auto found = playersRegions.find(cid);
-
 			permaAssertComment(found != playersRegions.end(), "invalid cid in split update logic.cpp");
-
 			chunkRegionsData[found->second].waitingTasks.push_back(t);
 		}
 		waitingTasks.clear();
 
 	#pragma endregion
 
-
 		serverProfiler.endSubProfile("Prepare tasks");
-
 
 		threadPool.setThrerIsWork();
 
@@ -276,17 +237,13 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 				chunkRegionsData[taskIndex].orphanEntities,
 				chunkRegionsData[taskIndex].seed,
 				chunkRegionsData[taskIndex].waitingTasks,
-				worldSaver, p
-				);
+				worldSaver, p);
 		}
-
 
 		threadPool.waitForEveryoneToFinish();
 		serverProfiler.endSubProfile("Multi Threaded tick update");
 
-
 		chunkCache.entityChunkPositions.clear();
-
 		for (auto &region : chunkRegionsData)
 		{
 			chunkCache.entityChunkPositions.merge(region.chunkCache.entityChunkPositions);
@@ -294,12 +251,9 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 
 		auto resetEntitiesInTheirNewChunk = [&](auto &container, auto memberSelector)
 		{
-
-			for (auto it = container.begin();
-				it != container.end();)
+			for (auto it = container.begin(); it != container.end();)
 			{
 				auto &e = *it;
-
 				auto pos = determineChunkThatIsEntityIn(e.second.getPosition());
 				auto chunk = chunkCache.getChunkOrGetNull(pos.x, pos.y);
 
@@ -312,17 +266,16 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 				else
 				{
 					auto f = chunkCache.entityChunkPositions.find(e.first);
-					if(f!= chunkCache.entityChunkPositions.end()){
+					if (f != chunkCache.entityChunkPositions.end())
+					{
 						chunkCache.entityChunkPositions.erase(f);
 					}
 					worldSaver.appendEntitiesForChunk(pos);
 				}
 
 				it++;
-
 			}
 		};
-
 
 		for (auto &c : chunkRegionsData)
 		{
@@ -333,27 +286,23 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 	}
 	else
 	{
-		//deprecated single threaded version
+		// deprecated single-threaded version
 	}
-
-
 
 #pragma region cache chunk positions checks debugging
 
-	if(INTERNAL_BUILD == 1)
+	if (INTERNAL_BUILD == 1)
 	for (auto &chunk : chunkCache.savedChunks)
 	{
-
 		if (chunk.second->otherData.shouldUnload)
 		{
 			continue;
-		};
+		}
 
 		auto &entityData = chunk.second->entityData;
 		for (auto &e : entityData.players)
 		{
 			auto found = chunkCache.entityChunkPositions.find(e.first);
-
 			if (found == chunkCache.entityChunkPositions.end())
 			{
 				permaAssertComment(0, "entityChunkPositions problem, player entity missing!");
@@ -361,7 +310,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 			else
 			{
 				auto pos = determineChunkThatIsEntityIn(e.second->getPosition());
-				
 				if (pos != found->second)
 				{
 					permaAssertComment(0, "entityChunkPositions problem, player desynk position!");
@@ -374,7 +322,6 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 			for (auto &e : container)
 			{
 				auto found = chunkCache.entityChunkPositions.find(e.first);
-
 				if (found == chunkCache.entityChunkPositions.end())
 				{
 					permaAssertComment(0, "entityChunkPositions problem, entity missing!");
@@ -382,27 +329,18 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 				else
 				{
 					auto pos = determineChunkThatIsEntityIn(e.second.getPosition());
-
 					if (pos != found->second)
 					{
 						permaAssertComment(0, "entityChunkPositions problem, entity desynk position!");
 					}
+				}
 			}
-
 		};
 
 		REPEAT_FOR_ALL_ENTITIES_NO_PLAYERS(ITERATE_TEST);
-
-
-
 	}
 
-
 #pragma endregion
-
-
-
-
 }
 
 void workerThread(int index, ThreadPool &threadPool)
@@ -413,7 +351,7 @@ void workerThread(int index, ThreadPool &threadPool)
 		{
 			int taskIndex = tryTakeTask();
 			if (taskIndex < 0) { break; }
-			
+
 			Profiler *p = 0;
 			if (taskIndex == 0) { p = &gameTickProfiler; }
 
@@ -422,8 +360,7 @@ void workerThread(int index, ThreadPool &threadPool)
 				chunkRegionsData[taskIndex].orphanEntities,
 				chunkRegionsData[taskIndex].seed,
 				chunkRegionsData[taskIndex].waitingTasks,
-				*worldSaver, p
-				);
+				*worldSaver, p);
 		}
 
 		threadPool.markWorkFinished(index);
@@ -537,4 +474,3 @@ void ThreadPool::cleanup()
 	setThreadsNumber(0, workerThread);
 	taskTaken.clear();
 }
-
