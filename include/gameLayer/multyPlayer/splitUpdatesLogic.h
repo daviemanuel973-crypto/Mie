@@ -4,6 +4,8 @@
 #include <multyPlayer/serverChunkStorer.h>
 #include <thread>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 struct Client;
 
@@ -20,11 +22,18 @@ struct ThreadPool
 	std::atomic_bool threIsWork[MAX_THREADS] = {};
 	std::deque<std::atomic<bool>> taskTaken;
 
+	// v0.9.2: workers sleep while idle and the owner sleeps while waiting for a batch.
+	// This replaces the previous tight spin loops that could consume a full CPU core.
+	std::mutex workMutex;
+	std::condition_variable workAvailable;
+	std::condition_variable workFinished;
 
 	void setThreadsNumber(int nr, void(*worker)(int, ThreadPool&));
 
 	void setThrerIsWork();
 
+	bool waitForWork(int index);
+	void markWorkFinished(int index);
 	void waitForEveryoneToFinish();
 
 	void cleanup();
