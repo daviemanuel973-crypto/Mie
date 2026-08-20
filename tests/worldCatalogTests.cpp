@@ -1,4 +1,5 @@
 #include <worldCatalog.h>
+#include <gameplay/worldGameMode.h>
 
 #include <chrono>
 #include <filesystem>
@@ -44,6 +45,38 @@ int main()
 	WorldDifficultySettings hardcore;
 	hardcore.hardcore = true;
 	REQUIRE(saveWorldDifficultySettings(root / "New World", hardcore));
+
+	// Worlds created before the v0.9.3 game-mode setting remain Survival.
+	WorldGameModeSettings legacyMode;
+	REQUIRE(!loadWorldGameModeSettings(root / "Older World", legacyMode));
+	REQUIRE(legacyMode.mode == WorldGameMode::Survival);
+	REQUIRE(std::string(getWorldGameModeName(legacyMode.mode)) == "Survival");
+
+	// New worlds persist either explicit initial mode independently from difficulty.
+	WorldGameModeSettings creativeMode;
+	creativeMode.mode = WorldGameMode::Creative;
+	REQUIRE(saveWorldGameModeSettings(root / "New World", creativeMode));
+	WorldGameModeSettings loadedMode;
+	REQUIRE(loadWorldGameModeSettings(root / "New World", loadedMode));
+	REQUIRE(loadedMode.mode == WorldGameMode::Creative);
+	REQUIRE(std::string(getWorldGameModeName(loadedMode.mode)) == "Creative");
+
+	WorldGameModeSettings survivalMode;
+	survivalMode.mode = WorldGameMode::Survival;
+	REQUIRE(saveWorldGameModeSettings(root / "New World", survivalMode));
+	REQUIRE(loadWorldGameModeSettings(root / "New World", loadedMode));
+	REQUIRE(loadedMode.mode == WorldGameMode::Survival);
+	REQUIRE(saveWorldGameModeSettings(root / "New World", creativeMode));
+
+	// Invalid/corrupt values never opt an old world into Creative.
+	{
+		std::ofstream invalid(root / "Older World" / "worldGameMode", std::ios::trunc);
+		invalid << "MIE_WORLD_GAME_MODE 1\n99\n";
+	}
+	WorldGameModeSettings invalidMode;
+	REQUIRE(!loadWorldGameModeSettings(root / "Older World", invalidMode));
+	REQUIRE(invalidMode.mode == WorldGameMode::Survival);
+
 	const auto now = std::filesystem::file_time_type::clock::now();
 	std::filesystem::last_write_time(root / "Older World", now - std::chrono::hours(2), filesystemError);
 	std::filesystem::last_write_time(root / "New World", now - std::chrono::hours(1), filesystemError);
