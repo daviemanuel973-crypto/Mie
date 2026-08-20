@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           MIE_VERSION="$(tr -d '\r\n' < VERSION)"
-          if [[ ! "$MIE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ ! "$MIE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
             echo "VERSION must contain a semantic version, got: '$MIE_VERSION'" >&2
             exit 1
           fi
@@ -65,7 +65,7 @@ jobs:
         run: |
           grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
           grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
-          grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
+          grep -F 'entityPosition += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
           grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp
           grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
           grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
@@ -278,6 +278,15 @@ jobs:
             src/gameLayer/gameplay/environmentMotion.cpp \
             -o survivalRulesTests
           ./survivalRulesTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra \
+            -Iinclude/gameLayer \
+            -Ithirdparty/safeSave/include \
+            tests/entityIdAllocatorTests.cpp \
+            src/gameLayer/multyPlayer/entityIdAllocator.cpp \
+            thirdparty/safeSave/src/safeSave.cpp \
+            -o entityIdAllocatorTests
+          ./entityIdAllocatorTests
 
       - name: Build Flatpak repository
         shell: bash
