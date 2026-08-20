@@ -1,4 +1,5 @@
 #include <blocks.h>
+#include <chunk.h>
 #include <gameplay/entityId.h>
 #include <gameplay/environmentMotion.h>
 #include <gameplay/combatBalance.h>
@@ -6,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <unordered_set>
 
 void assertFuncInternal(const char *, const char *, unsigned int, const char *)
 {
@@ -25,6 +27,29 @@ int main()
 	const std::uint64_t encoded = rawId | (std::uint64_t{5} << 56);
 	REQUIRE(getEntityTypeFromEID(encoded) == 5);
 	REQUIRE(getOnlyIdFromEID(encoded) == rawId);
+
+	// v0.9.2: region IDs must round-trip all signed 32-bit quadrants.
+	for (const glm::ivec2 region : {glm::ivec2{0, 0}, glm::ivec2{1, -1},
+		glm::ivec2{-1, 1}, glm::ivec2{-2048, -4096}, glm::ivec2{250000, -125000}})
+	{
+		int decodedX = 0;
+		int decodedZ = 0;
+		getRegionCenterFromId(getRegionId(region.x, region.y), decodedX, decodedZ);
+		REQUIRE(decodedX == region.x);
+		REQUIRE(decodedZ == region.y);
+	}
+
+	// Nearby chunk coordinates used to collapse into almost the same hash bucket.
+	Ivec2Hash chunkHash;
+	std::unordered_set<size_t> nearbyHashes;
+	for (int x = -8; x <= 8; ++x)
+	{
+		for (int z = -8; z <= 8; ++z)
+		{
+			nearbyHashes.insert(chunkHash({x, z}));
+		}
+	}
+	REQUIRE(nearbyHashes.size() >= 280);
 
 	for (const BlockType type : {BlockTypes::crate, BlockTypes::smallCrate,
 		BlockTypes::pot, BlockTypes::jar})
@@ -48,6 +73,13 @@ int main()
 	REQUIRE(ZOMBIE_RUNNER_ATTACK_COOLDOWN > 0.f);
 	REQUIRE(ZOMBIE_BRUTE_ATTACK_COOLDOWN >= 1.05f);
 	REQUIRE(ZOMBIE_BRUTE_ATTACK_COOLDOWN <= 2.35f);
+
+	// Existing resistance now participates in combat knockback.
+	REQUIRE(std::abs(getKnockBackResistanceMultiplier(0.f) - 1.f) < 0.0001f);
+	REQUIRE(std::abs(getKnockBackResistanceMultiplier(25.f) - 0.75f) < 0.0001f);
+	REQUIRE(std::abs(getKnockBackResistanceMultiplier(100.f)) < 0.0001f);
+	REQUIRE(std::abs(getKnockBackResistanceMultiplier(-100.f) - 2.f) < 0.0001f);
+	REQUIRE(std::abs(getKnockBackResistanceMultiplier(-1000.f) - 4.f) < 0.0001f);
 
 	std::cout << "Survival rule tests passed.\n";
 	return 0;

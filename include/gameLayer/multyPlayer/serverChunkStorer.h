@@ -33,18 +33,19 @@ bool operator==(const BlockInChunkPos &a, const BlockInChunkPos &b);
 
 struct BlockInChunkHash
 {
-	size_t operator()(const BlockInChunkPos &in) const
+	size_t operator()(const BlockInChunkPos &in) const noexcept
 	{
-		int x = in.x;
-		int y = in.y;
-		int z = in.z;
-
-		size_t ret = 0;
-		ret += x;
-		ret += (y < 8);
-		ret += (z < 16);
-
-		return ret;
+		// Each coordinate already fits in one byte. Pack all three bytes so distinct
+		// block positions do not collapse into the handful of buckets produced before.
+		std::uint32_t key = static_cast<std::uint32_t>(in.x) |
+			(static_cast<std::uint32_t>(in.y) << 8) |
+			(static_cast<std::uint32_t>(in.z) << 16);
+		key ^= key >> 16;
+		key *= 0x7feb352dU;
+		key ^= key >> 15;
+		key *= 0x846ca68bU;
+		key ^= key >> 16;
+		return static_cast<size_t>(key);
 	}
 };
 

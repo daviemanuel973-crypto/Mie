@@ -1,8 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <glm/vec3.hpp>
 #include <random>
 #include <gameplay/weaponStats.h>
+#include <gameplay/combatBalance.h>
 
 
 //this is where we compute all hitting things!
@@ -23,6 +25,7 @@ void doHittingThings(T &e, glm::vec3 dir, glm::dvec3 attackerPosition,
 
 		Life *life = 0;
 		Armour armour = {};
+		float knockBackResistancePercent = 0.f;
 
 	#pragma region get stuff
 		//the players are stored differently
@@ -30,6 +33,7 @@ void doHittingThings(T &e, glm::vec3 dir, glm::dvec3 attackerPosition,
 		{
 			life = &e.newLife;
 			armour = e.getArmour();
+			knockBackResistancePercent = static_cast<float>(e.getKnockBackResistance());
 		}
 		else
 		{
@@ -40,8 +44,6 @@ void doHittingThings(T &e, glm::vec3 dir, glm::dvec3 attackerPosition,
 
 		int damage = calculateDamage(armour, weaponStats, rng,
 			hitCorectness, critChanceBonus, e.isUnaware());
-
-		//std::cout << "Damage: " << damage << "\n";
 
 		if (damage >= life->life)
 		{
@@ -61,15 +63,9 @@ void doHittingThings(T &e, glm::vec3 dir, glm::dvec3 attackerPosition,
 			else { hitDir /= l; }
 		}
 
-		float knockBack = weaponStats.knockBack;
-
-		//todo add knock back resistance
-		//std::cout << "Attacked!\n";
-		//std::cout << life->life << "\n";
-		//std::cout << &life->life << "\n";
-
-		knockBack = std::max(knockBack, 0.f);
+		float knockBack = std::max(weaponStats.knockBack, 0.f);
 		knockBack *= std::max(hitCorectness, 0.2f);
+		knockBack *= getKnockBackResistanceMultiplier(knockBackResistancePercent);
 		e.applyHitForce(hitDir * knockBack);
 
 		auto entityPos = e.getPosition();

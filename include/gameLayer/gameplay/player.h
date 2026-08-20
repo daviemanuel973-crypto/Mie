@@ -166,6 +166,8 @@ struct PlayerServer: public ServerEntity<Player>
 		return rez;
 	};
 
+	short getKnockBackResistance();
+
 	glm::ivec2 lastChunkPositionWhenAnUpdateWasSent = {};
 
 	float calculateHealingDelayTime();
