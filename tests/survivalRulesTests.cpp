@@ -107,7 +107,12 @@ int main()
 		static_cast<double>(retainedChunk.y * CHUNK_SIZE) - 4.0};
 	const glm::dvec3 clampedPosition = mie::dataIntegrity::clampEntityPositionToChunk(
 		escapedPosition, retainedChunk);
-	REQUIRE(determineChunkThatIsEntityIn(clampedPosition) == retainedChunk);
+	const double retainedMinX = static_cast<double>(retainedChunk.x) * CHUNK_SIZE;
+	const double retainedMaxX = static_cast<double>(retainedChunk.x + 1) * CHUNK_SIZE;
+	const double retainedMinZ = static_cast<double>(retainedChunk.y) * CHUNK_SIZE;
+	const double retainedMaxZ = static_cast<double>(retainedChunk.y + 1) * CHUNK_SIZE;
+	REQUIRE(clampedPosition.x > retainedMinX && clampedPosition.x < retainedMaxX);
+	REQUIRE(clampedPosition.z > retainedMinZ && clampedPosition.z < retainedMaxZ);
 
 	REQUIRE(mie::dataIntegrity::isDroppedItemSpawnPositionValid(
 		{0.0, 64.0, 0.0}, {3.0, 64.0, 2.0}));
