@@ -4,6 +4,7 @@
 #include <glm/vec3.hpp>
 #include <random>
 #include <gameplay/weaponStats.h>
+#include <gameplay/combatBalance.h>
 
 
 //this is where we compute all hitting things!
@@ -64,12 +65,7 @@ void doHittingThings(T &e, glm::vec3 dir, glm::dvec3 attackerPosition,
 
 		float knockBack = std::max(weaponStats.knockBack, 0.f);
 		knockBack *= std::max(hitCorectness, 0.2f);
-		// Positive resistance reduces impulse and 100% fully cancels it. Negative
-		// resistance remains a supported vulnerability because EntityStats already
-		// normalizes this field to [-300, 100].
-		const float resistanceMultiplier = std::clamp(
-			1.f - knockBackResistancePercent / 100.f, 0.f, 4.f);
-		knockBack *= resistanceMultiplier;
+		knockBack *= getKnockBackResistanceMultiplier(knockBackResistancePercent);
 		e.applyHitForce(hitDir * knockBack);
 
 		auto entityPos = e.getPosition();
