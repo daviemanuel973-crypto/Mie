@@ -1,6 +1,7 @@
 #pragma once
 #include "blocks.h"
 #include <bitset>
+#include <cstdint>
 #include <glm/glm.hpp>
 
 #include <metrics.h>
@@ -8,19 +9,21 @@
 #include <platform/platformTools.h>
 #define NOMINMAX
 
-//https://www.geeksforgeeks.org/how-to-create-an-unordered_map-of-user-defined-class-in-cpp/
+// Hash chunk coordinates without collapsing one axis into a boolean. The previous
+// implementation caused very high collision rates in unordered containers.
 struct Ivec2Hash
 {
-	size_t operator()(const glm::ivec2 &in) const
+	size_t operator()(const glm::ivec2 &in) const noexcept
 	{
-		int x = in.x;
-		int z = in.y;
-
-		size_t ret = 0;
-		ret += x;
-		ret += (z < 32);
-
-		return ret;
+		std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(in.x)) << 32) |
+			static_cast<std::uint32_t>(in.y);
+		// SplitMix64 finalizer: cheap and stable for adjacent/negative chunk coordinates.
+		key ^= key >> 30;
+		key *= 0xbf58476d1ce4e5b9ULL;
+		key ^= key >> 27;
+		key *= 0x94d049bb133111ebULL;
+		key ^= key >> 31;
+		return static_cast<size_t>(key);
 	}
 };
 
@@ -29,20 +32,14 @@ struct Renderer;
 
 inline std::uint64_t getRegionId(int x, int z)
 {
-	std::uint64_t rez = 0;
-	rez |= x;
-	rez <<= 32;
-	rez |= z;
-	return rez;
+	return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32) |
+		static_cast<std::uint32_t>(z);
 }
 
 inline void getRegionCenterFromId(std::uint64_t id, int &x, int &z)
 {
-	x = 0;
-	z = 0;
-
-	x |= (id >> 32);
-	z |= (id);
+	x = static_cast<std::int32_t>(static_cast<std::uint32_t>(id >> 32));
+	z = static_cast<std::int32_t>(static_cast<std::uint32_t>(id));
 }
 
 struct ChunkData
