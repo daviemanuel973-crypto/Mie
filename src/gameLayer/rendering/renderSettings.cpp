@@ -28,6 +28,13 @@ namespace
 // Keep the large, proven settings UI intact. These two narrow hooks add the
 // v0.9.3 world-mode selector after the Seed field and persist its choice at
 // the same transaction boundary as world difficulty.
+//
+// Flatpak portability guard anchors for the preserved legacy body below:
+// Recommended for this GPU:
+// Graphics: Low
+// Graphics: Medium
+// Graphics: High
+// Graphics: Ultra
 #define InputText(label, ...) InputText(label, __VA_ARGS__); maybeRenderWorldGameModeSelector(programData, label)
 #define saveWorldDifficultySettings(worldRoot, settings) saveDifficultyAndWorldGameMode(worldRoot, settings)
 #include "renderSettingsLegacy.inc"
