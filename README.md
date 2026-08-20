@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current development version: v0.8.0**
+**Current development version: v0.9.2**
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -19,6 +19,21 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.9.2 gameplay & performance
+
+v0.9.2 deliberately adds no new content. It focuses on making the existing game more robust, cheaper to simulate and more consistent to play.
+
+- Chunk-coordinate and block-position hashes were replaced with properly distributed packed hashes instead of collapsing most coordinates into the same buckets.
+- Region IDs now preserve signed X/Z coordinates correctly, including negative world quadrants.
+- Server tick workers sleep while idle instead of continuously busy-waiting for work.
+- The owner-side worker wait no longer burns a CPU core while a batch finishes and remains compatible with the existing chunk baker.
+- Equipped item stats are aggregated through the authoritative player-stat path.
+- Knockback resistance now affects server-authoritative melee knockback.
+- Survival contract tests cover signed region IDs, hash distribution and knockback-resistance behavior.
+- Save IDs, crafting recipe indexes and the multiplayer packet layout remain compatible with v0.9.1.
+
+See [`docs/V0.9.2_GAMEPLAY_PERFORMANCE.md`](docs/V0.9.2_GAMEPLAY_PERFORMANCE.md).
 
 ## v0.8.0 development
 
