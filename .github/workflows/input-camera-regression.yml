@@ -1,0 +1,65 @@
+name: Input and Camera Regression
+
+on:
+  push:
+    branches:
+      - main
+      - agent/v0.9.5-stability
+    paths:
+      - 'include/platform/platformInput.h'
+      - 'src/platform/platformInput.cpp'
+      - 'src/gameLayer/rendering/camera.cpp'
+      - '.github/workflows/input-camera-regression.yml'
+  pull_request:
+    paths:
+      - 'include/platform/platformInput.h'
+      - 'src/platform/platformInput.cpp'
+      - 'src/gameLayer/rendering/camera.cpp'
+      - '.github/workflows/input-camera-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  input-camera-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Guard edge-triggered input semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'const bool wasHeld = b.held;' include/platform/platformInput.h
+          grep -F 'b.released = wasHeld;' include/platform/platformInput.h
+          grep -F 'b.newState = -1;' include/platform/platformInput.h
+          grep -F 'b.typed = 0;' include/platform/platformInput.h
+
+      - name: Guard gamepad mapping and disconnect reset
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];' src/platform/platformInput.cpp
+          grep -F 'controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];' src/platform/platformInput.cpp
+          grep -F 'if (!controllerPolled)' src/platform/platformInput.cpp
+          grep -F 'controllerButtons.setAllToZero();' src/platform/platformInput.cpp
+          ! grep -F 'controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];' src/platform/platformInput.cpp
+          ! grep -F 'controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];' src/platform/platformInput.cpp
+
+      - name: Guard accumulated scroll input
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'scrollY += static_cast<float>(yoffset);' src/platform/platformInput.cpp
+          ! grep -F 'scrollY = yoffset;' src/platform/platformInput.cpp
+
+      - name: Guard finite wrapped camera rotation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'if (!std::isfinite(delta.x) || !std::isfinite(delta.y))' src/gameLayer/rendering/camera.cpp
+          grep -F 'yaw = std::fmod(yaw + delta.x, TWO_PI);' src/gameLayer/rendering/camera.cpp
+          grep -F 'viewDirection = glm::normalize(viewDirection);' src/gameLayer/rendering/camera.cpp
+          ! grep -F 'yaw = 2.f * PI - yaw;' src/gameLayer/rendering/camera.cpp
