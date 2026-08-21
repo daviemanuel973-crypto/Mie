@@ -48,11 +48,24 @@ jobs:
           ! grep -F 'controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];' src/platform/platformInput.cpp
           ! grep -F 'controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];' src/platform/platformInput.cpp
 
+      - name: Guard same-frame focused input consumption
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'void ensureInputStateUpdated()' src/platform/platformInput.cpp
+          grep -F 'if (!inputStateUpdatedForCurrentFrame)' src/platform/platformInput.cpp
+          grep -F 'if (inputStateUpdatedForCurrentFrame)' src/platform/platformInput.cpp
+          grep -F 'inputStateUpdatedForCurrentFrame = true;' src/platform/platformInput.cpp
+          grep -F 'inputStateUpdatedForCurrentFrame = false;' src/platform/platformInput.cpp
+          grep -F 'if (!platform::isFocused()) { return 0; }' src/platform/platformInput.cpp
+          grep -F 'if (!platform::isFocused()) { return platform::ControllerButtons{}; }' src/platform/platformInput.cpp
+
       - name: Guard accumulated scroll input
         shell: bash
         run: |
           set -euo pipefail
           grep -F 'scrollY += static_cast<float>(yoffset);' src/platform/platformInput.cpp
+          grep -F 'scrollY = 0.f;' src/platform/platformInput.cpp
           ! grep -F 'scrollY = yoffset;' src/platform/platformInput.cpp
 
       - name: Guard finite wrapped camera rotation
