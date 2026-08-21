@@ -28,7 +28,7 @@ jobs:
 
       - name: Compile crafting selection regression
         run: |
-          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
             tests/craftingUiSelectionRegressionTests.cpp \
             -o craftingUiSelectionRegressionTests
 
