@@ -10,6 +10,12 @@ namespace
 
 SiegeDirector::SiegeDirector(SiegeTuning tuning): tuning(tuning)
 {
+	if (!std::isfinite(this->tuning.warningSeconds)) { this->tuning.warningSeconds = 45.f; }
+	if (!std::isfinite(this->tuning.intermissionSeconds)) { this->tuning.intermissionSeconds = 12.f; }
+	this->tuning.warningSeconds = std::max(this->tuning.warningSeconds, 0.f);
+	this->tuning.intermissionSeconds = std::max(this->tuning.intermissionSeconds, 0.f);
+	this->tuning.totalWaves = std::max<std::uint8_t>(this->tuning.totalWaves, 1u);
+	this->tuning.cyclesPerSiege = std::max<std::uint8_t>(this->tuning.cyclesPerSiege, 1u);
 	reset();
 }
 
@@ -56,7 +62,7 @@ void SiegeDirector::beginWave(unsigned int survivalPlayers)
 void SiegeDirector::update(float deltaTime, unsigned int survivalPlayers,
 	unsigned int activeSiegeEnemies, std::uint64_t currentWorldDay, bool scheduledNight)
 {
-	if (deltaTime <= 0.f) { return; }
+	if (!std::isfinite(deltaTime) || deltaTime <= 0.f) { return; }
 	observedWorldCycles = currentWorldDay;
 	if (survivalPlayers == 0)
 	{
@@ -81,7 +87,7 @@ void SiegeDirector::update(float deltaTime, unsigned int survivalPlayers,
 			while (nextSiegeCycle <= currentWorldDay &&
 				nextSiegeCycle != std::numeric_limits<std::uint64_t>::max());
 			phase = SiegePhase::Warning;
-			timer = std::max(tuning.warningSeconds, 0.f);
+			timer = tuning.warningSeconds;
 			currentWave = 0;
 		}
 		break;
@@ -96,7 +102,10 @@ void SiegeDirector::update(float deltaTime, unsigned int survivalPlayers,
 		{
 			if (currentWave >= tuning.totalWaves)
 			{
-				completedSieges++;
+				if (completedSieges != std::numeric_limits<unsigned int>::max())
+				{
+					++completedSieges;
+				}
 				phase = SiegePhase::Peace;
 				timer = 0.f;
 				currentWave = 0;
@@ -104,7 +113,7 @@ void SiegeDirector::update(float deltaTime, unsigned int survivalPlayers,
 			else
 			{
 				phase = SiegePhase::Intermission;
-				timer = std::max(tuning.intermissionSeconds, 0.f);
+				timer = tuning.intermissionSeconds;
 			}
 		}
 		break;
@@ -126,14 +135,16 @@ unsigned int SiegeDirector::takeSpawnRequest(unsigned int maxCount)
 void SiegeDirector::returnSpawnRequest(unsigned int count)
 {
 	if (phase != SiegePhase::Wave) { return; }
-	pendingSpawns = std::min(pendingSpawns + count, 32u);
+	pendingSpawns = std::min(pendingSpawns, 32u);
+	const unsigned int remainingCapacity = 32u - pendingSpawns;
+	pendingSpawns += std::min(count, remainingCapacity);
 }
 
 void SiegeDirector::forceWarning()
 {
 	if (phase == SiegePhase::Wave || phase == SiegePhase::Intermission) { return; }
 	phase = SiegePhase::Warning;
-	timer = std::max(tuning.warningSeconds, 0.f);
+	timer = tuning.warningSeconds;
 	currentWave = 0;
 	pendingSpawns = 0;
 }
@@ -158,11 +169,14 @@ SiegeStatus SiegeDirector::getStatus(unsigned int activeSiegeEnemies) const
 	result.phase = phase;
 	result.currentWave = static_cast<std::uint8_t>(currentWave);
 	result.totalWaves = tuning.totalWaves;
+	const std::uint64_t totalRemaining = static_cast<std::uint64_t>(activeSiegeEnemies) +
+		static_cast<std::uint64_t>(pendingSpawns);
 	result.enemiesRemaining = static_cast<std::uint16_t>(
-		std::min(activeSiegeEnemies + pendingSpawns, 65535u));
+		std::min<std::uint64_t>(totalRemaining, 65535u));
 	result.completedSieges = static_cast<std::uint16_t>(std::min(completedSieges, 65535u));
+	const float safeTimer = std::isfinite(timer) ? std::max(timer, 0.f) : 0.f;
 	result.secondsRemaining = static_cast<std::uint16_t>(
-		std::clamp(static_cast<unsigned int>(std::ceil(std::max(timer, 0.f))), 0u, 65535u));
+		std::clamp(static_cast<unsigned int>(std::ceil(safeTimer)), 0u, 65535u));
 	const std::uint64_t remainingCycles = nextSiegeCycle > observedWorldCycles ?
 		nextSiegeCycle - observedWorldCycles : 0;
 	result.cyclesUntilSiege = static_cast<std::uint8_t>(std::min<std::uint64_t>(remainingCycles, 255));
