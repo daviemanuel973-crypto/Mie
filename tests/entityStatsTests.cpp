@@ -1,4 +1,5 @@
 #include <gameplay/entityStats.h>
+#include <gameplay/life.h>
 
 #include <cmath>
 #include <iostream>
@@ -65,6 +66,30 @@ int main()
 	negativeOverflow.normalize();
 	REQUIRE(negativeOverflow.knockBackResistance == -300);
 	REQUIRE(negativeOverflow.luck == -100);
+
+	// Corrupt network/save state must never leave a zero/negative maximum life,
+	// because gameplay and HUD code divide by maxLife.
+	Life corruptLife;
+	corruptLife.life = std::numeric_limits<short>::max();
+	corruptLife.maxLife = -20;
+	corruptLife.sanitize();
+	REQUIRE(corruptLife.maxLife == 1);
+	REQUIRE(corruptLife.life == 1);
+
+	Life zeroMaximumLife;
+	zeroMaximumLife.life = -10;
+	zeroMaximumLife.maxLife = 0;
+	zeroMaximumLife.sanitize();
+	REQUIRE(zeroMaximumLife.maxLife == 1);
+	REQUIRE(zeroMaximumLife.life == 0);
+
+	SurvivalStats hunger;
+	hunger.hunger = 50;
+	hunger.maxHunger = 100;
+	hunger.addHunger(std::numeric_limits<int>::max());
+	REQUIRE(hunger.hunger == 100);
+	hunger.addHunger(std::numeric_limits<int>::min());
+	REQUIRE(hunger.hunger == 0);
 
 	std::cout << "Entity stats tests passed.\n";
 	return 0;
