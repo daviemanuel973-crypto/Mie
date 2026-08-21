@@ -40,7 +40,8 @@ namespace
 }
 
 WorldCycleClock::WorldCycleClock(double cycleDurationSeconds):
-	cycleDurationSeconds(std::max(cycleDurationSeconds, 1.0))
+	cycleDurationSeconds(std::isfinite(cycleDurationSeconds) ?
+		std::max(cycleDurationSeconds, 1.0) : 1.0)
 {
 	reset();
 }
