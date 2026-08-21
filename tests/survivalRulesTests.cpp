@@ -71,6 +71,19 @@ int main()
 	REQUIRE(std::abs(velocity.z) < 5.f);
 	REQUIRE(velocity.y >= -2.5f);
 	REQUIRE(std::abs(acceleration.x - 0.6f) < 0.0001f);
+
+	// v0.9.5: an invalid frame delta must never poison entity motion with NaNs.
+	glm::vec3 invalidDeltaVelocity(1.f, 2.f, 3.f);
+	glm::vec3 invalidDeltaAcceleration(4.f, 5.f, 6.f);
+	const glm::vec3 velocityBeforeInvalidDelta = invalidDeltaVelocity;
+	const glm::vec3 accelerationBeforeInvalidDelta = invalidDeltaAcceleration;
+	applyCobwebMotion(invalidDeltaVelocity, invalidDeltaAcceleration, NAN);
+	REQUIRE(invalidDeltaVelocity == velocityBeforeInvalidDelta);
+	REQUIRE(invalidDeltaAcceleration == accelerationBeforeInvalidDelta);
+	applyCobwebMotion(invalidDeltaVelocity, invalidDeltaAcceleration, -1.f);
+	REQUIRE(invalidDeltaVelocity == velocityBeforeInvalidDelta);
+	REQUIRE(invalidDeltaAcceleration == accelerationBeforeInvalidDelta);
+
 	REQUIRE(ZOMBIE_WALKER_ATTACK_COOLDOWN > 0.f);
 	REQUIRE(ZOMBIE_RUNNER_ATTACK_COOLDOWN > 0.f);
 	REQUIRE(ZOMBIE_BRUTE_ATTACK_COOLDOWN >= 1.05f);
