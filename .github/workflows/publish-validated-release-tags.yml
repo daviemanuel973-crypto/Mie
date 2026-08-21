@@ -13,6 +13,7 @@ on:
         type: string
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -67,6 +68,7 @@ jobs:
           fi
 
       - name: Create Windows and Flatpak tags
+        id: release_tags
         shell: bash
         env:
           RELEASE_VERSION: ${{ inputs.version }}
@@ -76,6 +78,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          WINDOWS_CREATED=false
+          FLATPAK_CREATED=false
           for TAG in "v$RELEASE_VERSION" "linux-v$RELEASE_VERSION"; do
             REMOTE_SHA="$(git ls-remote --tags origin "refs/tags/$TAG" | awk 'NR == 1 { print $1 }')"
             if [[ -n "$REMOTE_SHA" ]]; then
@@ -89,4 +93,30 @@ jobs:
 
             git tag "$TAG" "$TARGET_SHA"
             git push origin "refs/tags/$TAG"
+            if [[ "$TAG" == "v$RELEASE_VERSION" ]]; then
+              WINDOWS_CREATED=true
+            else
+              FLATPAK_CREATED=true
+            fi
           done
+
+          echo "windows_created=$WINDOWS_CREATED" >> "$GITHUB_OUTPUT"
+          echo "flatpak_created=$FLATPAK_CREATED" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch Windows release
+        if: steps.release_tags.outputs.windows_created == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: gh workflow run publish-windows-release.yml --repo "$GH_REPO" --ref "v$RELEASE_VERSION"
+
+      - name: Dispatch Flatpak repository publication
+        if: steps.release_tags.outputs.flatpak_created == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: gh workflow run publish-flatpak-pages.yml --repo "$GH_REPO" --ref "linux-v$RELEASE_VERSION"
