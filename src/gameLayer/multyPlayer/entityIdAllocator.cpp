@@ -116,10 +116,10 @@ void PersistentEntityIdAllocator::initializeForPath(const std::string &worldSave
 bool PersistentEntityIdAllocator::reserveRange(unsigned int entityType)
 {
 	if (entityType >= TypeSlots) { return false; }
-	if (nextIds[entityType] > RawIdMask - ReservationBlock) { return false; }
+	if (nextIds[entityType] >= RawIdMask) { return false; }
 
 	auto proposed = reservedUntil;
-	proposed[entityType] = nextIds[entityType] + ReservationBlock;
+	proposed[entityType] = std::min(RawIdMask, nextIds[entityType] + ReservationBlock);
 	if (!saveState(proposed))
 	{
 		std::cerr << "Warning: could not persist the entity ID reservation.\n";
@@ -133,11 +133,13 @@ bool PersistentEntityIdAllocator::reserveRange(unsigned int entityType)
 std::uint64_t PersistentEntityIdAllocator::allocate(
 	const std::string &worldSavePath, unsigned int entityType)
 {
+	std::lock_guard<std::mutex> lock(stateMutex);
 	if (entityType >= TypeSlots) { return 0; }
 	if (!initialized || currentWorldSavePath != worldSavePath)
 	{
 		initializeForPath(worldSavePath);
 	}
+	if (nextIds[entityType] >= RawIdMask) { return 0; }
 
 	if (nextIds[entityType] >= reservedUntil[entityType] && !reserveRange(entityType))
 	{
@@ -147,12 +149,12 @@ std::uint64_t PersistentEntityIdAllocator::allocate(
 		reservedUntil[entityType] = std::min(RawIdMask, nextIds[entityType] + ReservationBlock);
 	}
 
-	if (nextIds[entityType] > RawIdMask) { return 0; }
 	return nextIds[entityType]++;
 }
 
 void PersistentEntityIdAllocator::observe(std::uint64_t entityId)
 {
+	std::lock_guard<std::mutex> lock(stateMutex);
 	const unsigned int entityType = static_cast<unsigned int>((entityId >> 56) & 0xFFu);
 	if (entityType >= TypeSlots) { return; }
 
@@ -169,6 +171,7 @@ void PersistentEntityIdAllocator::observe(std::uint64_t entityId)
 
 std::uint64_t PersistentEntityIdAllocator::peek(unsigned int entityType) const
 {
+	std::lock_guard<std::mutex> lock(stateMutex);
 	if (entityType >= TypeSlots) { return 0; }
 	const std::uint64_t current = initialized ? nextIds[entityType] : LegacyMigrationFloor;
 	return std::max(current, observedFloor[entityType]);

@@ -43,10 +43,12 @@ static std::thread enetServerThread;
 
 EntityIdHolder entityIds;
 static PersistentEntityIdAllocator persistentEntityIds;
+static std::mutex entityIdStateMutex;
 
 
 std::uint64_t getEntityIdAndIncrement(WorldSaver &worldSaver, int entityType)
 {
+	std::lock_guard<std::mutex> lock(entityIdStateMutex);
 	permaAssert(entityType < EntitiesTypesCount);
 	permaAssert(entityType >= 0);
 
@@ -60,6 +62,7 @@ std::uint64_t getEntityIdAndIncrement(WorldSaver &worldSaver, int entityType)
 
 std::uint64_t getCurrentEntityId(int entityType)
 {
+	std::lock_guard<std::mutex> lock(entityIdStateMutex);
 	permaAssert(entityType < EntitiesTypesCount);
 	permaAssert(entityType >= 0);
 	return std::max(entityIds.entityIds[entityType],
@@ -68,6 +71,7 @@ std::uint64_t getCurrentEntityId(int entityType)
 
 void reserveEntityId(std::uint64_t entityId)
 {
+	std::lock_guard<std::mutex> lock(entityIdStateMutex);
 	const unsigned int entityType = getEntityTypeFromEID(entityId);
 	if (entityType >= EntitiesTypesCount) { return; }
 	const std::uint64_t rawId = getOnlyIdFromEID(entityId);

@@ -120,6 +120,15 @@ int main()
 		{0.0, 64.0, 0.0}, {20.0, 64.0, 0.0}));
 	REQUIRE(!mie::dataIntegrity::isDroppedItemSpawnPositionValid(
 		{0.0, 64.0, 0.0}, {NAN, 64.0, 0.0}));
+	MotionState validDropMotion = {};
+	validDropMotion.velocity = {1.f, 2.f, -1.f};
+	REQUIRE(mie::dataIntegrity::isDroppedItemMotionStateValid(validDropMotion));
+	validDropMotion.velocity.x = NAN;
+	REQUIRE(!mie::dataIntegrity::isDroppedItemMotionStateValid(validDropMotion));
+	REQUIRE(mie::dataIntegrity::clampDroppedItemCatchUpSeconds(-1.f) == 0.f);
+	REQUIRE(mie::dataIntegrity::clampDroppedItemCatchUpSeconds(NAN) == 0.f);
+	REQUIRE(mie::dataIntegrity::clampDroppedItemCatchUpSeconds(1.f) ==
+		mie::dataIntegrity::MaximumDroppedItemCatchUpSeconds);
 
 	const auto collisionQuery = mie::dataIntegrity::makeBlockPlacementCollisionQuery(
 		{128.0, 70.0, -64.0}, {0.8f, 1.8f, 0.8f}, {4, 70, 9});

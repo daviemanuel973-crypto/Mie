@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 class PersistentEntityIdAllocator
@@ -27,5 +28,6 @@ private:
 	std::array<std::uint64_t, TypeSlots> reservedUntil = {};
 	std::array<std::uint64_t, TypeSlots> observedFloor = {};
 	std::string currentWorldSavePath;
+	mutable std::mutex stateMutex;
 	bool initialized = false;
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chunk.h>
+#include <gameplay/physics.h>
 #include <glm/glm.hpp>
 
 #include <algorithm>
@@ -11,6 +12,7 @@ namespace mie::dataIntegrity
 	constexpr double StreamBoundaryEpsilon = 0.001;
 	constexpr double MaximumWorldCoordinate = 30'000'000.0;
 	constexpr double MaximumDroppedItemDistance = 8.0;
+	constexpr float MaximumDroppedItemCatchUpSeconds = 0.25f;
 
 	inline glm::dvec3 clampEntityPositionToChunk(glm::dvec3 position, glm::ivec2 chunkPosition)
 	{
@@ -39,6 +41,30 @@ namespace mie::dataIntegrity
 
 		const glm::dvec3 delta = dropPosition - playerPosition;
 		return glm::dot(delta, delta) <= MaximumDroppedItemDistance * MaximumDroppedItemDistance;
+	}
+
+	inline bool isDroppedItemMotionStateValid(const MotionState &motionState)
+	{
+		const auto componentIsValid = [](float value, float maximum)
+		{
+			return std::isfinite(value) && std::abs(value) <= maximum;
+		};
+
+		for (int component = 0; component < 3; ++component)
+		{
+			if (!componentIsValid(motionState.velocity[component], MAX_VELOCITY) ||
+				!componentIsValid(motionState.acceleration[component], MAX_ACCELERATION))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	inline float clampDroppedItemCatchUpSeconds(float seconds)
+	{
+		if (!std::isfinite(seconds) || seconds <= 0.f) { return 0.f; }
+		return std::min(seconds, MaximumDroppedItemCatchUpSeconds);
 	}
 
 	struct BlockPlacementCollisionQuery

@@ -2,9 +2,12 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
+#include <vector>
 
 namespace
 {
@@ -48,6 +51,30 @@ int main()
 	PersistentEntityIdAllocator recovered;
 	const auto recoveredId = recovered.allocate(root.string(), type);
 	REQUIRE(recoveredId > afterObserved);
+
+	// Server region workers can spawn entities concurrently. The allocator must
+	// serialize range reservation and never hand the same raw ID to two workers.
+	constexpr std::size_t threadCount = 4;
+	constexpr std::size_t idsPerThread = 512;
+	PersistentEntityIdAllocator concurrent;
+	std::vector<std::uint64_t> ids(threadCount * idsPerThread);
+	std::vector<std::thread> workers;
+	workers.reserve(threadCount);
+	for (std::size_t threadIndex = 0; threadIndex < threadCount; ++threadIndex)
+	{
+		workers.emplace_back([&, threadIndex]
+		{
+			for (std::size_t idIndex = 0; idIndex < idsPerThread; ++idIndex)
+			{
+				ids[threadIndex * idsPerThread + idIndex] =
+					concurrent.allocate(root.string(), type);
+			}
+		});
+	}
+	for (auto &worker : workers) { worker.join(); }
+	REQUIRE(std::all_of(ids.begin(), ids.end(), [](std::uint64_t id) { return id != 0; }));
+	std::sort(ids.begin(), ids.end());
+	REQUIRE(std::adjacent_find(ids.begin(), ids.end()) == ids.end());
 
 	std::filesystem::remove_all(root, error);
 	std::cout << "Entity ID allocator tests passed.\n";

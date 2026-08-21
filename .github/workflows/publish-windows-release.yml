@@ -26,7 +26,7 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart('v')
           if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?([+-][0-9A-Za-z.-]+)?$') {
-            throw "Invalid semantic release version: $version"
+            throw "Invalid supported release version: $version"
           }
           if ($sourceVersion -ne $version) {
             throw "VERSION ($sourceVersion) does not match release tag ($tag)"
@@ -40,6 +40,7 @@ jobs:
           cmake -S . -B build -A x64 `
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
             -DOURCRAFT_INSTALLABLE=ON `
+            -DOURCRAFT_LOW_END_BUILD=ON `
             -DOURCRAFT_ENABLE_AVX2=OFF `
             "-DOURCRAFT_VERSION=$env:MIE_VERSION"
 
@@ -47,7 +48,7 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build --config Release --parallel 2
-          ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|entity-id-allocator)$'
+          ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|farming-persistence|entity-id-allocator)$'
 
       - name: Stage Windows package
         shell: pwsh
@@ -78,16 +79,21 @@ jobs:
           if (-not $iscc) { throw "Inno Setup compiler not found" }
           "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Build installer and checksum
+      - name: Build installer and checksums
         shell: pwsh
         run: |
           & "$env:ISCC" "/DMyAppVersion=$env:MIE_VERSION" "windows/Mie.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
           $installer = "dist/Mie-Survival-Windows-x64-Setup.exe"
           if (-not (Test-Path $installer)) { throw "Windows installer is missing" }
-          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  Mie-Survival-Windows-x64-Setup.exe" |
+          $installerHash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$installerHash  Mie-Survival-Windows-x64-Setup.exe" |
             Set-Content "$installer.sha256" -Encoding ascii -NoNewline
+          $portable = "dist/Mie-Survival-Windows-x64-Portable.zip"
+          if (-not (Test-Path $portable)) { throw "Windows portable ZIP is missing" }
+          $portableHash = (Get-FileHash $portable -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$portableHash  Mie-Survival-Windows-x64-Portable.zip" |
+            Set-Content "$portable.sha256" -Encoding ascii -NoNewline
 
       - name: Publish GitHub release assets
         shell: pwsh
@@ -98,6 +104,7 @@ jobs:
             "dist/Mie-Survival-Windows-x64-Setup.exe" `
             "dist/Mie-Survival-Windows-x64-Setup.exe.sha256" `
             "dist/Mie-Survival-Windows-x64-Portable.zip" `
+            "dist/Mie-Survival-Windows-x64-Portable.zip.sha256" `
             --verify-tag `
             --generate-notes `
             --title "Mie Survival $env:MIE_TAG"

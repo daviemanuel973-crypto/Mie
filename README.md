@@ -34,6 +34,16 @@ v0.9.3.1 is a corrective release for persistence and authoritative-world integri
 
 See [`docs/V0.9.3.1_DATA_INTEGRITY.md`](docs/V0.9.3.1_DATA_INTEGRITY.md).
 
+## v0.9.3 authoritative gameplay stabilization
+
+v0.9.3 validates block actions and positional item use against the authoritative
+server state, rejects malformed packet payloads before reading them and restores
+predicted client state after rejected mutations. New worlds can start in Survival
+or Creative mode while legacy worlds continue as Survival and existing player saves
+keep their persisted mode.
+
+See [`docs/V0.9.3_STABILIZATION.md`](docs/V0.9.3_STABILIZATION.md).
+
 ## v0.9.2 gameplay & performance
 
 v0.9.2 deliberately adds no new content. It focuses on making the existing game more robust, cheaper to simulate and more consistent to play.
@@ -48,6 +58,15 @@ v0.9.2 deliberately adds no new content. It focuses on making the existing game 
 - Save IDs, crafting recipe indexes and the multiplayer packet layout remain compatible with v0.9.1.
 
 See [`docs/V0.9.2_GAMEPLAY_PERFORMANCE.md`](docs/V0.9.2_GAMEPLAY_PERFORMANCE.md).
+
+## Reference low-end target
+
+Official Windows and Flatpak builds use the low-end defaults and do not require
+AVX2. The reference target is an Intel Core i5-7200U, Intel HD Graphics 620,
+8 GB RAM and HDD at 1280x720. The Low profile prioritizes a stable 30 FPS while
+keeping all gameplay systems enabled; visual effects can still be re-enabled.
+
+See [`docs/LOW_END_PERFORMANCE.md`](docs/LOW_END_PERFORMANCE.md).
 
 ## v0.8.0 development
 

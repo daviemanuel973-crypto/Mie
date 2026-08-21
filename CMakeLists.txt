@@ -19,12 +19,11 @@ include(CTest)
 
 option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
-option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end Linux hardware" OFF)
+option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.9.3.1" CACHE STRING "Mie Survival semantic version")
+set(OURCRAFT_VERSION "0.9.3.1" CACHE STRING "Mie Survival release version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 if (OURCRAFT_ENABLE_AVX2)
@@ -355,10 +354,11 @@ if (BUILD_TESTING)
 	add_executable(entityIdAllocatorTests
 		tests/entityIdAllocatorTests.cpp
 		src/gameLayer/multyPlayer/entityIdAllocator.cpp)
+	find_package(Threads REQUIRED)
 	target_include_directories(entityIdAllocatorTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/safeSave/include/")
-	target_link_libraries(entityIdAllocatorTests PRIVATE safeSave)
+	target_link_libraries(entityIdAllocatorTests PRIVATE safeSave Threads::Threads)
 	add_test(NAME entity-id-allocator COMMAND entityIdAllocatorTests)
 
 	set_tests_properties(

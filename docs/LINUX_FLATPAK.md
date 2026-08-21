@@ -1,6 +1,6 @@
 # Mie Survival on Linux (Flatpak)
 
-This branch packages the Survival v0.1 game as a persistent Linux desktop application.
+This branch packages Mie Survival v0.9.3.1 as a persistent Linux desktop application.
 
 ## App identity
 
@@ -92,7 +92,7 @@ Create these repository Actions secrets:
 
 Never commit the private key.
 
-After Pages and the two secrets are configured, run **Publish Flatpak Repository** manually or push a tag matching `linux-v*` (for example `linux-v0.1.0`).
+After Pages and the two secrets are configured, run **Publish Flatpak Repository** manually or push a tag matching `linux-v*` (for example `linux-v0.9.3.1`).
 
 ## Sandbox permissions
 
