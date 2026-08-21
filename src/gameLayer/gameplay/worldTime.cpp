@@ -170,12 +170,26 @@ void setClientWorldTime(float dayPhase, std::uint64_t completedCycles, bool adva
 void updateClientWorldTime(float deltaTime)
 {
 	if (!clientWorldTime.advancing || !std::isfinite(deltaTime) || deltaTime <= 0.f) { return; }
-	clientWorldTime.dayPhase += static_cast<float>(deltaTime / DEFAULT_WORLD_CYCLE_SECONDS);
-	if (clientWorldTime.dayPhase >= 1.f)
+
+	const double totalPhase = static_cast<double>(clientWorldTime.dayPhase) +
+		static_cast<double>(deltaTime) / DEFAULT_WORLD_CYCLE_SECONDS;
+	if (!std::isfinite(totalPhase)) { return; }
+
+	const double completed = std::floor(totalPhase);
+	clientWorldTime.dayPhase = static_cast<float>(totalPhase - completed);
+	if (completed <= 0.0) { return; }
+
+	const std::uint64_t advancedCycles = completed >= static_cast<double>(
+		std::numeric_limits<std::uint64_t>::max()) ? std::numeric_limits<std::uint64_t>::max() :
+		static_cast<std::uint64_t>(completed);
+	if (advancedCycles > std::numeric_limits<std::uint64_t>::max() -
+		clientWorldTime.completedCycles)
 	{
-		const float completed = std::floor(clientWorldTime.dayPhase);
-		clientWorldTime.dayPhase -= completed;
-		clientWorldTime.completedCycles += static_cast<std::uint64_t>(completed);
+		clientWorldTime.completedCycles = std::numeric_limits<std::uint64_t>::max();
+	}
+	else
+	{
+		clientWorldTime.completedCycles += advancedCycles;
 	}
 }
 
