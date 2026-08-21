@@ -1,6 +1,18 @@
 #include <gameplay/entityStats.h>
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
+namespace
+{
+	short saturatingAddShort(short left, short right)
+	{
+		const int sum = static_cast<int>(left) + static_cast<int>(right);
+		return static_cast<short>(std::clamp(sum,
+			static_cast<int>(std::numeric_limits<short>::min()),
+			static_cast<int>(std::numeric_limits<short>::max())));
+	}
+}
 
 std::string EntityStats::formatDataToString()
 {
@@ -50,20 +62,17 @@ std::string EntityStats::formatDataToString()
 
 void EntityStats::add(EntityStats &other)
 {
-
 	runningSpeed += other.runningSpeed;
-	armour += other.armour;
-	knockBackResistance += other.knockBackResistance;
-	thorns += other.thorns;
-	meleDamage += other.meleDamage;
-	meleAttackSpeed += other.meleAttackSpeed;
-	critChance += other.critChance;
-	stealthSound += other.stealthSound;
-	stealthVisibility += other.stealthVisibility;
-	luck += other.luck;
-	improvedMiningPower += other.improvedMiningPower;
-
-
+	armour = saturatingAddShort(armour, other.armour);
+	knockBackResistance = saturatingAddShort(knockBackResistance, other.knockBackResistance);
+	thorns = saturatingAddShort(thorns, other.thorns);
+	meleDamage = saturatingAddShort(meleDamage, other.meleDamage);
+	meleAttackSpeed = saturatingAddShort(meleAttackSpeed, other.meleAttackSpeed);
+	critChance = saturatingAddShort(critChance, other.critChance);
+	stealthSound = saturatingAddShort(stealthSound, other.stealthSound);
+	stealthVisibility = saturatingAddShort(stealthVisibility, other.stealthVisibility);
+	luck = saturatingAddShort(luck, other.luck);
+	improvedMiningPower = saturatingAddShort(improvedMiningPower, other.improvedMiningPower);
 }
 
 void EntityStats::normalize()
@@ -71,6 +80,7 @@ void EntityStats::normalize()
 	// runningSpeed is a percentage modifier just like the other offensive/player
 	// stats. The previous 0..0 clamp silently erased every movement-speed bonus.
 	// Keep the same bounded modifier contract used by the neighboring stats.
+	if (!std::isfinite(runningSpeed)) { runningSpeed = 0.f; }
 	runningSpeed = std::clamp(runningSpeed, -300.f, 300.f);
 	armour = std::clamp(armour, (short)0, (short)300);
 	knockBackResistance = std::clamp(knockBackResistance, (short)-300, (short)100);
@@ -82,6 +92,4 @@ void EntityStats::normalize()
 	stealthVisibility = std::clamp(stealthVisibility, (short)-300, (short)300);
 	luck = std::clamp(luck, (short)-100, (short)100);
 	improvedMiningPower = std::clamp(improvedMiningPower, (short)-300, (short)300);
-
-
 }
