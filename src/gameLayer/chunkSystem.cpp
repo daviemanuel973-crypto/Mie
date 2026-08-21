@@ -11,8 +11,51 @@
 #include <platformTools.h>
 #include <cmath>
 #include <gameplay/gameplayRules.h>
+#include <gameplay/voxelRaycast.h>
 #include <rendering/renderSettings.h>
 #include <gameplay/entityManagerClient.h>
+
+namespace
+{
+	bool rayIntersectsBlockCollider(const glm::dvec3 &origin, const glm::dvec3 &direction,
+		const glm::ivec3 &blockPosition, const BlockCollider &collider,
+		double maximumDistance, double &intersectionDistance)
+	{
+		const glm::dvec3 halfSize = glm::dvec3(collider.size) * 0.5;
+		const glm::dvec3 bottomCenter = glm::dvec3(blockPosition) +
+			glm::dvec3(0.0, -0.5, 0.0) + glm::dvec3(collider.offset);
+		const glm::dvec3 minimum(bottomCenter.x - halfSize.x, bottomCenter.y,
+			bottomCenter.z - halfSize.z);
+		const glm::dvec3 maximum(bottomCenter.x + halfSize.x,
+			bottomCenter.y + static_cast<double>(collider.size.y),
+			bottomCenter.z + halfSize.z);
+
+		double nearDistance = 0.0;
+		double farDistance = maximumDistance;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			if (std::abs(direction[axis]) <= 1e-12)
+			{
+				if (origin[axis] < minimum[axis] || origin[axis] > maximum[axis])
+				{
+					return false;
+				}
+				continue;
+			}
+
+			double first = (minimum[axis] - origin[axis]) / direction[axis];
+			double second = (maximum[axis] - origin[axis]) / direction[axis];
+			if (first > second) { std::swap(first, second); }
+			nearDistance = std::max(nearDistance, first);
+			farDistance = std::min(farDistance, second);
+			if (nearDistance > farDistance) { return false; }
+		}
+
+		if (farDistance < 0.0 || nearDistance > maximumDistance) { return false; }
+		intersectionDistance = std::max(0.0, nearDistance);
+		return true;
+	}
+}
 
 Block *ChunkSystem::getBlockAndData(glm::ivec3 blockPos, std::vector<unsigned char> &data, Chunk *&chunk)
 {
@@ -1093,62 +1136,64 @@ void ChunkSystem::getBlockSafeWithNeigbhoursStopIfCenterFails(int x, int y, int 
 Block *ChunkSystem::rayCast(glm::dvec3 from, glm::vec3 dir, glm::ivec3 &outPos,
 	float maxDist, std::optional<glm::ivec3> &prevBlockForPlace, float &outDist)
 {
-	float deltaMagitude = 0.01f;
-	glm::vec3 delta = glm::normalize(dir) * deltaMagitude;
-
-	glm::dvec3 pos = from;
-
+	outDist = 0.f;
 	prevBlockForPlace = std::nullopt;
+	if (!std::isfinite(maxDist) || maxDist <= 0.f) { return nullptr; }
 
-	for (float walkedDist = 0.f; walkedDist < maxDist; walkedDist += deltaMagitude)
+	const glm::dvec3 rayDirection(dir);
+	const double rayLength = glm::length(rayDirection);
+	if (!std::isfinite(rayLength) || rayLength <= 1e-12) { return nullptr; }
+	const glm::dvec3 normalizedRayDirection = rayDirection / rayLength;
+	Block *hitBlock = nullptr;
+	std::optional<glm::ivec3> lastAirBlock;
+	visitVoxelsOnRay(from, rayDirection, static_cast<double>(maxDist),
+		[&](const glm::ivec3 &blockPosition, double entryDistance)
 	{
-		outDist = walkedDist;
-
-		glm::ivec3 intPos = from3DPointToBlock(pos);
-		outPos = intPos;
-		auto b = getBlockSafe(intPos.x, intPos.y, intPos.z);
-		
-		if (b != nullptr)
+		outPos = blockPosition;
+		Block *block = getBlockSafe(blockPosition.x, blockPosition.y, blockPosition.z);
+		if (!block) { return false; }
+		if (block->air())
 		{
-			if (!b->air())
-			{
-				
-				bool collide = 0;
-
-
-				collide = boxColideBlockWithCollider(pos, glm::dvec3(0, 0, 0),
-					intPos, b->getCollider());
-
-				if (b->hasSecondCollider())
-				{
-					collide |= boxColideBlockWithCollider(pos, glm::dvec3(0, 0, 0),
-						intPos, b->getSecondCollider());
-				}
-
-
-				if(collide)
-				{
-					outPos = intPos;
-					return b;
-				}
-				else
-				{
-					prevBlockForPlace = std::nullopt;
-				}
-				
-			}
-			else
-			{
-				prevBlockForPlace = intPos;
-			}
+			lastAirBlock = blockPosition;
+			return false;
 		}
 
-		pos += delta;
-	}
+		double closestDistance = static_cast<double>(maxDist) + 1.0;
+		double colliderDistance = 0.0;
+		if (rayIntersectsBlockCollider(from, normalizedRayDirection, blockPosition,
+			block->getCollider(), maxDist, colliderDistance))
+		{
+			closestDistance = colliderDistance;
+		}
+		if (block->hasSecondCollider() &&
+			rayIntersectsBlockCollider(from, normalizedRayDirection, blockPosition,
+				block->getSecondCollider(), maxDist, colliderDistance))
+		{
+			closestDistance = std::min(closestDistance, colliderDistance);
+		}
 
-	outDist = 0;
-	prevBlockForPlace = std::nullopt;
-	return nullptr;
+		if (closestDistance <= static_cast<double>(maxDist) &&
+			closestDistance + 1e-9 >= entryDistance)
+		{
+			hitBlock = block;
+			outPos = blockPosition;
+			outDist = static_cast<float>(closestDistance);
+			prevBlockForPlace = lastAirBlock;
+			return true;
+		}
+
+		// A ray can cross the empty portion of a slab/stair. Do not use an older
+		// air cell as placement support until another air cell is traversed.
+		lastAirBlock.reset();
+		return false;
+	});
+
+	if (!hitBlock)
+	{
+		outDist = 0.f;
+		prevBlockForPlace = std::nullopt;
+	}
+	return hitBlock;
 }
 
 void ChunkSystem::changeBlockLightStuff(glm::ivec3 pos, int currentSkyLightLevel, 

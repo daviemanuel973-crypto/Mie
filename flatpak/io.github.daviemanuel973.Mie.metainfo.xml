@@ -20,6 +20,11 @@
     <name>Mie contributors</name>
   </developer>
   <releases>
+    <release version="0.9.4" date="2026-08-21">
+      <description>
+        <p>Gameplay, networking, save durability and low-end performance stabilization without new content.</p>
+      </description>
+    </release>
     <release version="0.9.3.1" date="2026-08-21">
       <description>
         <p>Data-integrity hotfix for transactional sidecars, persistent entity IDs and authoritative item drops.</p>

@@ -408,9 +408,9 @@ void setBodyAndLookOrientation(glm::vec2 &bodyOrientation, glm::vec3 &lookDirect
 
 }
 
-void PhysicalEntity::jump(float impulse)
+void PhysicalEntity::jump(float impulse, bool allowAirborne)
 {
-	forces.jump(impulse);
+	forces.jump(impulse, allowAirborne);
 }
 
 void PhysicalEntity::move(glm::vec2 move)

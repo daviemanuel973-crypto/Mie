@@ -110,7 +110,7 @@ struct BasicEnemyBehaviour
 		float deltaTime, decltype(chunkGetterSignature) *chunkGetter,
 		ServerChunkStorer &serverChunkStorer, std::minstd_rand &rng, std::uint64_t yourEID,
 		std::unordered_set<std::uint64_t> &othersDeleted,
-		std::unordered_map<std::uint64_t, std::unordered_map<glm::ivec3, PathFindingNode>> &pathFindingSurvival,
+		PathFindingFieldView &pathFindingSurvival,
 		std::unordered_map<std::uint64_t, glm::dvec3> &playersPositionSurvival, const glm::dvec3 currentPosition,
 		std::unordered_map < std::uint64_t, Client *> &allClients,
 		BasicEnemyBehaviourOtherSettings otherSettings)
@@ -645,9 +645,11 @@ struct BasicEnemyBehaviour
 
 					auto pos = from3DPointToBlock(currentPosition);
 
-					auto foundNode = path->second.find(pos);
+					const PathFindingField *field = path->second;
+					if (!field) { return false; }
+					auto foundNode = field->find(pos);
 
-					if (foundNode != path->second.end())
+					if (foundNode != field->end())
 					{
 
 						std::pair<glm::ivec3, PathFindingNode> interPolateNode = *foundNode;
@@ -667,9 +669,9 @@ struct BasicEnemyBehaviour
 									break;
 								}
 
-								auto newFoundNode = path->second.find(interPolateNodeNotGood.second.returnPos);
+								auto newFoundNode = field->find(interPolateNodeNotGood.second.returnPos);
 
-								if (newFoundNode != path->second.end())
+								if (newFoundNode != field->end())
 								{
 									if (newFoundNode->second.level > 0)
 									{
@@ -827,8 +829,6 @@ struct BasicEnemyBehaviour
 				if (1)
 					if (!pathFindingSucceeded)
 					{
-						std::cout << "path finding failed!\n";
-
 						glm::vec3 d = playerLockedOnPosition
 							- currentPosition;
 						d.y = 0;

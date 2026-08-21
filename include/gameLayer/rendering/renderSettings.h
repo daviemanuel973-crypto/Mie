@@ -103,7 +103,26 @@ struct ShadingSettings
 	// Equality operator
 	bool operator==(const ShadingSettings &other) const
 	{
-		return std::memcmp(this, &other, sizeof(ShadingSettings)) == 0;
+		return viewDistance == other.viewDistance && tonemapper == other.tonemapper &&
+			shadows == other.shadows && waterType == other.waterType &&
+			workerThreadsForBaking == other.workerThreadsForBaking &&
+			lodStrength == other.lodStrength && PBR == other.PBR &&
+			maxLights == other.maxLights && useLights == other.useLights &&
+			lightsStrength == other.lightsStrength && FXAA == other.FXAA &&
+			glm::all(glm::equal(waterColor, other.waterColor)) &&
+			glm::all(glm::equal(underWaterColor, other.underWaterColor)) &&
+			underwaterDarkenStrength == other.underwaterDarkenStrength &&
+			underwaterDarkenDistance == other.underwaterDarkenDistance &&
+			fogGradientUnderWater == other.fogGradientUnderWater &&
+			bloomTresshold == other.bloomTresshold && bloomMultiplier == other.bloomMultiplier &&
+			exposure == other.exposure && fogGradient == other.fogGradient &&
+			bloom == other.bloom && SSR == other.SSR &&
+			toneMapSaturation == other.toneMapSaturation &&
+			toneMapVibrance == other.toneMapVibrance && toneMapGamma == other.toneMapGamma &&
+			toneMapShadowBoost == other.toneMapShadowBoost &&
+			toneMapHighlightBoost == other.toneMapHighlightBoost && vignette == other.vignette &&
+			glm::all(glm::equal(toneMapLift, other.toneMapLift)) &&
+			glm::all(glm::equal(toneMapGain, other.toneMapGain));
 	}
 
 	// Inequality operator

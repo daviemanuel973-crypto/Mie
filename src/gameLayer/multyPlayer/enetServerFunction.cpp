@@ -33,6 +33,7 @@
 #include <cmath>
 #include <algorithm>
 #include <multyPlayer/entityIdAllocator.h>
+#include <multyPlayer/dataIntegrity.h>
 
 //todo add to a struct
 ENetHost *server = 0;
@@ -114,13 +115,6 @@ bool checkIfPlayerShouldGetChunk(glm::ivec2 playerPos2D,
 	}
 }
 
-//todo this should dissapear
-Client getClient(std::uint64_t cid)
-{
-	Client rez = connections[cid];
-	return rez;
-}
-
 Client *getClientSafe(std::uint64_t cid)
 {
 	auto found = connections.find(cid);
@@ -140,13 +134,6 @@ Client *getClientNotLocked(std::uint64_t cid)
 	return &it->second;
 }
 
-//todo, check if every use of this is good, and that it is ok that it is a copy, or remove it completely
-std::unordered_map<std::uint64_t, Client> getAllClients()
-{
-	auto rez = connections;
-	return rez;
-}
-
 std::unordered_map<std::uint64_t, Client> &getAllClientsReff()
 {
 	return connections;
@@ -157,7 +144,7 @@ void insertConnection(std::uint64_t cid, Client &c)
 	connections.insert({cid, c});
 }
 
-void sentNewConnectionMessage(ENetPeer *peer, Client c, std::uint64_t eid)
+void sentNewConnectionMessage(ENetPeer *peer, const Client &c, std::uint64_t eid)
 {
 	Packet p;
 	p.header = headerClientRecieveOtherPlayerPosition;
@@ -171,7 +158,7 @@ void sentNewConnectionMessage(ENetPeer *peer, Client c, std::uint64_t eid)
 		sizeof(data), true, channelHandleConnections);
 }
 
-void broadcastNewConnectionMessage(ENetPeer *peerToIgnore, Client c, std::uint64_t cid)
+void broadcastNewConnectionMessage(ENetPeer *peerToIgnore, const Client &c, std::uint64_t cid)
 {
 	Packet p;
 	p.header = headerClientRecieveOtherPlayerPosition;
@@ -343,13 +330,15 @@ void finishAddingConnection(ENetEvent &event, WorldSaver &worldSaver,
 		Packet p;
 		p.header = headerReceiveCIDAndData;
 		p.cid = id;
-	
+		const Client *connectedClient = getClientNotLocked(id);
+		if (!connectedClient) { return; }
+
 		Packet_ReceiveCIDAndData packetToSend = {};
-		packetToSend.entity = getClient(id).playerData.entity;
+		packetToSend.entity = connectedClient->playerData.entity;
 		packetToSend.yourPlayerEntityId = id;
 		packetToSend.timer = getTimer();
-		packetToSend.otherSettings = getClient(id).playerData.otherPlayerSettings;
-		packetToSend.survivalStats = getClient(id).playerData.survivalStats;
+		packetToSend.otherSettings = connectedClient->playerData.otherPlayerSettings;
+		packetToSend.survivalStats = connectedClient->playerData.survivalStats;
 
 		//send own cid
 		sendPacket(event.peer, p, (const char *)&packetToSend,
@@ -417,8 +406,10 @@ void finishAddingConnection(ENetEvent &event, WorldSaver &worldSaver,
 	addCidToServerSettings(id);
 
 	//send this to others
-	Client c = *getClientNotLocked(id);
-	broadcastNewConnectionMessage(event.peer, c, id);
+	if (const Client *connectedClient = getClientNotLocked(id))
+	{
+		broadcastNewConnectionMessage(event.peer, *connectedClient, id);
+	}
 
 }
 
@@ -478,7 +469,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		if (!p.isCompressed() && data && size == sizeof(Packet_ClientIdentity))
 		{
 			const auto &identityPacket = *reinterpret_cast<const Packet_ClientIdentity *>(data);
-			if (identityPacket.protocolVersion == PLAYER_IDENTITY_PROTOCOL_VERSION)
+			if (identityPacket.protocolVersion == MULTIPLAYER_PROTOCOL_VERSION)
 			{
 				finishAddingConnection(event, worldSaver, identityPacket.identity);
 				return;
@@ -504,7 +495,9 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		p.setNotCompressed();
 		if (p.header != headerSendPlayerSkin)
 		{
-			permaAssertComment(0, "Decompresion on the server Not implemented!");
+			reportError("Rejected unsupported compressed client packet.");
+			enet_peer_disconnect(event.peer, 0);
+			return;
 		}
 
 		wasCompressed = true;
@@ -652,18 +645,33 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packer_SendPlayerData &packetData = *(Packer_SendPlayerData *)data;
+			Packer_SendPlayerData packetData = {};
+			memcpy(&packetData, data, sizeof(packetData));
 			const auto &position = packetData.playerData.position;
-			if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
-				!std::isfinite(position.z) || std::abs(position.x) > 30'000'000.0 ||
-				std::abs(position.y) > 30'000'000.0 || std::abs(position.z) > 30'000'000.0)
+			if (!mie::dataIntegrity::isFiniteWorldPosition(position) ||
+				!mie::dataIntegrity::isDroppedItemMotionStateValid(packetData.playerData.forces))
 			{
-				reportError("rejected player update with invalid position");
+				reportError("Rejected player update with invalid transform or motion state.");
 				break;
 			}
-			packetData.playerData.chunkDistance = std::clamp(packetData.playerData.chunkDistance, 2, 64);
+			const std::uint64_t now = getTimer();
+			const bool timestampTooOld = packetData.timer < now && now - packetData.timer > 1000;
+			const bool timestampTooFarAhead = packetData.timer > now + 2000;
+			const bool timestampDidNotAdvance = connection->second.lastAcceptedPlayerSimulationMs != 0 &&
+				packetData.timer <= connection->second.lastAcceptedPlayerSimulationMs;
+			const bool updateRateExceeded = connection->second.lastAcceptedPlayerUpdateMs != 0 &&
+				now - connection->second.lastAcceptedPlayerUpdateMs < 12;
+			if (timestampTooOld || timestampTooFarAhead || timestampDidNotAdvance || updateRateExceeded)
+			{
+				break;
+			}
+			connection->second.lastAcceptedPlayerUpdateMs = now;
+			connection->second.lastAcceptedPlayerSimulationMs = packetData.timer;
+			// Bound client-controlled streaming work. A forged 64-chunk request can
+			// otherwise cause a large CPU/RAM spike on the server.
+			packetData.playerData.chunkDistance = std::clamp(packetData.playerData.chunkDistance, 2, 24);
 
-			Client clientCopy = {};
+			ENetPeer *peerToIgnore = nullptr;
 			std::uint64_t clientCopyCid = 0;
 		
 			{
@@ -671,7 +679,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				if (connection->second.playerData.entity.position != packetData.playerData.position)
 				{
 
-					clientCopy = connection->second;
+					peerToIgnore = connection->second.peer;
 					clientCopyCid = connection->first;
 
 					//todo something better here...
@@ -688,27 +696,31 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 			}
 
-			//todo broadcast with the other entities maybe?
-			// or at least make sure only players that need to recieve this recieve updates.
-			if (packetData.timer + 16 * 4 > getTimer())
+			if (clientCopyCid)
 			{
+				Packet_ClientRecieveOtherPlayerPosition sendData;
 
-				//broadcast player movement
-				if (clientCopyCid)
+				sendData.timer = now;
+				sendData.eid = clientCopyCid;
+				sendData.entity = packetData.playerData;
+
+				Packet p;
+				p.cid = 0;
+				p.header = headerClientRecieveOtherPlayerPosition;
+
+				const glm::ivec2 playerChunk = determineChunkThatIsEntityIn(
+					packetData.playerData.position);
+				for (auto &recipient : connections)
 				{
-					Packet_ClientRecieveOtherPlayerPosition sendData;
-
-					sendData.timer = getTimer();
-					sendData.eid = clientCopyCid;
-					sendData.entity = clientCopy.playerData.entity;
-
-					Packet p;
-					p.cid = 0;
-					p.header = headerClientRecieveOtherPlayerPosition;
-
-					broadCast(p, &sendData, sizeof(sendData), clientCopy.peer, false, channelPlayerPositions);
+					if (recipient.second.peer == peerToIgnore ||
+						recipient.second.loadedChunks.find(playerChunk) == recipient.second.loadedChunks.end())
+					{
+						continue;
+					}
+					sendPacket(recipient.second.peer, p,
+						reinterpret_cast<const char *>(&sendData), sizeof(sendData),
+						false, channelPlayerPositions);
 				}
-
 			}
 
 			break;
@@ -913,7 +925,19 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 		case headerSendPlayerSkin:
 		{
-			if (!data || size > 4 * PLAYER_SKIN_SIZE * PLAYER_SKIN_SIZE) { break; }
+			const std::size_t rawSkinSize = 4u * PLAYER_SKIN_SIZE * PLAYER_SKIN_SIZE;
+			if (!data || size > rawSkinSize || (!wasCompressed && size != rawSkinSize)) { break; }
+			if (wasCompressed)
+			{
+				std::size_t decompressedSize = 0;
+				void *verifiedSkin = unCompressDataBounded(data, size, decompressedSize, rawSkinSize);
+				if (!verifiedSkin || decompressedSize != rawSkinSize)
+				{
+					delete[] static_cast<char *>(verifiedSkin);
+					break;
+				}
+				delete[] static_cast<char *>(verifiedSkin);
+			}
 
 			connection->second.skinData.resize(size);
 			memcpy(connection->second.skinData.data(), data, size);
@@ -949,24 +973,33 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packet_AttackEntity *packetData = (Packet_AttackEntity *)data;
+			Packet_AttackEntity packetData = {};
+			memcpy(&packetData, data, sizeof(packetData));
 			serverTask.t.taskType = Task::clientAttackedEntity;
-			serverTask.t.entityId = packetData->entityID;
-			serverTask.t.inventroySlot = packetData->inventorySlot;
-			serverTask.t.revisionNumber = packetData->inventoryRevision;
-			serverTask.t.vector = packetData->direction;
-			serverTask.t.hitResult = packetData->hitResult;
+			serverTask.t.entityId = packetData.entityID;
+			serverTask.t.inventroySlot = packetData.inventorySlot;
+			serverTask.t.revisionNumber = packetData.inventoryRevision;
+			serverTask.t.vector = packetData.direction;
+			serverTask.t.hitResult = packetData.hitResult;
 
 			//early ignore useless packets
-			if (serverTask.t.hitResult.hitCorectness > 1 ||
+			const glm::vec3 attackDirection = serverTask.t.vector;
+			const float directionLengthSquared = glm::dot(attackDirection, attackDirection);
+			if (!std::isfinite(serverTask.t.hitResult.hitCorectness) ||
+				!std::isfinite(serverTask.t.hitResult.bonusCritChance) ||
+				!std::isfinite(attackDirection.x) || !std::isfinite(attackDirection.y) ||
+				!std::isfinite(attackDirection.z) || !std::isfinite(directionLengthSquared) ||
+				directionLengthSquared <= 0.000001f || directionLengthSquared > 4.f ||
+				serverTask.t.hitResult.hitCorectness > 1 ||
 				serverTask.t.hitResult.hitCorectness < 0 ||
 				serverTask.t.hitResult.bonusCritChance > 1 ||
-				serverTask.t.hitResult.bonusCritChance < 0 ||
+				serverTask.t.hitResult.bonusCritChance < -1 ||
 				serverTask.t.hitResult.hit == 0
 				)
 			{
 				break;
 			}
+			serverTask.t.vector = glm::normalize(attackDirection);
 
 			serverTasks.push_back(serverTask);
 			break;
@@ -991,6 +1024,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 			}
 
 			Packet_ClientDamageLocally *packetData = (Packet_ClientDamageLocally *)data;
+			if (packetData->damage <= 0 || packetData->damage > 1000) { break; }
 
 			serverTask.t.taskType = Task::clientRecievedDamageLocally;
 			serverTask.t.damage = packetData->damage;

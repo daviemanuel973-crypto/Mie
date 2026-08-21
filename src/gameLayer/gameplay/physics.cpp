@@ -725,9 +725,9 @@ void applyImpulse(MotionState &force, glm::vec3 impulse, float mass)
 	force.velocity += impulse * mass;
 }
 
-void MotionState::jump(float impulse)
+void MotionState::jump(float impulse, bool allowAirborne)
 {
-	if (colidesBottom())
+	if (colidesBottom() || allowAirborne)
 	{
 		applyImpulse(*this, glm::vec3{0,impulse,0});
 		setColidesBottom(false);

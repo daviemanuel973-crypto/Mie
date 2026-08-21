@@ -47,7 +47,7 @@ bool inventoryContainsGuideWoodLog(const PlayerInventory &inventory);
 
 // Client-side mirror of the authoritative server progress. The shipped v0.7
 // executable exposes these symbols and synchronizes the 8-byte GuideProgress
-// payload over packet header 51.
+// payload over the dedicated packet header 52.
 GuideProgress getClientGuideProgress();
 void setClientGuideProgress(GuideProgress progress);
 void resetClientGuideProgress();

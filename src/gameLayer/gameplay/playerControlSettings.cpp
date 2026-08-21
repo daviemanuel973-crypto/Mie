@@ -37,6 +37,27 @@ MovementAssistOutput evaluateMovementAssist(const PlayerControlSettings &setting
 	return output;
 }
 
+bool updateBufferedJump(BufferedJumpState &state, float deltaTime,
+	bool grounded, bool jumpPressed, float coyoteSeconds, float bufferSeconds)
+{
+	if (!std::isfinite(deltaTime) || deltaTime < 0.f) { deltaTime = 0.f; }
+	if (!std::isfinite(coyoteSeconds) || coyoteSeconds < 0.f) { coyoteSeconds = 0.f; }
+	if (!std::isfinite(bufferSeconds) || bufferSeconds < 0.f) { bufferSeconds = 0.f; }
+
+	state.coyoteSecondsRemaining = grounded ? coyoteSeconds :
+		std::max(0.f, state.coyoteSecondsRemaining - deltaTime);
+	state.bufferedSecondsRemaining = jumpPressed ? bufferSeconds :
+		std::max(0.f, state.bufferedSecondsRemaining - deltaTime);
+
+	if (state.coyoteSecondsRemaining > 0.f && state.bufferedSecondsRemaining > 0.f)
+	{
+		state.coyoteSecondsRemaining = 0.f;
+		state.bufferedSecondsRemaining = 0.f;
+		return true;
+	}
+	return false;
+}
+
 PlayerControlSettings &getPlayerControlSettings()
 {
 	return settings;

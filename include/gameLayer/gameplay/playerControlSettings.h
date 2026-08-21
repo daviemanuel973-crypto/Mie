@@ -35,6 +35,16 @@ struct MovementAssistOutput
 	bool run = false;
 };
 
+struct BufferedJumpState
+{
+	float coyoteSecondsRemaining = 0.f;
+	float bufferedSecondsRemaining = 0.f;
+};
+
+bool updateBufferedJump(BufferedJumpState &state, float deltaTime,
+	bool grounded, bool jumpPressed, float coyoteSeconds = 0.10f,
+	float bufferSeconds = 0.10f);
+
 MovementAssistOutput evaluateMovementAssist(const PlayerControlSettings &settings,
 	const MovementAssistInput &input);
 

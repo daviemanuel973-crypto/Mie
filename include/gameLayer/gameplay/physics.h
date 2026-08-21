@@ -52,14 +52,20 @@ struct MotionState
 	bool colidesLeft() { return colides &  0b000010; }
 	bool colidesRight() { return colides & 0b000001; }
 
-	void setColidesFront(bool b) { colides ^= 0b100000; }
-	void setColidesBack(bool b) { colides ^=  0b010000; }
-	void setColidesTop(bool b) { colides ^=   0b001000; }
-	void setColidesBottom(bool b) { colides ^=0b000100; }
-	void setColidesLeft(bool b) { colides ^=  0b000010; }
-	void setColidesRight(bool b) { colides ^= 0b000001; }
+	void setCollisionFlag(unsigned char mask, bool enabled)
+	{
+		if (enabled) { colides = static_cast<unsigned char>(colides | mask); }
+		else { colides = static_cast<unsigned char>(colides & static_cast<unsigned char>(~mask)); }
+	}
 
-	void jump(float impulse = BASIC_JUMP_IMPULSE);
+	void setColidesFront(bool b) { setCollisionFlag(0b100000, b); }
+	void setColidesBack(bool b) { setCollisionFlag(0b010000, b); }
+	void setColidesTop(bool b) { setCollisionFlag(0b001000, b); }
+	void setColidesBottom(bool b) { setCollisionFlag(0b000100, b); }
+	void setColidesLeft(bool b) { setCollisionFlag(0b000010, b); }
+	void setColidesRight(bool b) { setCollisionFlag(0b000001, b); }
+
+	void jump(float impulse = BASIC_JUMP_IMPULSE, bool allowAirborne = false);
 };
 
 

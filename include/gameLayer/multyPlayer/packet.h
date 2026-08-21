@@ -21,6 +21,7 @@
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
+constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 2;
 
 struct EventId
 {
@@ -102,6 +103,7 @@ enum : std::uint32_t
 	headerUpdateSiegeStatus,
 	headerUpdateWorldTime,
 	headerUpdateWorldDifficulty,
+	headerUpdateGuideProgress,
 
 };
 
@@ -143,7 +145,7 @@ struct Packet_ClientUpdateTimer
 
 struct Packet_ClientIdentity
 {
-	std::uint32_t protocolVersion = PLAYER_IDENTITY_PROTOCOL_VERSION;
+	std::uint32_t protocolVersion = MULTIPLAYER_PROTOCOL_VERSION;
 	PlayerIdentity identity = {};
 };
 
@@ -402,6 +404,9 @@ struct Packet_ClientDroppedChunk
 };
 
 void *unCompressData(const char *data, size_t compressedSize, size_t &originalSize);
+
+void *unCompressDataBounded(const char *data, size_t compressedSize, size_t &originalSize,
+	size_t maximumOriginalSize);
 
 void sendPacketAndCompress(ENetPeer *to, Packet p,
 	const char *data, size_t size, bool reliable, int channel,
