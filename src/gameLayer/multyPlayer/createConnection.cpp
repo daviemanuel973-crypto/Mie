@@ -14,6 +14,8 @@
 #include <gameplay/worldTime.h>
 #include <gameplay/worldDifficulty.h>
 #include <lightSystem.h>
+#include <multyPlayer/packetValidation.h>
+#include <multyPlayer/dataIntegrity.h>
 
 static ConnectionData clientData;
 
@@ -74,11 +76,24 @@ ConnectionData getConnectionData()
 	return clientData;
 }
 
+template <class EntityPayload>
+bool isValidNetworkEntityPayload(const EntityPayload &entityPayload)
+{
+	if constexpr (hasForces<EntityPayload>)
+	{
+		return mie::dataIntegrity::isFiniteWorldPosition(entityPayload.position) &&
+			mie::dataIntegrity::isDroppedItemMotionStateValid(entityPayload.forces);
+	}
+	return true;
+}
+
 #define CASE_UPDATE(I) case I: { \
 if (size != sizeof(Packet_UpdateGenericEntity) + sizeof(decltype((*entityManager.entityGetter<I>())[0].entityBuffered))) { break; } \
-auto *p = (decltype((*entityManager.entityGetter<I>())[0].entityBuffered) *)(data + sizeof(Packet_UpdateGenericEntity)); \
+decltype((*entityManager.entityGetter<I>())[0].entityBuffered) entityPayload = {}; \
+memcpy(&entityPayload, data + sizeof(Packet_UpdateGenericEntity), sizeof(entityPayload)); \
+if (!isValidNetworkEntityPayload(entityPayload)) { break; } \
 float restantTimer = computeRestantTimer(firstPart->timer, serverTimer); \
-entityManager.addOrUpdateGenericEntity< I >(firstPart->eid, *p, undoQueue, restantTimer, serverTimer, firstPart->timer);\
+entityManager.addOrUpdateGenericEntity< I >(firstPart->eid, entityPayload, undoQueue, restantTimer, serverTimer, firstPart->timer);\
 } break;
 
 void recieveDataClient(ENetEvent &event, 
@@ -106,7 +121,9 @@ void recieveDataClient(ENetEvent &event,
 	{
 		//std::cout << "Decompressing\n";
 		size_t newSize = {};
-		auto deCompressedData = unCompressData(data, size, newSize);
+		p.setNotCompressed();
+		const size_t maximumSize = maximumDecompressedServerPayload(p.header);
+		auto deCompressedData = unCompressDataBounded(data, size, newSize, maximumSize);
 		
 		if (deCompressedData)
 		{
@@ -116,11 +133,16 @@ void recieveDataClient(ENetEvent &event,
 		}
 		else
 		{
-			//todo hard error request a hard reset.
-			permaAssertComment(0, "decompression failed");
+			reportError("Rejected malformed or oversized compressed server packet.");
+			return;
 		}
+	}
 
-		p.setNotCompressed();
+	if (!validateServerPacketPayload(p.header, data, size))
+	{
+		reportError("Rejected malformed server packet payload.");
+		if (wasCompressed) { delete[] data; }
+		return;
 	}
 
 	switch(p.header)
@@ -277,6 +299,7 @@ void recieveDataClient(ENetEvent &event,
 				BlockDataHeader blockHeader = {};
 				memcpy(&blockHeader, data + pointer, sizeof(BlockDataHeader));
 				pointer += sizeof(blockHeader);
+				const size_t recordEnd = pointer + blockHeader.dataSize;
 
 				//check if corupted data
 				if(blockHeader.pos.y < 0 || blockHeader.pos.y >= CHUNK_HEIGHT) { break; } //todo request hard reset here
@@ -309,19 +332,19 @@ void recieveDataClient(ENetEvent &event,
 
 				if((blockHeader.blockType == BlockTypes::structureBase) && (b->getType() == BlockTypes::structureBase) )
 				{
+					if (blockHeader.dataSize > size - pointer) { break; }
 
 					if (blockHeader.dataSize)
 					{
 						BaseBlock baseBlock;
 						size_t outSize = 0;
-						if (!baseBlock.readFromBuffer((unsigned char*)data + pointer, blockHeader.dataSize, outSize))
+						if (!baseBlock.readFromBuffer((unsigned char*)data + pointer,
+							blockHeader.dataSize, outSize) || outSize != blockHeader.dataSize)
 						{
 							//hard reset
 						}
 						else
 						{
-							pointer += outSize;
-
 							if (baseBlock.isDataValid())
 							{
 								chunk->blockData.baseBlocks[blockHash] = baseBlock;
@@ -341,19 +364,19 @@ void recieveDataClient(ENetEvent &event,
 				}
 				else if (isChest(blockHeader.blockType) && isChest(b->getType()))
 				{
+					if (blockHeader.dataSize > size - pointer) { break; }
 					
 					if (blockHeader.dataSize)
 					{
 						ChestBlock chestBlock;
 						size_t outSize = 0;
-						if (!chestBlock.readFromBuffer((unsigned char *)data + pointer, blockHeader.dataSize, outSize))
+						if (!chestBlock.readFromBuffer((unsigned char *)data + pointer,
+							blockHeader.dataSize, outSize) || outSize != blockHeader.dataSize)
 						{
 							//hard reset
 						}
 						else
 						{
-							pointer += outSize;
-
 							if (chestBlock.isDataValid())
 							{
 								chunk->blockData.chestBlocks[blockHash] = chestBlock;
@@ -387,7 +410,6 @@ void recieveDataClient(ENetEvent &event,
 						{
 							break;
 						}
-						pointer += outSize;
 						chunk->blockData.furnaceBlocks[blockHash] = std::move(furnace);
 					}
 					else
@@ -400,10 +422,7 @@ void recieveDataClient(ENetEvent &event,
 					std::cout << "ERROR probably forgot to add block stuff here!";
 					//todo request hard reset
 				}
-
-					
-
-				
+				pointer = recordEnd;
 			}
 
 
@@ -432,7 +451,8 @@ void recieveDataClient(ENetEvent &event,
 					BaseBlock baseBlock;
 					size_t _ = 0;
 					if (!baseBlock.readFromBuffer((unsigned char *)data + sizeof(Packet_ChangeBlockData),
-						size - sizeof(Packet_ChangeBlockData), _))
+						size - sizeof(Packet_ChangeBlockData), _) ||
+						_ != size - sizeof(Packet_ChangeBlockData))
 					{
 						//todo hard reset
 					}
@@ -473,7 +493,8 @@ void recieveDataClient(ENetEvent &event,
 		case headerPlaceBlock:
 		{
 			//chunkSystem.placeBlockNoClient
-			Packet_PlaceBlocks b = *(Packet_PlaceBlocks *)data;
+			Packet_PlaceBlocks b = {};
+			memcpy(&b, data, sizeof(b));
 
 			chunkSystem.placeBlockByServerAndRemoveFromUndoQueue(b.blockPos, b.blockInfo, lightSystem,
 				playerInteraction, undoQueue, entityManager);
@@ -516,7 +537,8 @@ void recieveDataClient(ENetEvent &event,
 			for (int i = 0; i < size / sizeof(Packet_PlaceBlocks); i++)
 			{
 
-				Packet_PlaceBlocks b = ((Packet_PlaceBlocks *)data)[i];
+				Packet_PlaceBlocks b = {};
+				memcpy(&b, data + static_cast<size_t>(i) * sizeof(b), sizeof(b));
 
 				chunkSystem.placeBlockByServerAndRemoveFromUndoQueue(b.blockPos, b.blockInfo, lightSystem,
 					playerInteraction, undoQueue, entityManager);
@@ -529,38 +551,49 @@ void recieveDataClient(ENetEvent &event,
 
 		case headerValidateEvent:
 		{
-			validatedEvent = std::max(validatedEvent, ((Packet_ValidateEvent *)data)->eventId.counter);
+			Packet_ValidateEvent eventData = {};
+			memcpy(&eventData, data, sizeof(eventData));
+			validatedEvent = std::max(validatedEvent, eventData.eventId.counter);
 			break;
 		}
 
 		case headerValidateEventAndChangeID:
 		{
-			Packet_ValidateEventAndChangeId &p = *(Packet_ValidateEventAndChangeId *)data;
+			Packet_ValidateEventAndChangeId eventData = {};
+			memcpy(&eventData, data, sizeof(eventData));
 
-			auto found = entityManager.droppedItems.find(p.oldId);
+			auto found = entityManager.droppedItems.find(eventData.oldId);
 
 			if (found != entityManager.droppedItems.end())
 			{
 				auto entity = found->second;
 				entityManager.droppedItems.erase(found);
-				entityManager.droppedItems.insert({p.newId, entity});
+				entityManager.droppedItems.insert({eventData.newId, entity});
 			}
 
-			validatedEvent = std::max(validatedEvent, p.eventId.counter);
+			validatedEvent = std::max(validatedEvent, eventData.eventId.counter);
 			break;
 		}
 
 		case headerInValidateEvent:
 		{
-			invalidateRevision = std::max(invalidateRevision, ((Packet_InValidateEvent *)data)->eventId.revision);
+			Packet_InValidateEvent eventData = {};
+			memcpy(&eventData, data, sizeof(eventData));
+			invalidateRevision = std::max(invalidateRevision, eventData.eventId.revision);
 			break;
 		}
 
 		case headerClientRecieveOtherPlayerPosition:
 		{
 
-			Packet_ClientRecieveOtherPlayerPosition *entity =
-				(Packet_ClientRecieveOtherPlayerPosition *)data;
+			Packet_ClientRecieveOtherPlayerPosition entityData = {};
+			memcpy(&entityData, data, sizeof(entityData));
+			Packet_ClientRecieveOtherPlayerPosition *entity = &entityData;
+			if (!mie::dataIntegrity::isFiniteWorldPosition(entity->entity.position) ||
+				!mie::dataIntegrity::isDroppedItemMotionStateValid(entity->entity.forces))
+			{
+				break;
+			}
 
 			//todo add the timer
 			//if (p->timer + 16 < yourTimer)
@@ -572,7 +605,6 @@ void recieveDataClient(ENetEvent &event,
 			{
 				//update local player
 				entityManager.localPlayer.entity = entity->entity;
-				std::cout << "YESSSSSSSSSSSSSSSSSSSSSSSSSSSS LMAO " << entity->entity.chunkDistance << "\n";
 			}
 			else
 			{
@@ -645,8 +677,9 @@ void recieveDataClient(ENetEvent &event,
 		case headerUpdateGenericEntity:
 		{
 
-			Packet_UpdateGenericEntity *firstPart = (Packet_UpdateGenericEntity *)data;
-			if (size < sizeof(Packet_UpdateGenericEntity)) { break; }
+			Packet_UpdateGenericEntity firstPartData = {};
+			memcpy(&firstPartData, data, sizeof(firstPartData));
+			Packet_UpdateGenericEntity *firstPart = &firstPartData;
 
 			auto entityType = getEntityTypeFromEID(firstPart->eid);
 
@@ -887,6 +920,7 @@ void recieveDataClient(ENetEvent &event,
 		{
 			if (sizeof(Packet_RespawnPlayer) != size) { break; }
 			Packet_RespawnPlayer *packetData = (Packet_RespawnPlayer *)data;
+			if (!mie::dataIntegrity::isFiniteWorldPosition(packetData->pos)) { break; }
 
 			//respawn yourself
 			if (p.cid == entityManager.localPlayer.entityId)

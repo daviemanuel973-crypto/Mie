@@ -9,6 +9,13 @@
 #include <multyPlayer/enetServerFunction.h>
 #include <gameplay/serverSiegeRuntime.h>
 #include <sstream>
+#include <cstdio>
+
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 constexpr unsigned int CHUNK_PACK = 4;
 
@@ -123,18 +130,25 @@ namespace
 		const unsigned char *data, std::size_t size)
 	{
 		const std::string tempFile = sidecarTempPath(fileName);
+		std::FILE *file = std::fopen(tempFile.c_str(), "wb");
+		if (!file) { return false; }
+
+		bool success = !size || std::fwrite(data, 1, size, file) == size;
+		if (success) { success = std::fflush(file) == 0; }
+		if (success)
 		{
-			std::ofstream file(tempFile, std::ios::binary | std::ios::trunc);
-			if (!file.is_open()) { return false; }
-			if (size) { file.write(reinterpret_cast<const char *>(data), static_cast<std::streamsize>(size)); }
-			file.flush();
-			if (!file.good())
-			{
-				file.close();
-				std::error_code error;
-				std::filesystem::remove(tempFile, error);
-				return false;
-			}
+#ifdef _WIN32
+			success = ::_commit(::_fileno(file)) == 0;
+#else
+			success = ::fsync(::fileno(file)) == 0;
+#endif
+		}
+		if (std::fclose(file) != 0) { success = false; }
+		if (!success)
+		{
+			std::error_code error;
+			std::filesystem::remove(tempFile, error);
+			return false;
 		}
 		return promoteSidecarTempFile(tempFile, fileName);
 	}

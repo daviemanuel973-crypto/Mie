@@ -12,7 +12,7 @@ void Player::flyFPS(glm::vec3 direction, glm::vec3 lookDirection)
 {
 	lookDirection.y = 0;
 	float l = glm::length(lookDirection);
-	if (!l) { return; }
+	if (!std::isfinite(l) || l <= 0.000001f) { return; }
 	lookDirection /= l;
 
 	float forward = -direction.z;
@@ -28,8 +28,11 @@ void Player::flyFPS(glm::vec3 direction, glm::vec3 lookDirection)
 
 void Player::moveFPS(glm::vec3 direction, glm::vec3 lookDirection, float deltaTime)
 {
+	if (!std::isfinite(deltaTime) || deltaTime <= 0.f) { return; }
 	lookDirection.y = 0;
-	lookDirection = glm::normalize(lookDirection);
+	const float lookLength = glm::length(lookDirection);
+	if (!std::isfinite(lookLength) || lookLength <= 0.000001f) { return; }
+	lookDirection /= lookLength;
 
 	float forward = -direction.z;
 	float leftRight = direction.x;

@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.9.3.1" CACHE STRING "Mie Survival release version")
+set(OURCRAFT_VERSION "0.9.4" CACHE STRING "Mie Survival release version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -361,6 +361,42 @@ if (BUILD_TESTING)
 	target_link_libraries(entityIdAllocatorTests PRIVATE safeSave Threads::Threads)
 	add_test(NAME entity-id-allocator COMMAND entityIdAllocatorTests)
 
+	add_executable(runtimeFoundationTests
+		tests/runtimeFoundationTests.cpp
+		src/gameLayer/metrics.cpp
+		src/gameLayer/gameplay/playerControlSettings.cpp)
+	target_include_directories(runtimeFoundationTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/safeSave/include/")
+	target_compile_definitions(runtimeFoundationTests PRIVATE
+		USER_SETTINGS_PATH="${CMAKE_CURRENT_BINARY_DIR}/testPlayerSettings/")
+	target_link_libraries(runtimeFoundationTests PRIVATE safeSave glm)
+	add_test(NAME runtime-foundation COMMAND runtimeFoundationTests)
+
+	add_executable(packetValidationTests
+		tests/packetValidationTests.cpp
+		src/gameLayer/multyPlayer/packetValidation.cpp
+		src/gameLayer/multyPlayer/packetCompression.cpp)
+	target_include_directories(packetValidationTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/enet-1.3.18/include/")
+	target_link_libraries(packetValidationTests PRIVATE glm enet fastNoiseSIMD FastNoise2
+		glui magic_enum safeSave profilerLib assimp libzstd_static)
+	if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND UNIX AND NOT APPLE)
+		target_compile_options(packetValidationTests PRIVATE
+			-include "${CMAKE_CURRENT_SOURCE_DIR}/include/platform/linuxLegacyCompat.h")
+	endif()
+	add_test(NAME packet-validation COMMAND packetValidationTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -379,5 +415,7 @@ if (BUILD_TESTING)
 		recipe-book-discovery
 		farming-persistence
 		entity-id-allocator
+		runtime-foundation
+		packet-validation
 		PROPERTIES TIMEOUT 60)
 endif()

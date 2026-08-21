@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <worldCatalog.h>
 #include <gameplay/playerControlSettings.h>
 #include <gameplay/worldDifficulty.h>
@@ -1754,6 +1755,37 @@ void displayWorldSelectorMenu(ProgramData &programData)
 
 void ShadingSettings::normalize()
 {
+	auto finiteOr = [](float value, float fallback)
+	{
+		return std::isfinite(value) ? value : fallback;
+	};
+	auto finiteVectorOr = [&](glm::vec3 value, glm::vec3 fallback)
+	{
+		for (int component = 0; component < 3; ++component)
+		{
+			value[component] = finiteOr(value[component], fallback[component]);
+		}
+		return value;
+	};
+
+	waterColor = finiteVectorOr(waterColor, glm::vec3(6, 42, 52) / 255.f);
+	underWaterColor = finiteVectorOr(underWaterColor, glm::vec3(0, 17, 25) / 255.f);
+	underwaterDarkenStrength = finiteOr(underwaterDarkenStrength, 0.94f);
+	underwaterDarkenDistance = finiteOr(underwaterDarkenDistance, 29.f);
+	fogGradientUnderWater = finiteOr(fogGradientUnderWater, 1.9f);
+	bloomTresshold = finiteOr(bloomTresshold, 0.5f);
+	bloomMultiplier = finiteOr(bloomMultiplier, 0.5f);
+	lightsStrength = finiteOr(lightsStrength, 1.f);
+	exposure = finiteOr(exposure, 0.f);
+	fogGradient = finiteOr(fogGradient, 16.f);
+	toneMapSaturation = finiteOr(toneMapSaturation, 1.f);
+	toneMapVibrance = finiteOr(toneMapVibrance, 1.f);
+	toneMapGamma = finiteOr(toneMapGamma, 1.f);
+	toneMapShadowBoost = finiteOr(toneMapShadowBoost, 0.f);
+	toneMapHighlightBoost = finiteOr(toneMapHighlightBoost, 0.f);
+	vignette = finiteOr(vignette, 0.15f);
+	toneMapLift = finiteVectorOr(toneMapLift, glm::vec3(0.5f));
+	toneMapGain = finiteVectorOr(toneMapGain, glm::vec3(0.5f));
 
 	viewDistance = glm::clamp(viewDistance, 1, 50);
 	tonemapper = glm::clamp(tonemapper, 0, 4);
@@ -1790,8 +1822,8 @@ void ShadingSettings::normalize()
 	toneMapShadowBoost = glm::clamp(toneMapShadowBoost, -1.f, 1.f);
 	toneMapHighlightBoost = glm::clamp(toneMapHighlightBoost, -1.f, 1.f);
 	vignette = glm::clamp(vignette, 0.f, 1.f);
-	glm::vec3 toneMapLift = glm::clamp(toneMapLift ,glm::vec3(0.f), glm::vec3(1));
-	glm::vec3 toneMapGain = glm::clamp(toneMapGain, glm::vec3(0.f), glm::vec3(1));
+	toneMapLift = glm::clamp(toneMapLift, glm::vec3(0.f), glm::vec3(1));
+	toneMapGain = glm::clamp(toneMapGain, glm::vec3(0.f), glm::vec3(1));
 
 }
 

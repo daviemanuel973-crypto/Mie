@@ -22,6 +22,15 @@ struct Client
 	bool skinDataCompressed = false;
 
 	std::unordered_set<glm::ivec2, Ivec2Hash> loadedChunks;
+	std::uint64_t lastAcceptedPlayerUpdateMs = 0;
+	std::uint64_t lastAcceptedPlayerSimulationMs = 0;
+
+	// Reused navigation field for nearby AI. Rebuilds are throttled in the
+	// server tick, avoiding thousands of allocations and a BFS per player/tick.
+	PathFindingField navigationField;
+	glm::ivec3 navigationOrigin = {};
+	std::uint64_t nextNavigationRefreshMs = 0;
+	bool hasNavigationOrigin = false;
 
 	std::unordered_set<unsigned int> chunksPacketPendingConfirmation;
 };

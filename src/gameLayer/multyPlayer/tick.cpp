@@ -44,7 +44,7 @@ void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
 
 template <class E>
 void genericBroadcastEntityUpdateFromServerToPlayer2(E &e, bool reliable,
-	std::uint64_t currentTimer)
+	std::uint64_t currentTimer, std::unordered_map<std::uint64_t, Client *> &clients)
 {
 
 	Packet packet;
@@ -63,16 +63,36 @@ void genericBroadcastEntityUpdateFromServerToPlayer2(E &e, bool reliable,
 		auto entity = e.second.getDataToSend();
 		memcpy(data + sizeof(Packet_UpdateGenericEntity), &entity, sizeof(entity));
 
-		broadCast(packet, data, sizeof(Packet_UpdateGenericEntity) + sizeof(entity),
-			nullptr, reliable, channelEntityPositions);
+		const glm::ivec2 entityChunk = determineChunkThatIsEntityIn(e.second.getPosition());
+		for (auto &clientEntry : clients)
+		{
+			Client *client = clientEntry.second;
+			if (client && client->loadedChunks.find(entityChunk) != client->loadedChunks.end())
+			{
+				sendPacket(client->peer, packet, reinterpret_cast<const char *>(data),
+					sizeof(Packet_UpdateGenericEntity) + sizeof(entity), reliable,
+					channelEntityPositions);
+			}
+		}
+		e.second.lastChunkPositionWhenAnUpdateWasSent = entityChunk;
 	}
 	else
 	{
 		auto entity = e.second.entity;
 		memcpy(data + sizeof(Packet_UpdateGenericEntity), &entity, sizeof(entity));
 
-		broadCast(packet, data, sizeof(Packet_UpdateGenericEntity) + sizeof(entity),
-			nullptr, reliable, channelEntityPositions);
+		const glm::ivec2 entityChunk = determineChunkThatIsEntityIn(e.second.getPosition());
+		for (auto &clientEntry : clients)
+		{
+			Client *client = clientEntry.second;
+			if (client && client->loadedChunks.find(entityChunk) != client->loadedChunks.end())
+			{
+				sendPacket(client->peer, packet, reinterpret_cast<const char *>(data),
+					sizeof(Packet_UpdateGenericEntity) + sizeof(entity), reliable,
+					channelEntityPositions);
+			}
+		}
+		e.second.lastChunkPositionWhenAnUpdateWasSent = entityChunk;
 	}
 
 
@@ -114,7 +134,7 @@ bool genericCallUpdateForEntity(T &e,
 	float deltaTime, ChunkData *(chunkGetter)(glm::ivec2),
 	ServerChunkStorer &chunkCache, std::minstd_rand &rng, 
 	std::unordered_set<std::uint64_t> &othersDeleted,
-	std::unordered_map<std::uint64_t, std::unordered_map<glm::ivec3, PathFindingNode>> &pathFinding,
+	PathFindingFieldView &pathFinding,
 	std::unordered_map<std::uint64_t, glm::dvec3> &playersPositionSurvival,
 	std::unordered_map < std::uint64_t, Client *> &allClients
 	)
@@ -131,6 +151,24 @@ bool genericCallUpdateForEntity(T &e,
 		//todo pack things into a struct
 		rez = e.second.update(time, chunkGetter, chunkCache, rng, e.first,
 			othersDeleted, pathFinding, playersPositionSurvival, allClients);
+	}
+
+	if constexpr (hasForces<decltype(e.second.entity)>)
+	{
+		auto &entity = e.second.entity;
+		if (!mie::dataIntegrity::isFiniteWorldPosition(entity.position) ||
+			!mie::dataIntegrity::isDroppedItemMotionStateValid(entity.forces))
+		{
+			if (mie::dataIntegrity::isFiniteWorldPosition(entity.lastPosition))
+			{
+				entity.position = entity.lastPosition;
+				entity.forces = {};
+			}
+			else
+			{
+				return false;
+			}
+		}
 	}
 
 
@@ -489,7 +527,9 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 		for (auto &p : allPlayers)
 		{
 			auto found = reff.find(p.first);
-			permaAssert(found != reff.end());
+			// The network listener may remove a disconnected client before the
+			// chunk snapshot is rebuilt. Ignore that stale player for this tick.
+			if (found == reff.end()) { continue; }
 			allClients.insert({found->first, &found->second});
 
 			if (found->second.playerData.otherPlayerSettings.gameMode ==
@@ -2433,11 +2473,11 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 #pragma region calculate path finding
 
 
-	std::unordered_map<std::uint64_t, std::unordered_map<glm::ivec3, PathFindingNode>> pathFindingSurvivalClients;
+	PathFindingFieldView pathFindingSurvivalClients;
 
 	{
 		std::deque<PathFindingNode> queue;
-		std::unordered_map<glm::ivec3, PathFindingNode> positions;
+		PathFindingField *positions = nullptr;
 		
 		auto addNode = [&](PathFindingNode node, glm::ivec3 displacement)
 		{
@@ -2445,7 +2485,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 			newEntry.returnPos = node.returnPos;
 			newEntry.level = node.level + 1;
 
-			positions[node.returnPos + displacement] = newEntry;
+			if (!positions || positions->size() >= 4096) { return; }
+			(*positions)[node.returnPos + displacement] = newEntry;
 
 			if (node.level < 40)
 			{
@@ -2458,8 +2499,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 		{
 			glm::ivec3 displacement = glm::ivec3(0, -1, 0) + disp;
 
-			auto found = positions.find(node.returnPos + displacement);
-			if (found == positions.end())
+			auto found = positions->find(node.returnPos + displacement);
+			if (found == positions->end())
 			{
 				auto b = chunkCache.getBlockSafe(node.returnPos + displacement);
 				if (b && !b->isColidable())
@@ -2481,8 +2522,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 		auto checkSides = [&](PathFindingNode node, glm::ivec3 displacement)
 		{
-			auto found = positions.find(node.returnPos + displacement);
-			if (found == positions.end())
+			auto found = positions->find(node.returnPos + displacement);
+			if (found == positions->end())
 			{
 				auto b = chunkCache.getBlockSafe(node.returnPos + displacement);
 				if (b && !b->isColidable())
@@ -2514,8 +2555,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 		auto checkUp = [&](PathFindingNode node, glm::ivec3 displacement)
 		{
-			auto found = positions.find(node.returnPos + displacement);
-			if (found == positions.end())
+			auto found = positions->find(node.returnPos + displacement);
+			if (found == positions->end())
 			{
 				auto b = chunkCache.getBlockSafe(node.returnPos + displacement);
 				if (b && !b->isColidable())
@@ -2530,9 +2571,14 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 		for(auto &player : playersPositionSurvival)
 		{
 			queue.clear();
-			positions.clear();
-			
+			auto clientEntry = allSurvivalClients.find(player.first);
+			if (clientEntry == allSurvivalClients.end() || !clientEntry->second) { continue; }
+			Client &client = *clientEntry->second;
+			positions = &client.navigationField;
+
 			glm::ivec3 pos = from3DPointToBlock(player.second);
+			glm::ivec3 rootPosition = {};
+			bool foundRoot = false;
 
 			//project players position down down
 			for(int i=1; i<4; i++)
@@ -2544,15 +2590,38 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 				if (b->isColidable())
 				{
-					PathFindingNode root;
-					root.returnPos = pos - glm::ivec3(0, i-1, 0);
-					root.level = 0;
-
-					queue.push_back(root);
-					positions[pos - glm::ivec3(0, i-1, 0)] = root;
+					rootPosition = pos - glm::ivec3(0, i-1, 0);
+					foundRoot = true;
 					break;
 				}
 			}
+
+			if (!foundRoot)
+			{
+				positions->clear();
+				client.hasNavigationOrigin = false;
+				client.nextNavigationRefreshMs = currentTimer + 250;
+				pathFindingSurvivalClients[player.first] = positions;
+				continue;
+			}
+
+			const glm::ivec3 originDelta = glm::abs(rootPosition - client.navigationOrigin);
+			const bool movedFarEnough = originDelta.x + originDelta.y + originDelta.z >= 2;
+			const bool rebuild = !client.hasNavigationOrigin || positions->empty() ||
+				movedFarEnough || currentTimer >= client.nextNavigationRefreshMs;
+			if (!rebuild)
+			{
+				pathFindingSurvivalClients[player.first] = positions;
+				continue;
+			}
+
+			positions->clear();
+			if (positions->bucket_count() < 4096) { positions->reserve(4096); }
+			PathFindingNode root;
+			root.returnPos = rootPosition;
+			root.level = 0;
+			queue.push_back(root);
+			(*positions)[rootPosition] = root;
 
 			while (!queue.empty())
 			{
@@ -2578,7 +2647,10 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 			}
 
-			pathFindingSurvivalClients[player.first] = std::move(positions);
+			client.navigationOrigin = rootPosition;
+			client.hasNavigationOrigin = true;
+			client.nextNavigationRefreshMs = currentTimer + 250;
+			pathFindingSurvivalClients[player.first] = positions;
 		}
 	
 	};
@@ -2621,7 +2693,10 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 #pragma region entity updates
 
-	std::unordered_set<std::uint64_t> othersDeleted;
+		std::unordered_set<std::uint64_t> othersDeleted;
+		const std::uint64_t previousTimer = currentTimer > static_cast<std::uint64_t>(deltaTimeMs)
+			? currentTimer - static_cast<std::uint64_t>(deltaTimeMs) : 0;
+		const bool sendEntityUpdates = currentTimer / 100u != previousTimer / 100u;
 
 	for (auto &c : chunkCache.savedChunks)
 	{	
@@ -2671,7 +2746,10 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						//genericBroadcastEntityUpdateFromServerToPlayer
 						//	< decltype(packetType)>(e, false, currentTimer, packetId);
 						//std::cout << "Sent update ";
-						genericBroadcastEntityUpdateFromServerToPlayer2(e, false, getTimer());
+						if (sendEntityUpdates)
+						{
+							genericBroadcastEntityUpdateFromServerToPlayer2(e, false, currentTimer, allClients);
+						}
 
 						using EntityValue = std::remove_reference_t<decltype(e.second.entity)>;
 						if constexpr (hasPositionBasedID<EntityValue>)

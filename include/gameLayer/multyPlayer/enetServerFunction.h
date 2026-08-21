@@ -35,10 +35,8 @@ struct EntityIdHolder
 	}
 };
 
-Client getClient(std::uint64_t cid);
 Client *getClientSafe(std::uint64_t cid);
 Client *getClientNotLocked(std::uint64_t cid);
-std::unordered_map<std::uint64_t, Client> getAllClients();
 
 std::unordered_map<std::uint64_t, Client> &getAllClientsReff();
 
@@ -66,4 +64,3 @@ std::uint64_t getEntityIdAndIncrement(WorldSaver &worldSaver, int entityType);
 
 std::uint64_t getCurrentEntityId(int entityType);
 void reserveEntityId(std::uint64_t entityId);
-

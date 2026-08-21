@@ -11,6 +11,7 @@
 #include <atomic>
 #include <enet/enet.h>
 #include "multyPlayer/packet.h"
+#include "multyPlayer/dataIntegrity.h"
 #include "multyPlayer/enetServerFunction.h"
 #include <platformTools.h>
 #include <fstream>
@@ -36,6 +37,7 @@
 #include <profiler.h>
 #include <magic_enum.hpp>
 #include <cmath>
+#include <algorithm>
 #include <iterator>
 #include <vector>
 
@@ -86,8 +88,6 @@ struct ServerData
 	ServerSettings settings = {};
 
 	float tickTimer = 0;
-	float tickDeltaTime = 0;
-	int tickDeltaTimeMs = 0;
 	int ticksPerSeccond = 0;
 	int runsPerSeccond = 0;
 	float seccondsTimer = 0;
@@ -95,7 +95,7 @@ struct ServerData
 	float saveEntitiesTimer = 5;
 	float passiveSpawnTimer = 4;
 	float naturalHostileSpawnTimer = 8;
-	std::uint64_t lastTimer = 0;
+	std::uint64_t droppedSimulationMilliseconds = 0;
 
 	//this is used as an unique id for chunk packets
 	unsigned int chunkPacketId = 0;
@@ -491,8 +491,6 @@ bool serverStartupStuff(const std::string &path)
 		return 0;
 	}
 
-	sd.lastTimer = getTimer();
-
 	return true;
 }
 
@@ -586,17 +584,35 @@ void serverWorkerUpdate(
 
 #pragma region timers stuff
 	auto currentTimer = getTimer();
-	sd.tickTimer += deltaTime;
-	sd.seccondsTimer += deltaTime;
-	sd.tickDeltaTime += deltaTime;
-	sd.saveEntitiesTimer -= deltaTime;
-	auto deltaTimeMS = currentTimer - sd.lastTimer;
-	sd.tickDeltaTimeMs += deltaTimeMS;
+	if (!std::isfinite(deltaTime) || deltaTime < 0.f) { deltaTime = 0.f; }
+	const float boundedDeltaTime = std::min(deltaTime, 0.25f);
+	sd.tickTimer += boundedDeltaTime;
+	sd.seccondsTimer += boundedDeltaTime;
+	sd.saveEntitiesTimer -= boundedDeltaTime;
 #pragma endregion
 
 	auto &settings = sd.settings;
 
 	static std::minstd_rand rng(std::random_device{}());
+	// Streaming performs integer block/chunk conversion before the gameplay tick.
+	// Repair persisted or network-corrupted state first so NaN/Inf never reaches it.
+	for (auto &clientEntry : getAllClientsReff())
+	{
+		auto &entity = clientEntry.second.playerData.entity;
+		entity.chunkDistance = std::clamp(entity.chunkDistance, 2, 24);
+		if (mie::dataIntegrity::isFiniteWorldPosition(entity.position) &&
+			mie::dataIntegrity::isDroppedItemMotionStateValid(entity.forces))
+		{
+			continue;
+		}
+
+		glm::dvec3 safePosition = glm::dvec3(worldSaver.spawnPosition);
+		const bool resolved = tryResolveSafeServerSpawn(worldSaver, safePosition);
+		entity.position = safePosition;
+		entity.lastPosition = safePosition;
+		entity.forces = {};
+		clientEntry.second.needsSafeSpawnPlacement = !resolved;
+	}
 
 
 #pragma region send chunks to players
@@ -642,8 +658,12 @@ void serverWorkerUpdate(
 #pragma region gameplay tick
 
 
-	if (sd.tickTimer > 1.f / targetTicksPerSeccond)
+	constexpr float fixedTickDeltaTime = 1.f / targetTicksPerSeccond;
+	constexpr int fixedTickDeltaTimeMs = 1000 / targetTicksPerSeccond;
+	int catchUpTicks = 0;
+	while (sd.tickTimer >= fixedTickDeltaTime && catchUpTicks < 4)
 	{
+		++catchUpTicks;
 
 	#pragma region set players in their chunks
 		for (auto &c : sd.chunkCache.savedChunks)
@@ -676,19 +696,41 @@ void serverWorkerUpdate(
 				}
 			}
 
+			if (!mie::dataIntegrity::isFiniteWorldPosition(client.second.playerData.entity.position) ||
+				!mie::dataIntegrity::isDroppedItemMotionStateValid(
+					client.second.playerData.entity.forces))
+			{
+				glm::dvec3 safePosition;
+				if (tryResolveSafeServerSpawn(worldSaver, safePosition))
+				{
+					client.second.playerData.entity.position = safePosition;
+					client.second.playerData.entity.lastPosition = safePosition;
+					client.second.playerData.entity.forces = {};
+				}
+				else
+				{
+					client.second.needsSafeSpawnPlacement = true;
+					continue;
+				}
+			}
+
 			auto cPos = determineChunkThatIsEntityIn(client.second.playerData.entity.position);
 
 			auto chunk = sd.chunkCache.getChunkOrGetNull(cPos.x, cPos.y);
 
-			permaAssertComment(chunk, "Error, A chunk that a player is in unloaded...");
+			if (!chunk)
+			{
+				client.second.needsSafeSpawnPlacement = true;
+				continue;
+			}
 
 			chunk->entityData.players[client.first] = &client.second.playerData;
 			sd.chunkCache.entityChunkPositions[client.first] = cPos;
 
 		}
 
-		updateServerSiegeRuntime(sd.tickDeltaTime, sd.chunkCache, worldSaver, rng);
-		mie::native::updateServerNativeSystems(sd.tickDeltaTime);
+		updateServerSiegeRuntime(fixedTickDeltaTime, sd.chunkCache, worldSaver, rng);
+		mie::native::updateServerNativeSystems(fixedTickDeltaTime);
 		const auto survivalPlayers = livingSurvivalPlayers();
 		const SiegeStatus siegeStatus = getServerSiegeStatus();
 		const NaturalSpawnPressure spawnPressure = getNaturalSpawnPressure(
@@ -697,10 +739,10 @@ void serverWorkerUpdate(
 			getServerWorldDifficultySettings(), siegeStatus.phase != SiegePhase::Peace);
 		if (!isServerSiegeWaveActive())
 		{
-			updateAmbientEcologySpawning(sd.tickDeltaTime, worldSaver, rng,
+			updateAmbientEcologySpawning(fixedTickDeltaTime, worldSaver, rng,
 				spawnPressure);
 		}
-		updateNightHostileSpawning(sd.tickDeltaTime, worldSaver, rng,
+		updateNightHostileSpawning(fixedTickDeltaTime, worldSaver, rng,
 			spawnPressure, survivalPlayers);
 
 	#pragma endregion
@@ -732,8 +774,14 @@ void serverWorkerUpdate(
 	#pragma endregion
 
 
-		sd.tickTimer -= (1.f / targetTicksPerSeccond);
-		sd.tickTimer = std::min(sd.tickTimer, 2.f / targetTicksPerSeccond);
+		sd.tickTimer -= fixedTickDeltaTime;
+		// Timestamp each recovered tick at its actual position in the backlog.
+		// Reusing currentTimer for every catch-up step produces multiple entity
+		// snapshots with the same timestamp and breaks client interpolation.
+		const std::uint64_t pendingSimulationMilliseconds = static_cast<std::uint64_t>(
+			std::max(0.f, sd.tickTimer) * 1000.f);
+		const std::uint64_t tickCurrentTimer = currentTimer > pendingSimulationMilliseconds
+			? currentTimer - pendingSimulationMilliseconds : 0;
 
 		sd.ticksPerSeccond++;
 
@@ -824,12 +872,16 @@ void serverWorkerUpdate(
 			c.second.playerData.inventory.sanitize();
 		}
 
-		splitUpdatesLogic(sd.tickDeltaTime, sd.tickDeltaTimeMs,
-			currentTimer, sd.chunkCache, rng(), clients, worldSaver, serverTask,
+		splitUpdatesLogic(fixedTickDeltaTime, fixedTickDeltaTimeMs,
+			tickCurrentTimer, sd.chunkCache, rng(), clients, worldSaver, serverTask,
 			serverProfiler);
-
-		sd.tickDeltaTime = 0;
-		sd.tickDeltaTimeMs = 0;
+	}
+	if (catchUpTicks == 4 && sd.tickTimer >= fixedTickDeltaTime)
+	{
+		const float droppedSeconds = sd.tickTimer - std::fmod(sd.tickTimer, fixedTickDeltaTime);
+		sd.droppedSimulationMilliseconds += static_cast<std::uint64_t>(
+			std::max(0.f, droppedSeconds) * 1000.f);
+		sd.tickTimer = std::fmod(sd.tickTimer, fixedTickDeltaTime);
 	}
 
 	//std::cout << deltaTime << " <- dt / 1/dt-> " << (1.f / (deltaTime)) << "\n";
@@ -896,22 +948,23 @@ void serverWorkerUpdate(
 	sd.chunkCache.saveNextChunk(worldSaver);
 	serverProfiler.endSubProfile("Save chunk on disk");
 
-	//mark all entities as dirty every 5 secconds, so we save them
-	//TODO some chunks aren't in the simulation distance so ther's no need to mark them as dirty.
-	//so find a way to check if a chunk was inactive since the last update.
+	// Chunks already scheduled for unload are saved by the unload path. Do not
+	// enqueue the same sidecar twice on the periodic pass, which is especially
+	// expensive on HDDs.
 	if (sd.saveEntitiesTimer <= 0)
 	{
 		sd.saveEntitiesTimer = 5;
 
 		for (auto &c : sd.chunkCache.savedChunks)
 		{
-			c.second->otherData.dirtyEntity = true;
+			if (c.second && !c.second->otherData.shouldUnload)
+			{
+				c.second->otherData.dirtyEntity = true;
+			}
 		}
 
 	}
 #pragma endregion
-
-	sd.lastTimer = currentTimer;
 
 }
 

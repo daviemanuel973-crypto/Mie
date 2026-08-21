@@ -78,6 +78,9 @@ struct PathFindingNode
 	int level = 0;
 };
 
+using PathFindingField = std::unordered_map<glm::ivec3, PathFindingNode>;
+using PathFindingFieldView = std::unordered_map<std::uint64_t, const PathFindingField *>;
+
 struct PositionAndEID
 {
 	glm::dvec3 pos;
@@ -464,7 +467,7 @@ struct PhysicalEntity
 		lastPosition = position;
 	}
 
-	void jump(float impulse = BASIC_JUMP_IMPULSE);
+	void jump(float impulse = BASIC_JUMP_IMPULSE, bool allowAirborne = false);
 
 	void move(glm::vec2 move);
 

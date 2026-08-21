@@ -638,46 +638,26 @@ int main(int argc, char **argv)
 		glfwPollEvents();
 
 #if defined(OURCRAFT_LOW_END_BUILD)
-		// Favor stable frame pacing over oscillating between 30 and 60 FPS.
-		auto frameWorkEnd = std::chrono::steady_clock::now();
-		double workMs = std::chrono::duration<double, std::milli>(frameWorkEnd - frameStartLowEnd).count();
-		static double smoothedWorkMs = 16.67;
-		static int slowFrames = 0;
-		static int fastFrames = 0;
-		static bool stable30Mode = false;
-
-		smoothedWorkMs = smoothedWorkMs * 0.95 + workMs * 0.05;
-		if (!stable30Mode)
+		// The low-end package targets a consistent 30 FPS instead of repeatedly
+		// switching between 60 and 30 on integrated graphics. Advanced users may
+		// override it with MIE_FRAME_LIMIT (0 = uncapped, 30 or 60).
+		static const int foregroundFrameLimit = []
 		{
-			if (smoothedWorkMs > 20.5)
-			{
-				if (++slowFrames >= 90)
-				{
-					stable30Mode = true;
-					slowFrames = 0;
-				}
-			}
-			else
-			{
-				slowFrames = std::max(0, slowFrames - 2);
-			}
-		}
-		else
-		{
-			if (smoothedWorkMs < 13.5)
-			{
-				if (++fastFrames >= 300)
-				{
-					stable30Mode = false;
-					fastFrames = 0;
-				}
-			}
-			else { fastFrames = 0; }
-		}
+			const char *value = std::getenv("MIE_FRAME_LIMIT");
+			if (!value || !*value) { return 30; }
+			char *end = nullptr;
+			const long parsed = std::strtol(value, &end, 10);
+			if (end == value || *end != '\0') { return 30; }
+			if (parsed == 0 || parsed == 30 || parsed == 60) { return static_cast<int>(parsed); }
+			return 30;
+		}();
 
-		auto targetFrame = !platform::isFocused() ? std::chrono::microseconds(66667) :
-			(stable30Mode ? std::chrono::microseconds(33333) : std::chrono::microseconds(16667));
-		std::this_thread::sleep_until(frameStartLowEnd + targetFrame);
+		const int frameLimit = platform::isFocused() ? foregroundFrameLimit : 15;
+		if (frameLimit > 0)
+		{
+			const auto targetFrame = std::chrono::microseconds(1'000'000 / frameLimit);
+			std::this_thread::sleep_until(frameStartLowEnd + targetFrame);
+		}
 #endif
 
 	#pragma endregion

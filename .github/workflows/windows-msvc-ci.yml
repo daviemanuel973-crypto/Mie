@@ -13,6 +13,7 @@ on:
       - 'src/**'
       - 'include/**'
       - 'shared/**'
+      - 'tests/**'
       - 'resources/**'
       - 'windows/**'
       - '.github/workflows/windows-msvc-ci.yml'
@@ -68,7 +69,7 @@ jobs:
 
       - name: Test all Mie gameplay contracts
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|farming-persistence|entity-id-allocator)$'
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|farming-persistence|entity-id-allocator|runtime-foundation|packet-validation)$'
 
       - name: Stage portable Windows build
         shell: pwsh

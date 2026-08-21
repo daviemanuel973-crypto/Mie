@@ -199,17 +199,15 @@ void splitUpdatesLogic(float tickDeltaTime, int tickDeltaTimeMs, std::uint64_t c
 			}
 		}
 
-		if (playersRegions.empty() && !waitingTasks.empty())
-		{
-			permaAssertComment(0, "No players in split update logic.cpp");
-		}
-
 		for (auto &t : waitingTasks)
 		{
 			auto cid = t.cid;
-			permaAssertComment(cid != 0, "Cid can't be 0 in split update logic.cpp");
+			if (cid == 0) { continue; }
 			auto found = playersRegions.find(cid);
-			permaAssertComment(found != playersRegions.end(), "invalid cid in split update logic.cpp");
+			// A client can disconnect or temporarily have no loaded player chunk
+			// between the network queue and this tick. Such an action is stale and
+			// must not be allowed to terminate the server.
+			if (found == playersRegions.end()) { continue; }
 			chunkRegionsData[found->second].waitingTasks.push_back(t);
 		}
 		waitingTasks.clear();

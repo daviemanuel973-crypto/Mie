@@ -12,6 +12,7 @@ void pushFlagsLightAndPosition(std::vector<int> &vect,
 int modBlockToChunk(int x);
 glm::ivec2 modBlockToChunk(glm::ivec2);
 int divideChunk(int x);
+int divideChunk(double x);
 glm::ivec2 fromBlockPosToChunkPos(glm::ivec3 blockPos);
 glm::ivec2 fromBlockPosToChunkPos(int x, int z);
 

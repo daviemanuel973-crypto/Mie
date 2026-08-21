@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current development version: v0.9.3.1**
+**Current development version: v0.9.4**
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -19,6 +19,24 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.9.4 gameplay and runtime stabilization
+
+v0.9.4 adds no content. It concentrates on predictable movement, bounded server
+work, hostile-network safety, durable saves and stable frame pacing on the
+reference Intel HD 620 system.
+
+- Jump input has a short buffer and coyote-time window, while collision flags are now idempotent.
+- Block interaction uses voxel traversal instead of hundredths-of-a-block brute-force sampling.
+- The server uses a bounded 20 Hz fixed timestep and recovers invalid transforms without terminating the session.
+- AI navigation fields are reused and refreshed at a controlled rate instead of rebuilt for every player every tick.
+- Entity and player updates are interest-filtered; generic entity updates are capped at 10 Hz.
+- Every server-to-client payload has a size contract before parsing or decompression.
+- World-difficulty and Field Guide messages now have distinct protocol identifiers.
+- Entity sidecars are flushed durably before atomic promotion and chunks already queued for unload are not written twice.
+- Low-end packages default to a stable 30 FPS at 1280x720; `MIE_FRAME_LIMIT=60` or `0` opt into 60 FPS or uncapped rendering.
+
+See [`docs/V0.9.4_STABILIZATION.md`](docs/V0.9.4_STABILIZATION.md).
 
 ## v0.9.3.1 data-integrity hotfix
 

@@ -87,6 +87,7 @@ struct GameData
 	Player lastSendPlayerData = {};
 
 	int currentItemSelected = 0;
+	BufferedJumpState bufferedJump = {};
 	
 	InteractionData interaction;
 	unsigned char currentBlockInteractionRevisionNumber = 0;
@@ -807,8 +808,15 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			const bool playerInWater = !player.entity.fly && player.entity.isInWater(localChunkGetter);
 			const bool playerClimbing = !player.entity.fly && !playerInWater &&
 				player.entity.isOnClimbable(localChunkGetter);
-			const bool manualJumpRequested = platform::isKeyPressedOn(platform::Button::Space) ||
+			const bool manualJumpPressed = platform::isKeyPressedOn(platform::Button::Space) ||
+				platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].pressed;
+			const bool manualJumpHeld = platform::isKeyHeld(platform::Button::Space) ||
 				platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held;
+			const bool canGroundJump = !player.entity.fly && !playerInWater && !playerClimbing;
+			if (!canGroundJump) { gameData.bufferedJump = {}; }
+			const bool bufferedGroundJump = canGroundJump &&
+				updateBufferedJump(gameData.bufferedJump, deltaTime,
+					player.entity.forces.colidesBottom(), manualJumpPressed);
 
 			if (player.entity.fly)
 			{
@@ -818,17 +826,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				{
 					moveDir.y -= 1;
 				}
-				if (platform::isKeyHeld(platform::Button::Space)
-					|| platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held
-					)
+				if (manualJumpHeld)
 				{
 					moveDir.y += 1;
 				}
 			}
 			else if (playerInWater)
 			{
-				if (platform::isKeyHeld(platform::Button::Space)
-					|| platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held)
+				if (manualJumpHeld)
 				{
 					player.entity.swimUp(localChunkGetter);
 				}
@@ -837,8 +842,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			{
 				float climbDirection = 0.f;
 				if (platform::isKeyHeld(platform::Button::LeftShift)) { climbDirection = -1.f; }
-				else if (platform::isKeyHeld(platform::Button::Space) ||
-					platform::getControllerButtons().buttons[platform::ControllerButtons::Rthumb].held ||
+				else if (manualJumpHeld ||
 					moveDir.z < -0.1f)
 				{
 					climbDirection = 1.f;
@@ -849,9 +853,11 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			}
 			else
 			{
-				if (manualJumpRequested)
+				if (bufferedGroundJump)
 				{
-					gameData.entityManager.localPlayer.entity.jump();
+					// The buffered/coyote gate has already validated this jump. Allow the
+					// impulse during the short grace period after leaving a ledge.
+					gameData.entityManager.localPlayer.entity.jump(BASIC_JUMP_IMPULSE, true);
 				}
 			}
 
@@ -865,7 +871,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			assistInput.hasHeadClearance = headClearance;
 			const MovementAssistOutput movementAssist = evaluateMovementAssist(
 				getPlayerControlSettings(), assistInput);
-			if (movementAssist.jump && !manualJumpRequested && !playerClimbing && !playerInWater &&
+			if (movementAssist.jump && !manualJumpPressed && !playerClimbing && !playerInWater &&
 				!player.entity.fly)
 			{
 				// A half block needs less impulse than a full manual jump, keeping the

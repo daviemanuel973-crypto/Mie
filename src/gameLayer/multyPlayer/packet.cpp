@@ -1,121 +1,11 @@
 #include "multyPlayer/packet.h"
-#include <algorithm>
-#include <zstd-1.5.5/lib/zstd.h> 
 #include <iostream>
 #include <platformTools.h>
 #include <cstdint>
 #include <cstring>
-#include <limits>
-#include <new>
 #include <multyPlayer/createConnection.h>
 #include <gameplay/fieldGuide.h>
 #include <gameplay/fieldGuideProtocol.h>
-
-namespace
-{
-	constexpr unsigned long long maxDecompressedPacketSize = 256ULL * 1024ULL * 1024ULL;
-}
-
-void *compressData(const char *data, size_t size, size_t &compressedSize)
-{
-	compressedSize = 0;
-	if (!data || size == 0) { return nullptr; }
-
-	//PL::Profiler profiler;
-	//profiler.start();
-
-	const size_t newExpectedMaxSize = ZSTD_compressBound(size);
-	char *rezult = new (std::nothrow) char[newExpectedMaxSize];
-	if (!rezult) { return nullptr; }
-
-	//TODO try out other compresssion levels
-	compressedSize = ZSTD_compress(rezult, newExpectedMaxSize, data, size, 1);
-
-	//profiler.end();
-
-	if (ZSTD_isError(compressedSize))
-	{
-		delete[] rezult;
-		return 0;
-	}
-
-	//std::cout << "Old size: " << size << " new size: " << rezSize << " ratio: " << (float)size / rezSize << "\n";
-	//std::cout << "Time ms: " << profiler.rezult.timeSeconds * 1000 << " Time per 100: " << profiler.rezult.timeSeconds * 100'000 <<"\n";
-
-	return rezult;
-	//delete[] rezult;
-
-}
-
-void *compressDataForce(const char *data, size_t size, size_t &compressedSize)
-{
-	compressedSize = 0;
-	if (!data || size == 0) { return nullptr; }
-
-	//PL::Profiler profiler;
-	//profiler.start();
-
-	const size_t newExpectedMaxSize = ZSTD_compressBound(size);
-	char *rezult = new (std::nothrow) char[newExpectedMaxSize];
-	if (!rezult) { return nullptr; }
-
-	//TODO try out other compresssion levels
-	compressedSize = ZSTD_compress(rezult, newExpectedMaxSize, data, size, 3);
-
-	//profiler.end();
-
-	if (ZSTD_isError(compressedSize))
-	{
-		delete[] rezult;
-		return 0;
-	}
-
-	//std::cout << "Old size: " << size << " new size: " << rezSize << " ratio: " << (float)size / rezSize << "\n";
-	//std::cout << "Time ms: " << profiler.rezult.timeSeconds * 1000 << " Time per 100: " << profiler.rezult.timeSeconds * 100'000 <<"\n";
-
-	return rezult;
-	//delete[] rezult;
-
-}
-
-void *unCompressData(const char *data, size_t compressedSize, size_t &originalSize)
-{
-	originalSize = 0;
-	if (!data || compressedSize == 0) { return nullptr; }
-
-	// Decompress data
-	// First, we need to get the decompressed size.
-	const unsigned long long frameSize = ZSTD_getFrameContentSize(data, compressedSize);
-	if (frameSize == ZSTD_CONTENTSIZE_ERROR || frameSize == ZSTD_CONTENTSIZE_UNKNOWN ||
-		frameSize == 0 || frameSize > maxDecompressedPacketSize ||
-		frameSize > static_cast<unsigned long long>(std::numeric_limits<size_t>::max()))
-	{
-		return nullptr;
-	}
-	originalSize = static_cast<size_t>(frameSize);
-
-	char *decompressedData = new (std::nothrow) char[originalSize];
-	if (!decompressedData)
-	{
-		// Memory allocation failed
-		return nullptr;
-	}
-
-	// Decompress data
-	// First, we need to create a ZSTD decompression context.
-	// Decompress the data.
-	size_t result = ZSTD_decompress(decompressedData, originalSize, data, compressedSize);
-	if (ZSTD_isError(result) || result != originalSize)
-	{
-		// Decompression failed
-		delete[] decompressedData;
-		return nullptr;
-	}
-
-	return decompressedData;
-}
-
-
 
 void sendPacketAndCompress(ENetPeer *to, 
 	Packet p, const char *data, size_t size, 
@@ -214,8 +104,8 @@ char *parsePacket(ENetEvent &event, Packet &p, size_t &dataSize)
 {
 	char *data = parsePacket(*event.packet, p, dataSize);
 
-	// Field Guide progress is authoritative on the server. The v0.7 protocol
-	// uses header 51 with a raw 8-byte GuideProgress payload. Only accept this
+	// Field Guide progress is authoritative on the server. v0.9.4 uses the
+	// dedicated header 52 with a raw 8-byte GuideProgress payload. Only accept this
 	// client mirror update from the peer that this process connected to as its
 	// server, so packets received by an integrated/dedicated server cannot
 	// mutate client UI state.
