@@ -129,6 +129,19 @@ int main()
 	REQUIRE(negativeDurationClock.update(1.0, true) == 1);
 	REQUIRE(negativeDurationClock.getCompletedCycles() == 1);
 
+	// Extreme but finite client-side frame deltas must preserve a valid phase
+	// and saturate the cycle counter instead of overflowing a uint64 conversion.
+	resetClientWorldTime();
+	setClientWorldTime(0.25f, std::numeric_limits<std::uint64_t>::max() - 1u, true);
+	updateClientWorldTime(std::numeric_limits<float>::max());
+	REQUIRE(getClientWorldDayPhase() >= 0.f);
+	REQUIRE(getClientWorldDayPhase() < 1.f);
+	REQUIRE(getClientCompletedWorldCycles() == std::numeric_limits<std::uint64_t>::max());
+	const float saturatedPhase = getClientWorldDayPhase();
+	updateClientWorldTime(std::numeric_limits<float>::quiet_NaN());
+	REQUIRE(getClientWorldDayPhase() == saturatedPhase);
+	REQUIRE(getClientCompletedWorldCycles() == std::numeric_limits<std::uint64_t>::max());
+
 	SiegeDirector cancelled(fastTuning());
 	cancelled.update(0.1f, 1, 0, 7, true);
 	REQUIRE(cancelled.getStatus(0).phase == SiegePhase::Warning);
