@@ -99,7 +99,9 @@ void platform::internal::setRightMouseState(int newState)
 float scrollY = 0;
 void scrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
-	scrollY = yoffset;
+	(void)window;
+	(void)xoffset;
+	scrollY += static_cast<float>(yoffset);
 }
 
 void platform::internal::updateAllButtons(float deltaTime)
@@ -111,43 +113,42 @@ void platform::internal::updateAllButtons(float deltaTime)
 
 	updateButton(leftMouse, deltaTime);
 	updateButton(rightMouse, deltaTime);
-	
-	for(int i=0; i<=GLFW_JOYSTICK_LAST; i++)
+
+	bool controllerPolled = false;
+	for(int joystick = 0; joystick <= GLFW_JOYSTICK_LAST; joystick++)
 	{
-		if(glfwJoystickPresent(i) && glfwJoystickIsGamepad(i))
+		if(glfwJoystickPresent(joystick) && glfwJoystickIsGamepad(joystick))
 		{
 			GLFWgamepadstate state;
 
-			if (glfwGetGamepadState(i, &state))
+			if (glfwGetGamepadState(joystick, &state))
 			{
-				for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++)
+				for (int button = 0; button <= GLFW_GAMEPAD_BUTTON_LAST; button++)
 				{
-					if(state.buttons[i] == GLFW_PRESS)
-					{
-						processEventButton(controllerButtons.buttons[i], 1);
-					}else
-					if (state.buttons[i] == GLFW_RELEASE)
-					{
-						processEventButton(controllerButtons.buttons[i], 0);
-					}
-					updateButton(controllerButtons.buttons[i], deltaTime);
-
+					processEventButton(controllerButtons.buttons[button], state.buttons[button] == GLFW_PRESS);
+					updateButton(controllerButtons.buttons[button], deltaTime);
 				}
-				
-				controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];
-				controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];
+
+				controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];
+				controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];
 
 				controllerButtons.LStick.x = state.axes[GLFW_GAMEPAD_AXIS_LEFT_X];
 				controllerButtons.LStick.y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
 
 				controllerButtons.RStick.x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
 				controllerButtons.RStick.y = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
-			
+
+				controllerPolled = true;
 				break;
 			}
 
 		}
 
+	}
+
+	if (!controllerPolled)
+	{
+		controllerButtons.setAllToZero();
 	}
 
 	scrollY = 0;
