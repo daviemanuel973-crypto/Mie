@@ -14,4 +14,9 @@ The first package containing this launcher must still be installed once over an 
 
 ## Publishing
 
-Push a semantic-version tag such as `v0.4.0`. The `Publish Windows Release` workflow builds and tests the game, creates the portable ZIP and installer, calculates the installer checksum, and publishes all three assets to a GitHub Release. The updater ignores releases that do not contain the expected installer/checksum pair.
+Push a supported release tag such as `v0.9.3.1`. Three- and four-component
+versions are understood by both the launcher and release workflows. The
+`Publish Windows Release` workflow builds and tests the game, creates the
+portable ZIP and installer, calculates SHA-256 checksums for both packages and
+publishes the assets to a GitHub Release. The updater ignores releases that do
+not contain the expected installer/checksum pair.

@@ -9,8 +9,8 @@
     <p>
       Mie Survival is a lightweight voxel sandbox focused on gathering resources,
       crafting, exploration, building and survival. This Linux package includes
-      the Survival v0.1 gameplay systems, including hunger, food, armour and the
-      expanded early-game crafting progression.
+      persistent worlds, server-authoritative multiplayer, farming, cooking,
+      equipment progression, base sieges and low-end graphics defaults.
     </p>
   </description>
   <launchable type="desktop-id">io.github.daviemanuel973.Mie.desktop</launchable>
@@ -20,6 +20,31 @@
     <name>Mie contributors</name>
   </developer>
   <releases>
+    <release version="0.9.3.1" date="2026-08-21">
+      <description>
+        <p>Data-integrity hotfix for transactional sidecars, persistent entity IDs and authoritative item drops.</p>
+      </description>
+    </release>
+    <release version="0.9.3" date="2026-08-20">
+      <description>
+        <p>Server action validation, network synchronization fixes and Survival or Creative world creation.</p>
+      </description>
+    </release>
+    <release version="0.9.2" date="2026-08-20">
+      <description>
+        <p>Gameplay and performance stabilization for hashing, worker waits and authoritative knockback.</p>
+      </description>
+    </release>
+    <release version="0.9.1" date="2026-08-19">
+      <description>
+        <p>Corrective crafting and inventory release.</p>
+      </description>
+    </release>
+    <release version="0.9.0" date="2026-08-17">
+      <description>
+        <p>Home, farming, cooking, repair and world-backup survival systems.</p>
+      </description>
+    </release>
     <release version="0.1.0-linux" date="2026-08-07">
       <description>
         <p>First Flatpak-ready Linux build based on Survival v0.1.</p>

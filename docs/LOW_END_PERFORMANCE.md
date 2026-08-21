@@ -1,4 +1,4 @@
-# Low-end Linux performance profile
+# Low-end performance profile
 
 Target reference hardware:
 
@@ -6,9 +6,13 @@ Target reference hardware:
 - Intel HD Graphics 620
 - 8 GB RAM
 - HDD
-- Linux x86_64 / Flatpak
+- Windows x64 or Linux x86_64 / Flatpak
 
 The profile targets stable 30 FPS first and up to 60 FPS at 1280x720 when GPU/CPU headroom permits. FPS is an engineering target until benchmarked on the reference machine.
+
+Official Windows and Flatpak release builds enable `OURCRAFT_LOW_END_BUILD` and
+disable the global AVX2 requirement. Faster computers can re-enable expensive
+effects from the rendering settings without requiring a separate package.
 
 ## Changes
 

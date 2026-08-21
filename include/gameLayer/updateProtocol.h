@@ -9,7 +9,8 @@ struct WindowsReleaseInfo
 	std::string checksumUrl;
 };
 
-// Returns -1, 0 or 1. A leading 'v' and prerelease/build suffixes are allowed.
+// Returns -1, 0 or 1. Three- and four-component release versions are supported;
+// a leading 'v' and prerelease/build suffixes are allowed.
 int compareSemanticVersions(const std::string &left, const std::string &right);
 
 bool parseWindowsReleaseInfo(const std::string &githubReleaseJson,

@@ -7,12 +7,14 @@
 #include <multyPlayer/enetServerFunction.h>
 #include <multyPlayer/server.h>
 #include <deque>
+#include <type_traits>
 #include <platformTools.h>
 #include <gameplay/gameplayRules.h>
 #include <gameplay/crafting.h>
 #include <gameplay/food.h>
 #include <gameplay/worldDifficulty.h>
 #include <gameplay/itemDurability.h>
+#include <multyPlayer/dataIntegrity.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
@@ -1037,6 +1039,17 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								serverAllows = 0;
 							}
 
+							if (!mie::dataIntegrity::isDroppedItemSpawnPositionValid(
+								client->playerData.entity.position, i.t.doublePos))
+							{
+								serverAllows = false;
+							}
+							if (i.t.blockCount == 0 ||
+								!mie::dataIntegrity::isDroppedItemMotionStateValid(i.t.motionState))
+							{
+								serverAllows = false;
+							}
+
 
 							if (
 								getEntityTypeFromEID(i.t.entityId) != EntityType::droppedItems ||
@@ -1062,24 +1075,36 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								}
 							}
 
-							auto newId = getEntityIdAndIncrement(worldSaver, EntityType::droppedItems);
-
-							if (computeRevisionStuff(*client, true && serverAllows, i.t.eventId,
-								&i.t.entityId, &newId))
+							std::uint64_t newId = 0;
+							if (serverAllows)
 							{
+								newId = getEntityIdAndIncrement(worldSaver, EntityType::droppedItems);
+							}
 
-								//todo get or create chunk here, so we create a function that cant fail.
-								spawnDroppedItemEntity(chunkCache,
+							if (computeRevisionStuff(*client, serverAllows, i.t.eventId,
+								serverAllows ? &i.t.entityId : nullptr,
+								serverAllows ? &newId : nullptr))
+							{
+								const bool spawned = spawnDroppedItemEntity(chunkCache,
 									worldSaver, i.t.blockCount, i.t.blockType, &from->metaData,
 									i.t.doublePos, i.t.motionState, newId,
-									computeRestantTimer(i.t.timer, getTimer()));
+									mie::dataIntegrity::clampDroppedItemCatchUpSeconds(
+										computeRestantTimer(i.t.timer, getTimer())));
 
-								//std::cout << "restant: " << newEntity.restantTime << "\n";
-
-								//substract item from inventory
-								from->counter -= i.t.blockCount;
-								if (!from->counter) { *from = {}; }
-
+								if (spawned)
+								{
+									// Consume inventory only after the authoritative entity exists.
+									from->counter -= i.t.blockCount;
+									if (!from->counter) { *from = {}; }
+								}
+								else
+								{
+									serverAllows = false;
+								}
+							}
+							else
+							{
+								serverAllows = false;
 							}
 
 							if (!serverAllows)
@@ -2629,8 +2654,6 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 					bool rez = genericCallUpdateForEntity(e, deltaTime, chunkGetter,
 						chunkCache, rng, othersDeleted,
 						pathFindingSurvivalClients, playersPositionSurvival, allClients);
-					glm::ivec2 newChunk = determineChunkThatIsEntityIn(e.second.getPosition());
-
 					if (!rez)
 					{
 
@@ -2650,44 +2673,48 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						//std::cout << "Sent update ";
 						genericBroadcastEntityUpdateFromServerToPlayer2(e, false, getTimer());
 
-						if (initialChunk != newChunk)
+						using EntityValue = std::remove_reference_t<decltype(e.second.entity)>;
+						if constexpr (hasPositionBasedID<EntityValue>)
 						{
-							//std::cout << "Prepare to move\n";
-							auto chunk = chunkCache.getChunkOrGetNull(newChunk.x, newChunk.y);
-							
-							if (chunk)
-							{
-								//std::cout << "Found!\n";
-
-								//move entity in another chunk
-								auto member = memberSelector(chunk->entityData);
-								member->insert({e.first, e.second});
-								chunkCache.entityChunkPositions[e.first] = newChunk;
-
-							}
-							else
-							{
-								//std::cout << "Not Found!\n";
-
-								//the entity left the region, we move it out,
-								// so we save it to disk or to other chunks
-
-								auto found = chunkCache.entityChunkPositions.find(e.first);
-								if (found != chunkCache.entityChunkPositions.end())
-								{
-									chunkCache.entityChunkPositions.erase(found);
-								}
-
-								orphanContainer.insert(
-									{e.first, e.second});
-							}
-
-
-							it = container.erase(it);
+							// Position-based entities, such as TrainingDummy, are anchored to
+							// their authoritative block/chunk and never participate in movement streaming.
+							chunkCache.entityChunkPositions[e.first] = initialChunk;
+							++it;
 						}
 						else
 						{
-							++it;
+							const glm::ivec2 newChunk = determineChunkThatIsEntityIn(e.second.getPosition());
+							if (initialChunk != newChunk)
+							{
+								//std::cout << "Prepare to move\n";
+								auto chunk = chunkCache.getChunkOrGetNull(newChunk.x, newChunk.y);
+
+								if (chunk)
+								{
+									//move entity in another chunk
+									auto member = memberSelector(chunk->entityData);
+									member->insert({e.first, e.second});
+									chunkCache.entityChunkPositions[e.first] = newChunk;
+								}
+								else
+								{
+									// Keep a mobile entity inside the last authoritative loaded chunk
+									// until streaming catches up instead of losing it as an orphan.
+									const glm::dvec3 clampedPosition = mie::dataIntegrity::clampEntityPositionToChunk(
+										e.second.getPosition(), initialChunk);
+									e.second.entity.position = clampedPosition;
+									e.second.entity.lastPosition = clampedPosition;
+									chunkCache.entityChunkPositions[e.first] = initialChunk;
+									++it;
+									continue;
+								}
+
+								it = container.erase(it);
+							}
+							else
+							{
+								++it;
+							}
 						}
 					}
 

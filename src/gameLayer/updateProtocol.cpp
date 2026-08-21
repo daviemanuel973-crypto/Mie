@@ -8,9 +8,9 @@
 
 namespace
 {
-	std::array<int, 3> parseVersionNumbers(const std::string &version)
+	std::array<int, 4> parseVersionNumbers(const std::string &version)
 	{
-		std::array<int, 3> result{};
+		std::array<int, 4> result{};
 		std::size_t position = (!version.empty() && (version[0] == 'v' || version[0] == 'V')) ? 1 : 0;
 		for (std::size_t component = 0; component < result.size(); ++component)
 		{

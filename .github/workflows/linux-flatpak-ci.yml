@@ -3,16 +3,9 @@ name: Linux Flatpak CI
 on:
   push:
     branches:
-      - agent/v0.8-development
-      - agent/v0.7.2-stabilization
-      - agent/survival-linux-flatpak
-      - agent/linux-lowend-performance
-      - agent/release-packaging-stabilization
-      - agent/release-packaging-windows-fix
-      - agent/linux-world-create-crash-fix
-      - agent/linux-texture-compat-fix
-      - agent/linux-nonbindless-renderer-fix
       - main
+      - 'agent/**'
+      - 'fix/**'
   pull_request:
     paths:
       - 'VERSION'
@@ -29,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: linux-flatpak-ci-${{ github.ref }}
+  group: linux-flatpak-ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -43,8 +36,8 @@ jobs:
         shell: bash
         run: |
           MIE_VERSION="$(tr -d '\r\n' < VERSION)"
-          if [[ ! "$MIE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "VERSION must contain a semantic version, got: '$MIE_VERSION'" >&2
+          if [[ ! "$MIE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "VERSION must contain a supported release version, got: '$MIE_VERSION'" >&2
             exit 1
           fi
           grep -F "set(OURCRAFT_VERSION \"$MIE_VERSION\"" CMakeLists.txt
@@ -65,7 +58,7 @@ jobs:
         run: |
           grep -F '*this = PlayerInventory{};' src/gameLayer/gameplay/items.cpp
           grep -F 'reinterpret_cast<std::uintptr_t>(packet->userData)' src/gameLayer/multyPlayer/server.cpp
-          grep -F 'position += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
+          grep -F 'entityPosition += e.second.entity.getColliderOffset();' src/gameLayer/multyPlayer/serverChunkStorer.cpp
           grep -F 'Player has no getColliderOffset()' src/gameLayer/multyPlayer/serverChunkStorer.cpp
           grep -F 'WeaponStats weaponStats' include/gameLayer/multyPlayer/doHittingThings.h
           grep -F 'entityData.template entityGetter<X>()' src/gameLayer/multyPlayer/splitUpdatesLogic.cpp
@@ -279,6 +272,16 @@ jobs:
             -o survivalRulesTests
           ./survivalRulesTests
 
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra \
+            -pthread \
+            -Iinclude/gameLayer \
+            -Ithirdparty/safeSave/include \
+            tests/entityIdAllocatorTests.cpp \
+            src/gameLayer/multyPlayer/entityIdAllocator.cpp \
+            thirdparty/safeSave/src/safeSave.cpp \
+            -o entityIdAllocatorTests
+          ./entityIdAllocatorTests
+
       - name: Build Flatpak repository
         shell: bash
         run: |
@@ -301,6 +304,8 @@ jobs:
           flatpak build-bundle flatpak-repo Mie-Survival-Linux-x86_64.flatpak \
             io.github.daviemanuel973.Mie stable \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          sha256sum Mie-Survival-Linux-x86_64.flatpak > \
+            Mie-Survival-Linux-x86_64.flatpak.sha256
 
       - name: Smoke-test install and writable user data
         run: |
@@ -320,5 +325,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Mie-Survival-v${{ env.MIE_VERSION }}-Linux-x86_64-Flatpak
-          path: Mie-Survival-Linux-x86_64.flatpak
+          path: |
+            Mie-Survival-Linux-x86_64.flatpak
+            Mie-Survival-Linux-x86_64.flatpak.sha256
           if-no-files-found: error

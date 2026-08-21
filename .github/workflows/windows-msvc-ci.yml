@@ -4,13 +4,8 @@ on:
   push:
     branches:
       - main
-      - agent/v0.9-home-and-survival
-      - agent/v0.8-development
-      - agent/v0.7.2-stabilization
-      - agent/content-exploration-v01
-      - agent/release-packaging-stabilization
-      - agent/release-packaging-windows-fix
-      - agent/linux-nonbindless-renderer-fix
+      - 'agent/**'
+      - 'fix/**'
   pull_request:
     paths:
       - 'VERSION'
@@ -27,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-release-ci-${{ github.ref }}
+  group: windows-release-ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -41,8 +36,8 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content "VERSION" -Raw).Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+$') {
-            throw "VERSION must contain a semantic version, got: '$version'"
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+            throw "VERSION must contain a supported release version, got: '$version'"
           }
 
           $cmake = Get-Content "CMakeLists.txt" -Raw
@@ -64,6 +59,7 @@ jobs:
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
             "-DOURCRAFT_VERSION=$env:MIE_VERSION" `
             -DOURCRAFT_INSTALLABLE=ON `
+            -DOURCRAFT_LOW_END_BUILD=ON `
             -DOURCRAFT_ENABLE_AVX2=OFF
 
       - name: Build MSVC Release
@@ -72,7 +68,7 @@ jobs:
 
       - name: Test all Mie gameplay contracts
         shell: pwsh
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|farming-persistence)$'
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|farming-persistence|entity-id-allocator)$'
 
       - name: Stage portable Windows build
         shell: pwsh
@@ -132,6 +128,9 @@ jobs:
           Compress-Archive -Path "stage/*" -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path $zip)) { throw "portable ZIP missing" }
           if ((Get-Item $zip).Length -le 0) { throw "portable ZIP is empty" }
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Mie-Survival-Windows-x64-Portable.zip" |
+            Set-Content "$zip.sha256" -Encoding ascii -NoNewline
 
       - name: Install Inno Setup compiler
         shell: pwsh
@@ -153,7 +152,11 @@ jobs:
         run: |
           & "$env:ISCC" "/DMyAppVersion=$env:MIE_VERSION" "windows/Mie.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
-          if (-not (Test-Path "dist/Mie-Survival-Windows-x64-Setup.exe")) { throw "setup executable missing" }
+          $setup = "dist/Mie-Survival-Windows-x64-Setup.exe"
+          if (-not (Test-Path $setup)) { throw "setup executable missing" }
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Mie-Survival-Windows-x64-Setup.exe" |
+            Set-Content "$setup.sha256" -Encoding ascii -NoNewline
 
       - name: Smoke-test install, update and uninstall
         shell: pwsh
@@ -194,12 +197,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Mie-Survival-Windows-x64-Portable
-          path: dist/Mie-Survival-Windows-x64-Portable.zip
+          path: |
+            dist/Mie-Survival-Windows-x64-Portable.zip
+            dist/Mie-Survival-Windows-x64-Portable.zip.sha256
           if-no-files-found: error
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: Mie-Survival-Windows-x64-Setup
-          path: dist/Mie-Survival-Windows-x64-Setup.exe
+          path: |
+            dist/Mie-Survival-Windows-x64-Setup.exe
+            dist/Mie-Survival-Windows-x64-Setup.exe.sha256
           if-no-files-found: error

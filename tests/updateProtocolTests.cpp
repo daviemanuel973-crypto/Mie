@@ -17,6 +17,10 @@ int main()
 	REQUIRE(compareSemanticVersions("0.4.0", "v0.4.0") == 0);
 	REQUIRE(compareSemanticVersions("0.4.0-beta.1", "0.4.0") < 0);
 	REQUIRE(compareSemanticVersions("1.0.0", "0.99.99") > 0);
+	REQUIRE(compareSemanticVersions("v0.9.3.1", "0.9.3") > 0);
+	REQUIRE(compareSemanticVersions("0.9.3.1", "v0.9.3.1") == 0);
+	REQUIRE(compareSemanticVersions("0.9.3.1-beta.1", "0.9.3.1") < 0);
+	REQUIRE(compareSemanticVersions("0.9.4", "0.9.3.99") > 0);
 
 	const std::string json = R"json({
 		"tag_name":"v0.4.1",

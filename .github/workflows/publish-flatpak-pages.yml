@@ -22,6 +22,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Resolve and verify release version
+        shell: bash
+        run: |
+          MIE_VERSION="$(tr -d '\r\n' < VERSION)"
+          if [[ ! "$MIE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "VERSION must contain a supported release version, got: '$MIE_VERSION'" >&2
+            exit 1
+          fi
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG_VERSION="${{ github.ref_name }}"
+            TAG_VERSION="${TAG_VERSION#linux-v}"
+            test "$TAG_VERSION" = "$MIE_VERSION" || {
+              echo "VERSION ($MIE_VERSION) does not match Flatpak tag ($TAG_VERSION)" >&2
+              exit 1
+            }
+          fi
+          grep -F "set(OURCRAFT_VERSION \"$MIE_VERSION\"" CMakeLists.txt
+          grep -F "#define MyAppVersion \"$MIE_VERSION\"" windows/Mie.iss
+          echo "MIE_VERSION=$MIE_VERSION" >> "$GITHUB_ENV"
+
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
@@ -88,6 +108,8 @@ jobs:
           flatpak build-bundle site/repo site/Mie-Survival-Linux-x86_64.flatpak \
             io.github.daviemanuel973.Mie stable \
             --runtime-repo="$RUNTIME_REPO"
+          sha256sum site/Mie-Survival-Linux-x86_64.flatpak > \
+            site/Mie-Survival-Linux-x86_64.flatpak.sha256
 
           cat > site/index.html <<'EOF'
           <!doctype html>
@@ -97,6 +119,7 @@ jobs:
             <h1>Mie Survival for Linux</h1>
             <p><a href="Mie-Survival.flatpakref">Install with Flatpak and receive updates</a></p>
             <p><a href="Mie-Survival-Linux-x86_64.flatpak">Download standalone Flatpak bundle</a></p>
+            <p><a href="Mie-Survival-Linux-x86_64.flatpak.sha256">SHA-256 checksum</a></p>
           </body>
           </html>
           EOF
