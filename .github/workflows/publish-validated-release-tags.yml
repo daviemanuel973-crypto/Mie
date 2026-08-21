@@ -1,0 +1,92 @@
+name: Publish validated release tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+        type: string
+      target_sha:
+        description: Full 40-character commit SHA already validated on main
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release-tags-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish-tags:
+    name: Validate main and create release tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 0
+
+      - name: Validate version and target
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Unsupported release version: $RELEASE_VERSION" >&2
+            exit 1
+          fi
+          if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "target_sha must be a full lowercase 40-character commit SHA" >&2
+            exit 1
+          fi
+
+          SOURCE_VERSION="$(tr -d '\r\n' < VERSION)"
+          if [[ "$SOURCE_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "VERSION ($SOURCE_VERSION) does not match requested release ($RELEASE_VERSION)" >&2
+            exit 1
+          fi
+
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          if [[ "$ACTUAL_SHA" != "$TARGET_SHA" ]]; then
+            echo "Checked-out commit ($ACTUAL_SHA) does not match target_sha ($TARGET_SHA)" >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$TARGET_SHA" origin/main; then
+            echo "Target commit is not contained in origin/main" >&2
+            exit 1
+          fi
+
+      - name: Create Windows and Flatpak tags
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for TAG in "v$RELEASE_VERSION" "linux-v$RELEASE_VERSION"; do
+            REMOTE_SHA="$(git ls-remote --tags origin "refs/tags/$TAG" | awk 'NR == 1 { print $1 }')"
+            if [[ -n "$REMOTE_SHA" ]]; then
+              if [[ "$REMOTE_SHA" != "$TARGET_SHA" ]]; then
+                echo "Tag $TAG already exists at $REMOTE_SHA instead of $TARGET_SHA" >&2
+                exit 1
+              fi
+              echo "Tag $TAG already points to the validated commit"
+              continue
+            fi
+
+            git tag "$TAG" "$TARGET_SHA"
+            git push origin "refs/tags/$TAG"
+          done
