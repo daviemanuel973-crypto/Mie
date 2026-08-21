@@ -61,7 +61,7 @@ jobs:
             exit 1
           fi
 
-          git fetch --no-tags origin main
+          git fetch --no-tags origin main:refs/remotes/origin/main
           if ! git merge-base --is-ancestor "$TARGET_SHA" origin/main; then
             echo "Target commit is not contained in origin/main" >&2
             exit 1
