@@ -1,0 +1,45 @@
+name: Crafting UI Crash Regression
+
+on:
+  push:
+    branches:
+      - main
+      - fix/v0.9.4-crafting-regression
+    paths:
+      - 'src/gameLayer/rendering/UiEngine.cpp'
+      - 'tests/craftingUiSelectionRegressionTests.cpp'
+      - '.github/workflows/crafting-ui-regression.yml'
+  pull_request:
+    paths:
+      - 'src/gameLayer/rendering/UiEngine.cpp'
+      - 'tests/craftingUiSelectionRegressionTests.cpp'
+      - '.github/workflows/crafting-ui-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crafting-ui-selection-bounds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Compile crafting selection regression
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            tests/craftingUiSelectionRegressionTests.cpp \
+            -o craftingUiSelectionRegressionTests
+
+      - name: Reproduce boundary cases safely
+        run: ./craftingUiSelectionRegressionTests
+
+      - name: Guard renderer selection bounds
+        shell: bash
+        run: |
+          grep -F 'const int recipeCount = static_cast<int>(allItems.size());' src/gameLayer/rendering/UiEngine.cpp
+          grep -F 'craftingSlider = glm::clamp(craftingSlider, -1, recipeCount - 2);' src/gameLayer/rendering/UiEngine.cpp
+          grep -F 'if (selectedIndex >= 0 && selectedIndex < recipeCount)' src/gameLayer/rendering/UiEngine.cpp
+          grep -F 'currentItemHovered = allItems[selectedIndex].recepie.result;' src/gameLayer/rendering/UiEngine.cpp
+          ! grep -F 'currentItemHovered = allItems[start + 1].recepie.result;' src/gameLayer/rendering/UiEngine.cpp
