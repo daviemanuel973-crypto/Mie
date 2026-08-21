@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace
 {
@@ -114,6 +115,19 @@ int main()
 	REQUIRE(clock.getCompletedCycles() == 7);
 	REQUIRE(clock.getDayPhase() == 0.25f);
 	REQUIRE(clock.update(100.0, false) == 0);
+
+	// v0.9.5: invalid or nonsensical cycle durations fall back to a finite
+	// one-second clock instead of allowing NaN to poison all day/night state.
+	WorldCycleClock nanDurationClock(std::numeric_limits<double>::quiet_NaN());
+	REQUIRE(nanDurationClock.getDayPhase() == 0.25f);
+	REQUIRE(nanDurationClock.update(1.0, true) == 1);
+	REQUIRE(nanDurationClock.getCompletedCycles() == 1);
+	REQUIRE(nanDurationClock.getDayPhase() == 0.25f);
+
+	WorldCycleClock negativeDurationClock(-10.0);
+	REQUIRE(negativeDurationClock.getDayPhase() == 0.25f);
+	REQUIRE(negativeDurationClock.update(1.0, true) == 1);
+	REQUIRE(negativeDurationClock.getCompletedCycles() == 1);
 
 	SiegeDirector cancelled(fastTuning());
 	cancelled.update(0.1f, 1, 0, 7, true);
