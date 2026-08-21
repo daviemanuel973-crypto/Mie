@@ -1,11 +1,23 @@
 #include <gameplay/weaponStats.h>
 #include <splines.h>
 #include <glm/glm.hpp>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 
 void WeaponStats::normalize()
 {
+	if (!std::isfinite(critChance)) { critChance = 0.1f; }
+	if (!std::isfinite(critDamage)) { critDamage = 15.f; }
+	if (!std::isfinite(surprizeDamage)) { surprizeDamage = 20.f; }
+	if (!std::isfinite(damage)) { damage = 10.f; }
+	if (!std::isfinite(accuracy)) { accuracy = 5.f; }
+	if (!std::isfinite(range)) { range = 1.8f; }
+	if (!std::isfinite(knockBack)) { knockBack = 4.f; }
+	if (!std::isfinite(speed)) { speed = 6.f; }
+	if (!std::isfinite(drawSpeed)) { drawSpeed = 2.f; }
+	if (!std::isfinite(armourPenetration)) { armourPenetration = 1.f; }
+
 	critChance = glm::clamp(critChance, 0.f, 0.7f);
 	critDamage = glm::clamp(critDamage, 0.f, 999.f);
 	surprizeDamage = glm::clamp(surprizeDamage, 0.f, 999.f);
@@ -27,9 +39,9 @@ glm::vec2 WeaponStats::getTimerCulldownRangeForAttacks()
 {
 	glm::vec2 ret = {0.8, 2.0};
 
-	float normalizedSpeed = (speed + 10) / 30.f;
-	normalizedSpeed = powf(normalizedSpeed, 2.f);
-	normalizedSpeed = 1.2 + normalizedSpeed * 3;
+	float normalizedSpeed = (glm::clamp(speed, -10.f, 20.f) + 10.f) / 30.f;
+	normalizedSpeed = std::pow(normalizedSpeed, 2.f);
+	normalizedSpeed = 1.2f + normalizedSpeed * 3.f;
 
 	ret.x /= normalizedSpeed;
 	ret.y /= normalizedSpeed;
@@ -38,47 +50,47 @@ glm::vec2 WeaponStats::getTimerCulldownRangeForAttacks()
 
 float WeaponStats::getUIMoveSpeed()
 {
-	float s = (speed + 10) / 30.f;
-	s = powf(speed, 0.5f);
-	s *= 0.7f;
-	return s + 0.6f;
+	// Speed is intentionally allowed down to -10 for heavy weapons. The old
+	// implementation normalised into `s` and then accidentally evaluated
+	// sqrt(speed), producing NaN for war hammers and other negative-speed items.
+	const float normalizedSpeed = (glm::clamp(speed, -10.f, 20.f) + 10.f) / 30.f;
+	return std::sqrt(normalizedSpeed) * 0.7f + 0.6f;
 }
 
 float WeaponStats::getSpeedNormalizedInSecconds() const
 {
-	float normalizedSpeed = (speed + 10) / 30.f;
-	normalizedSpeed = 1 - normalizedSpeed;
-	normalizedSpeed = powf(normalizedSpeed, 2.f);
-	normalizedSpeed = 0.1 + normalizedSpeed * 2.0;
+	float normalizedSpeed = (glm::clamp(speed, -10.f, 20.f) + 10.f) / 30.f;
+	normalizedSpeed = 1.f - normalizedSpeed;
+	normalizedSpeed = std::pow(normalizedSpeed, 2.f);
+	normalizedSpeed = 0.1f + normalizedSpeed * 2.0f;
 	return normalizedSpeed;
 }
 
 float WeaponStats::getDrawSpeedNormalizedInSecconds() const
 {
-	float normalizedSpeed = (drawSpeed + 10) / 30.f;
-	normalizedSpeed = 1 - normalizedSpeed;
-	normalizedSpeed = powf(normalizedSpeed, 2.f);
-	normalizedSpeed = 0.1 + normalizedSpeed * 2.0;
+	float normalizedSpeed = (glm::clamp(drawSpeed, -10.f, 20.f) + 10.f) / 30.f;
+	normalizedSpeed = 1.f - normalizedSpeed;
+	normalizedSpeed = std::pow(normalizedSpeed, 2.f);
+	normalizedSpeed = 0.1f + normalizedSpeed * 2.0f;
 	return normalizedSpeed;
 }
 
 float WeaponStats::getAccuracyAdjusted()
 {
-	float accuracyNormalized = (accuracy + 10.f) / 30.f;
-	accuracyNormalized *= 1.0f;
+	float accuracyNormalized = (glm::clamp(accuracy, -10.f, 20.f) + 10.f) / 30.f;
 	accuracyNormalized -= 0.5f;
-	accuracyNormalized *= 0.5;
+	accuracyNormalized *= 0.5f;
 	return accuracyNormalized;
 }
 
 float WeaponStats::getAccuracyNormalized() const
 {
-	return (accuracy + 10.f) / 30.f;
+	return (glm::clamp(accuracy, -10.f, 20.f) + 10.f) / 30.f;
 }
 
 float WeaponStats::getAccuracyNormalizedNegative() const
 {
-	return (accuracy) / 20.f;
+	return glm::clamp(accuracy, -10.f, 20.f) / 20.f;
 }
 
 std::string WeaponStats::formatDataToString() const

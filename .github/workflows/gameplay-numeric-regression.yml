@@ -1,0 +1,71 @@
+name: Gameplay Numeric Regression
+
+on:
+  push:
+    branches:
+      - main
+      - agent/v0.9.5-stability
+    paths:
+      - 'include/gameLayer/gameplay/entityStats.h'
+      - 'include/gameLayer/gameplay/life.h'
+      - 'include/gameLayer/gameplay/weaponStats.h'
+      - 'src/gameLayer/gameplay/entityStats.cpp'
+      - 'src/gameLayer/gameplay/weaponStats.cpp'
+      - 'tests/entityStatsTests.cpp'
+      - 'tests/weaponStatsRegressionTests.cpp'
+      - '.github/workflows/gameplay-numeric-regression.yml'
+  pull_request:
+    paths:
+      - 'include/gameLayer/gameplay/entityStats.h'
+      - 'include/gameLayer/gameplay/life.h'
+      - 'include/gameLayer/gameplay/weaponStats.h'
+      - 'src/gameLayer/gameplay/entityStats.cpp'
+      - 'src/gameLayer/gameplay/weaponStats.cpp'
+      - 'tests/entityStatsTests.cpp'
+      - 'tests/weaponStatsRegressionTests.cpp'
+      - '.github/workflows/gameplay-numeric-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gameplay-numeric-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Compile entity, life and hunger regression tests
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            tests/entityStatsTests.cpp \
+            src/gameLayer/gameplay/entityStats.cpp \
+            -o entityStatsTests
+
+      - name: Run entity, life and hunger regression tests
+        run: ./entityStatsTests
+
+      - name: Compile weapon timing regression tests
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            -Ishared \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/weaponStatsRegressionTests.cpp \
+            src/gameLayer/gameplay/weaponStats.cpp \
+            -o weaponStatsRegressionTests
+
+      - name: Run weapon timing regression tests
+        run: ./weaponStatsRegressionTests
+
+      - name: Guard the negative-speed UI regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'const float normalizedSpeed = (glm::clamp(speed, -10.f, 20.f) + 10.f) / 30.f;' src/gameLayer/gameplay/weaponStats.cpp
+          grep -F 'return std::sqrt(normalizedSpeed) * 0.7f + 0.6f;' src/gameLayer/gameplay/weaponStats.cpp
+          ! grep -F 'powf(speed, 0.5f)' src/gameLayer/gameplay/weaponStats.cpp

@@ -1,5 +1,5 @@
 #include "rendering/camera.h"
-#include <math.h>
+#include <cmath>
 
 
 glm::mat4 customPerspective(float fovy, float aspect, float zNear, float zFar)
@@ -96,22 +96,26 @@ void Camera::rotateCamera(const glm::vec2 delta)
 //
 //	viewDirection = glm::normalize(viewDirection);
 
-	constexpr float PI = 3.1415926;
+	constexpr float PI = 3.1415926f;
+	constexpr float TWO_PI = 2.f * PI;
 
-	yaw += delta.x;
+	if (!std::isfinite(delta.x) || !std::isfinite(delta.y))
+	{
+		return;
+	}
+
+	if (!std::isfinite(yaw)) { yaw = 0.f; }
+	if (!std::isfinite(pitch)) { pitch = 0.f; }
+
+	yaw = std::fmod(yaw + delta.x, TWO_PI);
+	if (yaw < 0.f)
+	{
+		yaw += TWO_PI;
+	}
+
 	pitch += delta.y;
-
-	if (yaw >= (2.f * PI) * 2)
-	{
-		yaw -= 2.f * PI;
-	}
-	else if (yaw < 0)
-	{
-		yaw = 2.f * PI - yaw;
-	}
-
-	if (pitch > PI/2.f - 0.01) { pitch = PI / 2.f - 0.01; }
-	if (pitch < -PI / 2.f + 0.01) { pitch = -PI / 2.f + 0.01; }
+	if (pitch > PI/2.f - 0.01f) { pitch = PI / 2.f - 0.01f; }
+	if (pitch < -PI / 2.f + 0.01f) { pitch = -PI / 2.f + 0.01f; }
 
 	viewDirection = glm::vec3(0,0,-1);
 
@@ -119,6 +123,7 @@ void Camera::rotateCamera(const glm::vec2 delta)
 
 	glm::vec3 rotatePitchAxe = glm::cross(viewDirection, up);
 	viewDirection = glm::mat3(glm::rotate(pitch, rotatePitchAxe)) * viewDirection;
+	viewDirection = glm::normalize(viewDirection);
 
 }
 
@@ -311,15 +316,3 @@ glm::dmat4 lookAtSafe(glm::dvec3 const &eye, glm::dvec3 const &center, glm::dvec
 	Result[3][2] = dot(f, eye);
 	return Result;
 }
-
-
-
-
-
-
-
-
-
-
-
-
