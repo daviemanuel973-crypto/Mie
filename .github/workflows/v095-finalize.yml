@@ -1,0 +1,149 @@
+name: v0.9.5 Finalize
+
+on:
+  push:
+    branches:
+      - agent/v0.9.5-stability
+    paths:
+      - '.github/workflows/v095-finalize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout stability branch
+        uses: actions/checkout@v6
+        with:
+          ref: agent/v0.9.5-stability
+          fetch-depth: 0
+
+      - name: Apply final stability fixes and regression guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}")
+              p.write_text(text.replace(old, new, 1))
+
+          gameplay = Path('src/gameLayer/gamePlayLogic.cpp')
+          text = gameplay.read_text()
+
+          old = "\tbool stopMainInput = gameData.escapePressed || gameData.killed || gameData.insideInventoryMenu ||\n\t\tgameData.isInsideMapView || gameData.isInsideChat || gameData.interaction.blockInteractionType != 0;\n\n\tstatic float moveSpeed = 7.f;\n\tfloat isPlayerMovingSpeed = 0;"
+          new = "\tconst auto controllerButtons = platform::getControllerButtons();\n\tconst bool controllerCloseReleased =\n\t\tcontrollerButtons.buttons[platform::ControllerButtons::B].released ||\n\t\tcontrollerButtons.buttons[platform::ControllerButtons::Start].released;\n\tconst bool controllerInventoryReleased =\n\t\tcontrollerButtons.buttons[platform::ControllerButtons::Y].released;\n\n\tbool stopMainInput = gameData.escapePressed || gameData.killed || gameData.insideInventoryMenu ||\n\t\tgameData.isInsideMapView || gameData.isInsideChat || gameData.interaction.blockInteractionType != 0 ||\n\t\t!platform::isFocused();\n\n\tstatic bool mainInputWasStoppedLastFrame = true;\n\tconst bool resumeMainInputThisFrame = !stopMainInput && mainInputWasStoppedLastFrame;\n\tmainInputWasStoppedLastFrame = stopMainInput;\n\n\tstatic float moveSpeed = 7.f;\n\tfloat isPlayerMovingSpeed = 0;"
+          if new not in text:
+              if text.count(old) != 1:
+                  raise SystemExit('gamePlayLogic.cpp: stopMainInput anchor mismatch')
+              text = text.replace(old, new, 1)
+
+          old = "\tif (!stopMainInput || gameData.insideInventoryMenu)\n\t\tif (platform::isKeyReleased(platform::Button::E))"
+          new = "\tif (!stopMainInput || gameData.insideInventoryMenu)\n\t\tif (platform::isKeyReleased(platform::Button::E) || controllerInventoryReleased)"
+          if new not in text:
+              if text.count(old) != 1:
+                  raise SystemExit('gamePlayLogic.cpp: inventory toggle anchor mismatch')
+              text = text.replace(old, new, 1)
+
+          old = "\t\t\tbool rotate = !gameData.escapePressed;\n\t\t\tgameData.inputCamera.rotateFPS(platform::getRelMousePosition(), 0.22f * 0.02f, rotate);"
+          new = "\t\t\tif (resumeMainInputThisFrame)\n\t\t\t{\n\t\t\t\tplatform::setRelMousePosition(w / 2, h / 2);\n\t\t\t\tgameData.inputCamera.lastMousePos = {w / 2, h / 2};\n\t\t\t}\n\n\t\t\tbool rotate = !gameData.escapePressed && !resumeMainInputThisFrame;\n\t\t\tgameData.inputCamera.rotateFPS(platform::getRelMousePosition(), 0.22f * 0.02f, rotate);"
+          if new not in text:
+              if text.count(old) != 1:
+                  raise SystemExit('gamePlayLogic.cpp: camera rotate anchor mismatch')
+              text = text.replace(old, new, 1)
+
+          old = "\t\t\t\t\telse if (isChest(e.originalBlock.getType()))"
+          furnace_rollback = "\t\t\t\t\telse if (e.originalBlock.getType() == BlockTypes::furnace)\n\t\t\t\t\t{\n\t\t\t\t\t\tFurnaceBlock block;\n\t\t\t\t\t\tsize_t _ = 0;\n\t\t\t\t\t\tif (block.readFromBuffer(e.blockData.data(), e.blockData.size(), _))\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\tauto *c = gameData.chunkSystem.getChunkSafeFromBlockPos(e.blockPos.x, e.blockPos.z);\n\t\t\t\t\t\t\tif (c)\n\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\tauto blockData = c->blockData.getFurnaceBlock(modBlockToChunk(e.blockPos.x), e.blockPos.y,\n\t\t\t\t\t\t\t\t\tmodBlockToChunk(e.blockPos.z));\n\t\t\t\t\t\t\t\tif (blockData)\n\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\t*blockData = block;\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\telse if (isChest(e.originalBlock.getType()))"
+          if "e.originalBlock.getType() == BlockTypes::furnace" not in text:
+              if text.count(old) != 1:
+                  raise SystemExit('gamePlayLogic.cpp: chest rollback anchor mismatch')
+              text = text.replace(old, furnace_rollback, 1)
+
+          start = text.index('#pragma region esc manu')
+          end = text.index('#pragma endregion', start)
+          segment = text[start:end]
+          if 'const bool closeUiReleased =' not in segment:
+              segment = segment.replace("\tbool justPressedEsc = 0;", "\tbool justPressedEsc = 0;\n\tconst bool closeUiReleased = platform::isKeyReleased(platform::Button::Escape) ||\n\t\tcontrollerCloseReleased;", 1)
+              escape_count = segment.count('platform::isKeyReleased(platform::Button::Escape)')
+              if escape_count != 6:
+                  raise SystemExit(f'gamePlayLogic.cpp: expected 6 escape checks in menu region, found {escape_count}')
+              # Preserve the newly-added definition; replace only the remaining checks.
+              definition = "platform::isKeyReleased(platform::Button::Escape) ||\n\t\tcontrollerCloseReleased"
+              segment = segment.replace(definition, '__CLOSE_UI_DEF__', 1)
+              segment = segment.replace('platform::isKeyReleased(platform::Button::Escape)', 'closeUiReleased')
+              segment = segment.replace('__CLOSE_UI_DEF__', definition, 1)
+              text = text[:start] + segment + text[end:]
+
+          old = "\tplatform::showMouse(gameData.escapePressed || gameData.insideInventoryMenu ||\n\t\tgameData.killed || gameData.isInsideMapView || gameData.interaction.blockInteractionType);"
+          new = "\tplatform::showMouse(gameData.escapePressed || gameData.insideInventoryMenu ||\n\t\tgameData.killed || gameData.isInsideMapView || gameData.isInsideChat ||\n\t\tgameData.interaction.blockInteractionType || !platform::isFocused());"
+          if new not in text:
+              if text.count(old) != 1:
+                  raise SystemExit('gamePlayLogic.cpp: showMouse anchor mismatch')
+              text = text.replace(old, new, 1)
+
+          gameplay.write_text(text)
+
+          chunks = Path('src/gameLayer/chunkSystem.cpp')
+          text = chunks.read_text()
+          old = "\telse if (isChest(type))"
+          new = "\telse if (type == BlockTypes::furnace)\n\t{\n\t\tauto foundBlock = chunk->blockData.getFurnaceBlock(chunkPos.x, chunkPos.y, chunkPos.z);\n\t\tif (foundBlock)\n\t\t{\n\t\t\tfoundBlock->formatIntoData(data);\n\t\t}\n\t}\n\telse if (isChest(type))"
+          if new not in text:
+              if text.count(old) != 1:
+                  raise SystemExit(f'chunkSystem.cpp: expected one chest snapshot anchor, found {text.count(old)}')
+              text = text.replace(old, new, 1)
+          chunks.write_text(text)
+
+          input_ci = Path('.github/workflows/input-camera-regression.yml')
+          text = input_ci.read_text()
+          path_line = "      - 'src/gameLayer/rendering/camera.cpp'\n"
+          expanded = path_line + "      - 'src/gameLayer/gamePlayLogic.cpp'\n"
+          if "      - 'src/gameLayer/gamePlayLogic.cpp'" not in text:
+              if text.count(path_line) != 2:
+                  raise SystemExit('input-camera-regression.yml: camera path anchor mismatch')
+              text = text.replace(path_line, expanded)
+          marker = '      - name: Guard focus recovery and controller UI parity\n'
+          if marker not in text:
+              text += "\n      - name: Guard focus recovery and controller UI parity\n        shell: bash\n        run: |\n          set -euo pipefail\n          grep -F 'const auto controllerButtons = platform::getControllerButtons();' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'ControllerButtons::B].released' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'ControllerButtons::Start].released' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'ControllerButtons::Y].released' src/gameLayer/gamePlayLogic.cpp\n          grep -F '!platform::isFocused();' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'const bool resumeMainInputThisFrame = !stopMainInput && mainInputWasStoppedLastFrame;' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'bool rotate = !gameData.escapePressed && !resumeMainInputThisFrame;' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'gameData.isInsideMapView || gameData.isInsideChat ||' src/gameLayer/gamePlayLogic.cpp\n"
+          input_ci.write_text(text)
+
+          numeric_ci = Path('.github/workflows/gameplay-numeric-regression.yml')
+          text = numeric_ci.read_text()
+          path_line = "      - 'src/gameLayer/gamePlayLogic.cpp'\n"
+          expanded = path_line + "      - 'src/gameLayer/chunkSystem.cpp'\n      - 'include/gameLayer/rendering/renderSettings.h'\n      - 'src/gameLayer/gameplay/entity.cpp'\n"
+          if "      - 'src/gameLayer/chunkSystem.cpp'" not in text:
+              if text.count(path_line) != 2:
+                  raise SystemExit('gameplay-numeric-regression.yml: gameplay path anchor mismatch')
+              text = text.replace(path_line, expanded)
+          marker = '      - name: Guard block rollback and low-end runtime bounds\n'
+          if marker not in text:
+              text += "\n      - name: Guard block rollback and low-end runtime bounds\n        shell: bash\n        run: |\n          set -euo pipefail\n          grep -F 'else if (type == BlockTypes::furnace)' src/gameLayer/chunkSystem.cpp\n          grep -F 'getFurnaceBlock(chunkPos.x, chunkPos.y, chunkPos.z)' src/gameLayer/chunkSystem.cpp\n          grep -F 'e.originalBlock.getType() == BlockTypes::furnace' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'getFurnaceBlock(modBlockToChunk(e.blockPos.x), e.blockPos.y,' src/gameLayer/gamePlayLogic.cpp\n          grep -F 'workerThreadsForBaking = 1' include/gameLayer/rendering/renderSettings.h\n          grep -F 'chunkVectorCopyNoNullsOnlyToBake.resize(100 + threadPool.currentCounter);' src/gameLayer/chunkSystem.cpp\n          grep -F 'getCollisionsListThatCanPush(positiom, colider, yourEID)' src/gameLayer/gameplay/entity.cpp\n"
+          numeric_ci.write_text(text)
+
+          Path('VERSION').write_text('0.9.5\n')
+          PY
+
+          git diff --check
+          grep -F '0.9.5' VERSION
+          grep -F 'BlockTypes::furnace' src/gameLayer/chunkSystem.cpp
+          grep -F 'ControllerButtons::Start].released' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'resumeMainInputThisFrame' src/gameLayer/gamePlayLogic.cpp
+
+      - name: Commit finalized release branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/v095-finalize.yml
+          git add VERSION src/gameLayer/gamePlayLogic.cpp src/gameLayer/chunkSystem.cpp .github/workflows/input-camera-regression.yml .github/workflows/gameplay-numeric-regression.yml
+          git commit -m 'fix: close v0.9.5 stability blockers'
+          git push origin HEAD:agent/v0.9.5-stability
