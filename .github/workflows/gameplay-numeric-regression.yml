@@ -9,20 +9,26 @@ on:
       - 'include/gameLayer/gameplay/entityStats.h'
       - 'include/gameLayer/gameplay/life.h'
       - 'include/gameLayer/gameplay/weaponStats.h'
+      - 'include/gameLayer/multyPlayer/interactionInvalidation.h'
       - 'src/gameLayer/gameplay/entityStats.cpp'
       - 'src/gameLayer/gameplay/weaponStats.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
       - 'tests/entityStatsTests.cpp'
       - 'tests/weaponStatsRegressionTests.cpp'
+      - 'tests/interactionInvalidationTests.cpp'
       - '.github/workflows/gameplay-numeric-regression.yml'
   pull_request:
     paths:
       - 'include/gameLayer/gameplay/entityStats.h'
       - 'include/gameLayer/gameplay/life.h'
       - 'include/gameLayer/gameplay/weaponStats.h'
+      - 'include/gameLayer/multyPlayer/interactionInvalidation.h'
       - 'src/gameLayer/gameplay/entityStats.cpp'
       - 'src/gameLayer/gameplay/weaponStats.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
       - 'tests/entityStatsTests.cpp'
       - 'tests/weaponStatsRegressionTests.cpp'
+      - 'tests/interactionInvalidationTests.cpp'
       - '.github/workflows/gameplay-numeric-regression.yml'
   workflow_dispatch:
 
@@ -62,6 +68,16 @@ jobs:
       - name: Run weapon timing regression tests
         run: ./weaponStatsRegressionTests
 
+      - name: Compile interaction invalidation regression tests
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/interactionInvalidationTests.cpp \
+            -o interactionInvalidationTests
+
+      - name: Run interaction invalidation regression tests
+        run: ./interactionInvalidationTests
+
       - name: Guard the negative-speed UI regression
         shell: bash
         run: |
@@ -69,3 +85,12 @@ jobs:
           grep -F 'const float normalizedSpeed = (glm::clamp(speed, -10.f, 20.f) + 10.f) / 30.f;' src/gameLayer/gameplay/weaponStats.cpp
           grep -F 'return std::sqrt(normalizedSpeed) * 0.7f + 0.6f;' src/gameLayer/gameplay/weaponStats.cpp
           ! grep -F 'powf(speed, 0.5f)' src/gameLayer/gameplay/weaponStats.cpp
+
+      - name: Guard deterministic interaction invalidation handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F '#include "multyPlayer/interactionInvalidation.h"' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'planInteractionInvalidation(' src/gameLayer/gamePlayLogic.cpp
+          ! grep -F 'undo queue is empty but I revieved an undo message' src/gameLayer/gamePlayLogic.cpp
+          ! grep -F 'inconsistency between the server' src/gameLayer/gamePlayLogic.cpp
