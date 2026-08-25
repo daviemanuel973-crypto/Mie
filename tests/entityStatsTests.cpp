@@ -1,5 +1,15 @@
+#if defined(__GNUC__)
+// Bundled GLM intentionally uses anonymous-struct extensions. Keep the v0.9.5
+// regression test itself under -Werror -pedantic, but do not promote diagnostics
+// emitted by that third-party header implementation to Mie build failures.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
 #include <gameplay/entityStats.h>
 #include <gameplay/life.h>
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 #include <cmath>
 #include <iostream>
