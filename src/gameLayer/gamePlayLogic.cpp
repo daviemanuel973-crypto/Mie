@@ -18,6 +18,7 @@
 #endif
 #include <iostream>
 #include "multyPlayer/undoQueue.h"
+#include "multyPlayer/interactionInvalidation.h"
 #include <lightSystem.h>
 #include <structure.h>
 #include <safeSave.h>
@@ -474,32 +475,20 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			}
 		}
 
-		//undo stuff
+		// Undo/revision resynchronisation. Delayed duplicate invalidations from a
+		// revision that was already handled are stale. Current/future authoritative
+		// invalidations roll back any remaining prediction and rebase the client.
 		if (inValidateRevision)
 		{
-			if (gameData.undoQueue.events.empty())
-			{
-				permaAssert(0); // undo queue is empty but I revieved an undo message.
-			}
+			const auto invalidationPlan = mie::network::planInteractionInvalidation(
+				inValidateRevision, gameData.undoQueue.currentEventId.revision);
 
-			RevisionNumber currentRevisionNumber = gameData.undoQueue.events[0].eventId.revision;
-			for (auto &i : gameData.undoQueue.events)
+			if (invalidationPlan.apply)
 			{
-				if (i.eventId.revision != currentRevisionNumber)
+				for (auto i = gameData.undoQueue.events.size(); i > 0; --i)
 				{
-					permaAssert(0); // undo queue has inconsistent revisions
-				}
-			}
 
-			if (inValidateRevision != gameData.undoQueue.currentEventId.revision)
-			{
-				permaAssert(0 && "inconsistency between the server's revision and mine"); //inconsistency between the server's revision and mine
-			}
-
-			for (int i = gameData.undoQueue.events.size() - 1; i >= 0; i--)
-			{
-
-				auto &e = gameData.undoQueue.events[i];
+					auto &e = gameData.undoQueue.events[i - 1];
 
 				if (e.type == UndoQueueEvent::iPlacedBlock)
 				{
@@ -579,9 +568,9 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 			}
 
-			gameData.undoQueue.events.clear();
-
-			gameData.undoQueue.currentEventId.revision++;
+				gameData.undoQueue.events.clear();
+				gameData.undoQueue.currentEventId.revision = invalidationPlan.nextRevision;
+			}
 		}
 
 		//player sends updates to server
