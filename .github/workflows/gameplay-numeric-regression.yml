@@ -13,6 +13,9 @@ on:
       - 'src/gameLayer/gameplay/entityStats.cpp'
       - 'src/gameLayer/gameplay/weaponStats.cpp'
       - 'src/gameLayer/gamePlayLogic.cpp'
+      - 'src/gameLayer/chunkSystem.cpp'
+      - 'include/gameLayer/rendering/renderSettings.h'
+      - 'src/gameLayer/gameplay/entity.cpp'
       - 'tests/entityStatsTests.cpp'
       - 'tests/weaponStatsRegressionTests.cpp'
       - 'tests/interactionInvalidationTests.cpp'
@@ -26,6 +29,9 @@ on:
       - 'src/gameLayer/gameplay/entityStats.cpp'
       - 'src/gameLayer/gameplay/weaponStats.cpp'
       - 'src/gameLayer/gamePlayLogic.cpp'
+      - 'src/gameLayer/chunkSystem.cpp'
+      - 'include/gameLayer/rendering/renderSettings.h'
+      - 'src/gameLayer/gameplay/entity.cpp'
       - 'tests/entityStatsTests.cpp'
       - 'tests/weaponStatsRegressionTests.cpp'
       - 'tests/interactionInvalidationTests.cpp'
@@ -95,3 +101,15 @@ jobs:
           ! grep -F 'undo queue is empty but I revieved an undo message' src/gameLayer/gamePlayLogic.cpp
           ! grep -F 'undo queue has inconsistent revisions' src/gameLayer/gamePlayLogic.cpp
           ! grep -F 'inconsistency between the server' src/gameLayer/gamePlayLogic.cpp
+
+      - name: Guard block rollback and low-end runtime bounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'else if (type == BlockTypes::furnace)' src/gameLayer/chunkSystem.cpp
+          grep -F 'getFurnaceBlock(chunkPos.x, chunkPos.y, chunkPos.z)' src/gameLayer/chunkSystem.cpp
+          grep -F 'e.originalBlock.getType() == BlockTypes::furnace' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'getFurnaceBlock(modBlockToChunk(e.blockPos.x), e.blockPos.y,' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'workerThreadsForBaking = 1' include/gameLayer/rendering/renderSettings.h
+          grep -F 'chunkVectorCopyNoNullsOnlyToBake.resize(100 + threadPool.currentCounter);' src/gameLayer/chunkSystem.cpp
+          grep -F 'getCollisionsListThatCanPush(positiom, colider, yourEID)' src/gameLayer/gameplay/entity.cpp
