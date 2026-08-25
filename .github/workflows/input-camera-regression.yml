@@ -9,12 +9,14 @@ on:
       - 'include/platform/platformInput.h'
       - 'src/platform/platformInput.cpp'
       - 'src/gameLayer/rendering/camera.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
       - '.github/workflows/input-camera-regression.yml'
   pull_request:
     paths:
       - 'include/platform/platformInput.h'
       - 'src/platform/platformInput.cpp'
       - 'src/gameLayer/rendering/camera.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
       - '.github/workflows/input-camera-regression.yml'
   workflow_dispatch:
 
@@ -82,3 +84,16 @@ jobs:
           grep -F 'yaw = std::fmod(yaw + delta.x, TWO_PI);' src/gameLayer/rendering/camera.cpp
           grep -F 'viewDirection = glm::normalize(viewDirection);' src/gameLayer/rendering/camera.cpp
           ! grep -F 'yaw = 2.f * PI - yaw;' src/gameLayer/rendering/camera.cpp
+
+      - name: Guard focus recovery and controller UI parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'const auto controllerButtons = platform::getControllerButtons();' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'ControllerButtons::B].released' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'ControllerButtons::Start].released' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'ControllerButtons::Y].released' src/gameLayer/gamePlayLogic.cpp
+          grep -F '!platform::isFocused();' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'const bool resumeMainInputThisFrame = !stopMainInput && mainInputWasStoppedLastFrame;' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'bool rotate = !gameData.escapePressed && !resumeMainInputThisFrame;' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'gameData.isInsideMapView || gameData.isInsideChat ||' src/gameLayer/gamePlayLogic.cpp
