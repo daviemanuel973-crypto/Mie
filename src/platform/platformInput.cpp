@@ -1,4 +1,5 @@
 #include "platformInput.h"
+#include <algorithm>
 #include <cmath>
 
 platform::Button keyBoard[platform::Button::BUTTONS_COUNT];
@@ -12,6 +13,35 @@ namespace
 {
 	bool inputStateUpdatedForCurrentFrame = false;
 	float lastInputDeltaTime = 1.f / 60.f;
+
+	constexpr float controllerStickDeadzone = 0.18f;
+
+	float sanitizeControllerAxis(float value)
+	{
+		if (!std::isfinite(value)) { return 0.f; }
+		return std::clamp(value, -1.f, 1.f);
+	}
+
+	void applyRadialControllerDeadzone(float rawX, float rawY, float &outX, float &outY)
+	{
+		const float x = sanitizeControllerAxis(rawX);
+		const float y = sanitizeControllerAxis(rawY);
+		const float magnitude = std::sqrt(x * x + y * y);
+
+		if (!std::isfinite(magnitude) || magnitude <= controllerStickDeadzone)
+		{
+			outX = 0.f;
+			outY = 0.f;
+			return;
+		}
+
+		const float clampedMagnitude = std::min(magnitude, 1.f);
+		const float remappedMagnitude =
+			(clampedMagnitude - controllerStickDeadzone) / (1.f - controllerStickDeadzone);
+		const float scale = remappedMagnitude / magnitude;
+		outX = x * scale;
+		outY = y * scale;
+	}
 
 	void ensureInputStateUpdated()
 	{
@@ -173,14 +203,20 @@ void platform::internal::updateAllButtons(float deltaTime)
 					updateButton(controllerButtons.buttons[button], lastInputDeltaTime);
 				}
 
-				controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];
-				controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];
+				// Preserve GLFW trigger semantics (-1 released, +1 fully pressed), while
+				// rejecting malformed/non-finite driver values before they reach gameplay.
+				controllerButtons.LT = sanitizeControllerAxis(state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);
+				controllerButtons.RT = sanitizeControllerAxis(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);
 
-				controllerButtons.LStick.x = state.axes[GLFW_GAMEPAD_AXIS_LEFT_X];
-				controllerButtons.LStick.y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+				applyRadialControllerDeadzone(
+					state.axes[GLFW_GAMEPAD_AXIS_LEFT_X],
+					state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y],
+					controllerButtons.LStick.x, controllerButtons.LStick.y);
 
-				controllerButtons.RStick.x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
-				controllerButtons.RStick.y = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
+				applyRadialControllerDeadzone(
+					state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X],
+					state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y],
+					controllerButtons.RStick.x, controllerButtons.RStick.y);
 
 				controllerPolled = true;
 				break;
