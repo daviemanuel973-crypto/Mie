@@ -37,12 +37,18 @@ jobs:
           grep -F 'b.newState = -1;' include/platform/platformInput.h
           grep -F 'b.typed = 0;' include/platform/platformInput.h
 
-      - name: Guard gamepad mapping and disconnect reset
+      - name: Guard gamepad mapping, deadzone and disconnect reset
         shell: bash
         run: |
           set -euo pipefail
-          grep -F 'controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];' src/platform/platformInput.cpp
-          grep -F 'controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];' src/platform/platformInput.cpp
+          grep -F 'controllerStickDeadzone = 0.18f;' src/platform/platformInput.cpp
+          grep -F 'void applyRadialControllerDeadzone' src/platform/platformInput.cpp
+          grep -F 'controllerButtons.LT = sanitizeControllerAxis(state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);' src/platform/platformInput.cpp
+          grep -F 'controllerButtons.RT = sanitizeControllerAxis(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_LEFT_X]' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]' src/platform/platformInput.cpp
           grep -F 'if (!controllerPolled)' src/platform/platformInput.cpp
           grep -F 'controllerButtons.setAllToZero();' src/platform/platformInput.cpp
           ! grep -F 'controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];' src/platform/platformInput.cpp
