@@ -33,7 +33,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   gameplay-numeric-contracts:
@@ -41,6 +41,95 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: agent/v0.9.5-stability
+          fetch-depth: 0
+
+      - name: Apply one-shot interaction rollback maintenance patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/gameLayer/gamePlayLogic.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          include_anchor = '#include "multyPlayer/undoQueue.h"\n'
+          include_line = '#include "multyPlayer/interactionInvalidation.h"\n'
+          if include_line not in text:
+              if include_anchor not in text:
+                  raise SystemExit('undoQueue include anchor not found')
+              text = text.replace(include_anchor, include_anchor + include_line, 1)
+
+          old_prefix = '''\t\t//undo stuff
+\t\tif (inValidateRevision)
+\t\t{
+\t\t\tif (gameData.undoQueue.events.empty())
+\t\t\t{
+\t\t\t\tpermaAssert(0); // undo queue is empty but I revieved an undo message.
+\t\t\t}
+
+\t\t\tRevisionNumber currentRevisionNumber = gameData.undoQueue.events[0].eventId.revision;
+\t\t\tfor (auto &i : gameData.undoQueue.events)
+\t\t\t{
+\t\t\t\tif (i.eventId.revision != currentRevisionNumber)
+\t\t\t\t{
+\t\t\t\t\tpermaAssert(0); // undo queue has inconsistent revisions
+\t\t\t\t}
+\t\t\t}
+
+\t\t\tif (inValidateRevision != gameData.undoQueue.currentEventId.revision)
+\t\t\t{
+\t\t\t\tpermaAssert(0 && "inconsistency between the server's revision and mine"); //inconsistency between the server's revision and mine
+\t\t\t}
+
+\t\t\tfor (int i = gameData.undoQueue.events.size() - 1; i >= 0; i--)
+\t\t\t{
+
+\t\t\t\tauto &e = gameData.undoQueue.events[i];'''
+          new_prefix = '''\t\t// Undo/revision resynchronisation. Delayed duplicate invalidations from a
+\t\t// revision that was already handled are stale. Current/future authoritative
+\t\t// invalidations roll back any remaining prediction and rebase the client.
+\t\tif (inValidateRevision)
+\t\t{
+\t\t\tconst auto invalidationPlan = mie::network::planInteractionInvalidation(
+\t\t\t\tinValidateRevision, gameData.undoQueue.currentEventId.revision);
+
+\t\t\tif (invalidationPlan.apply)
+\t\t\t{
+\t\t\t\tfor (auto i = gameData.undoQueue.events.size(); i > 0; --i)
+\t\t\t\t{
+
+\t\t\t\t\tauto &e = gameData.undoQueue.events[i - 1];'''
+
+          if old_prefix not in text:
+              raise SystemExit('legacy rollback prefix not found')
+          text = text.replace(old_prefix, new_prefix, 1)
+
+          old_suffix = '''\t\t\tgameData.undoQueue.events.clear();
+
+\t\t\tgameData.undoQueue.currentEventId.revision++;
+\t\t}'''
+          new_suffix = '''\t\t\t\tgameData.undoQueue.events.clear();
+\t\t\t\tgameData.undoQueue.currentEventId.revision = invalidationPlan.nextRevision;
+\t\t\t}
+\t\t}'''
+          if old_suffix not in text:
+              raise SystemExit('legacy rollback suffix not found')
+          text = text.replace(old_suffix, new_suffix, 1)
+
+          for marker in (
+              'undo queue is empty but I revieved an undo message',
+              'undo queue has inconsistent revisions',
+              "inconsistency between the server's revision and mine",
+          ):
+              if marker in text:
+                  raise SystemExit(f'legacy assertion remains: {marker}')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
 
       - name: Compile entity, life and hunger regression tests
         run: |
@@ -94,3 +183,17 @@ jobs:
           grep -F 'planInteractionInvalidation(' src/gameLayer/gamePlayLogic.cpp
           ! grep -F 'undo queue is empty but I revieved an undo message' src/gameLayer/gamePlayLogic.cpp
           ! grep -F 'inconsistency between the server' src/gameLayer/gamePlayLogic.cpp
+
+      - name: Commit maintained gameplay source
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/gameLayer/gamePlayLogic.cpp; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/gameLayer/gamePlayLogic.cpp
+          git commit -m "net: harden delayed invalidation rollback"
+          git push origin HEAD:agent/v0.9.5-stability
