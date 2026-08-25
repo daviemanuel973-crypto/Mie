@@ -61,6 +61,9 @@ namespace platform
 			b.pressed = 0;
 			b.held = 0;
 			b.released = 0;
+			b.newState = -1;
+			b.typed = 0;
+			b.typedTime = 0;
 		}
 	}
 
@@ -151,9 +154,10 @@ namespace platform
 			}
 			else if(b.newState == 0)
 			{
+				const bool wasHeld = b.held;
 				b.held = false;
 				b.pressed = false;
-				b.released = true;
+				b.released = wasHeld;
 			}else
 			{
 				b.pressed = false;

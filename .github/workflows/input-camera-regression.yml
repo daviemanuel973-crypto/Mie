@@ -1,0 +1,99 @@
+name: Input and Camera Regression
+
+on:
+  push:
+    branches:
+      - main
+      - agent/v0.9.5-stability
+    paths:
+      - 'include/platform/platformInput.h'
+      - 'src/platform/platformInput.cpp'
+      - 'src/gameLayer/rendering/camera.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
+      - '.github/workflows/input-camera-regression.yml'
+  pull_request:
+    paths:
+      - 'include/platform/platformInput.h'
+      - 'src/platform/platformInput.cpp'
+      - 'src/gameLayer/rendering/camera.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
+      - '.github/workflows/input-camera-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  input-camera-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Guard edge-triggered input semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'const bool wasHeld = b.held;' include/platform/platformInput.h
+          grep -F 'b.released = wasHeld;' include/platform/platformInput.h
+          grep -F 'b.newState = -1;' include/platform/platformInput.h
+          grep -F 'b.typed = 0;' include/platform/platformInput.h
+
+      - name: Guard gamepad mapping, deadzone and disconnect reset
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'controllerStickDeadzone = 0.18f;' src/platform/platformInput.cpp
+          grep -F 'void applyRadialControllerDeadzone' src/platform/platformInput.cpp
+          grep -F 'controllerButtons.LT = sanitizeControllerAxis(state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);' src/platform/platformInput.cpp
+          grep -F 'controllerButtons.RT = sanitizeControllerAxis(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_LEFT_X]' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]' src/platform/platformInput.cpp
+          grep -F 'state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]' src/platform/platformInput.cpp
+          grep -F 'if (!controllerPolled)' src/platform/platformInput.cpp
+          grep -F 'controllerButtons.setAllToZero();' src/platform/platformInput.cpp
+          ! grep -F 'controllerButtons.LT = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];' src/platform/platformInput.cpp
+          ! grep -F 'controllerButtons.RT = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];' src/platform/platformInput.cpp
+
+      - name: Guard same-frame focused input consumption
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'void ensureInputStateUpdated()' src/platform/platformInput.cpp
+          grep -F 'if (!inputStateUpdatedForCurrentFrame)' src/platform/platformInput.cpp
+          grep -F 'if (inputStateUpdatedForCurrentFrame)' src/platform/platformInput.cpp
+          grep -F 'inputStateUpdatedForCurrentFrame = true;' src/platform/platformInput.cpp
+          grep -F 'inputStateUpdatedForCurrentFrame = false;' src/platform/platformInput.cpp
+          grep -F 'if (!platform::isFocused()) { return 0; }' src/platform/platformInput.cpp
+          grep -F 'if (!platform::isFocused()) { return platform::ControllerButtons{}; }' src/platform/platformInput.cpp
+
+      - name: Guard accumulated scroll input
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'scrollY += static_cast<float>(yoffset);' src/platform/platformInput.cpp
+          grep -F 'scrollY = 0.f;' src/platform/platformInput.cpp
+          ! grep -F 'scrollY = yoffset;' src/platform/platformInput.cpp
+
+      - name: Guard finite wrapped camera rotation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'if (!std::isfinite(delta.x) || !std::isfinite(delta.y))' src/gameLayer/rendering/camera.cpp
+          grep -F 'yaw = std::fmod(yaw + delta.x, TWO_PI);' src/gameLayer/rendering/camera.cpp
+          grep -F 'viewDirection = glm::normalize(viewDirection);' src/gameLayer/rendering/camera.cpp
+          ! grep -F 'yaw = 2.f * PI - yaw;' src/gameLayer/rendering/camera.cpp
+
+      - name: Guard focus recovery and controller UI parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'const auto controllerButtons = platform::getControllerButtons();' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'ControllerButtons::B].released' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'ControllerButtons::Start].released' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'ControllerButtons::Y].released' src/gameLayer/gamePlayLogic.cpp
+          grep -F '!platform::isFocused();' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'const bool resumeMainInputThisFrame = !stopMainInput && mainInputWasStoppedLastFrame;' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'bool rotate = !gameData.escapePressed && !resumeMainInputThisFrame;' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'gameData.isInsideMapView || gameData.isInsideChat ||' src/gameLayer/gamePlayLogic.cpp

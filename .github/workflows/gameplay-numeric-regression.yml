@@ -1,0 +1,115 @@
+name: Gameplay Numeric Regression
+
+on:
+  push:
+    branches:
+      - main
+      - agent/v0.9.5-stability
+    paths:
+      - 'include/gameLayer/gameplay/entityStats.h'
+      - 'include/gameLayer/gameplay/life.h'
+      - 'include/gameLayer/gameplay/weaponStats.h'
+      - 'include/gameLayer/multyPlayer/interactionInvalidation.h'
+      - 'src/gameLayer/gameplay/entityStats.cpp'
+      - 'src/gameLayer/gameplay/weaponStats.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
+      - 'src/gameLayer/chunkSystem.cpp'
+      - 'include/gameLayer/rendering/renderSettings.h'
+      - 'src/gameLayer/gameplay/entity.cpp'
+      - 'tests/entityStatsTests.cpp'
+      - 'tests/weaponStatsRegressionTests.cpp'
+      - 'tests/interactionInvalidationTests.cpp'
+      - '.github/workflows/gameplay-numeric-regression.yml'
+  pull_request:
+    paths:
+      - 'include/gameLayer/gameplay/entityStats.h'
+      - 'include/gameLayer/gameplay/life.h'
+      - 'include/gameLayer/gameplay/weaponStats.h'
+      - 'include/gameLayer/multyPlayer/interactionInvalidation.h'
+      - 'src/gameLayer/gameplay/entityStats.cpp'
+      - 'src/gameLayer/gameplay/weaponStats.cpp'
+      - 'src/gameLayer/gamePlayLogic.cpp'
+      - 'src/gameLayer/chunkSystem.cpp'
+      - 'include/gameLayer/rendering/renderSettings.h'
+      - 'src/gameLayer/gameplay/entity.cpp'
+      - 'tests/entityStatsTests.cpp'
+      - 'tests/weaponStatsRegressionTests.cpp'
+      - 'tests/interactionInvalidationTests.cpp'
+      - '.github/workflows/gameplay-numeric-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gameplay-numeric-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Compile entity, life and hunger regression tests
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            -Ithirdparty/glm \
+            tests/entityStatsTests.cpp \
+            src/gameLayer/gameplay/entityStats.cpp \
+            -o entityStatsTests
+
+      - name: Run entity, life and hunger regression tests
+        run: ./entityStatsTests
+
+      - name: Compile weapon timing regression tests
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+            -Iinclude/gameLayer \
+            -Ishared \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/weaponStatsRegressionTests.cpp \
+            src/gameLayer/gameplay/weaponStats.cpp \
+            -o weaponStatsRegressionTests
+
+      - name: Run weapon timing regression tests
+        run: ./weaponStatsRegressionTests
+
+      - name: Compile interaction invalidation regression tests
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/interactionInvalidationTests.cpp \
+            -o interactionInvalidationTests
+
+      - name: Run interaction invalidation regression tests
+        run: ./interactionInvalidationTests
+
+      - name: Guard the negative-speed UI regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'const float normalizedSpeed = (glm::clamp(speed, -10.f, 20.f) + 10.f) / 30.f;' src/gameLayer/gameplay/weaponStats.cpp
+          grep -F 'return std::sqrt(normalizedSpeed) * 0.7f + 0.6f;' src/gameLayer/gameplay/weaponStats.cpp
+          ! grep -F 'powf(speed, 0.5f)' src/gameLayer/gameplay/weaponStats.cpp
+
+      - name: Guard deterministic interaction invalidation handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F '#include "multyPlayer/interactionInvalidation.h"' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'planInteractionInvalidation(' src/gameLayer/gamePlayLogic.cpp
+          ! grep -F 'undo queue is empty but I revieved an undo message' src/gameLayer/gamePlayLogic.cpp
+          ! grep -F 'undo queue has inconsistent revisions' src/gameLayer/gamePlayLogic.cpp
+          ! grep -F 'inconsistency between the server' src/gameLayer/gamePlayLogic.cpp
+
+      - name: Guard block rollback and low-end runtime bounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'else if (type == BlockTypes::furnace)' src/gameLayer/chunkSystem.cpp
+          grep -F 'getFurnaceBlock(chunkPos.x, chunkPos.y, chunkPos.z)' src/gameLayer/chunkSystem.cpp
+          grep -F 'e.originalBlock.getType() == BlockTypes::furnace' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'getFurnaceBlock(modBlockToChunk(e.blockPos.x), e.blockPos.y,' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'workerThreadsForBaking = 1' include/gameLayer/rendering/renderSettings.h
+          grep -F 'chunkVectorCopyNoNullsOnlyToBake.resize(100 + threadPool.currentCounter);' src/gameLayer/chunkSystem.cpp
+          grep -F 'getCollisionsListThatCanPush(positiom, colider, yourEID)' src/gameLayer/gameplay/entity.cpp

@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace
 {
@@ -79,6 +80,34 @@ int main()
 	forced.returnSpawnRequest(4);
 	REQUIRE(forced.getPendingSpawns() <= 32);
 
+	// v0.9.5: invalid timing and extreme counters must not poison the siege
+	// state or overflow before the public status is clamped.
+	SiegeDirector invalidTiming(fastTuning());
+	invalidTiming.forceWarning();
+	const auto warningBeforeNaN = invalidTiming.getStatus(0);
+	invalidTiming.update(std::numeric_limits<float>::quiet_NaN(), 1, 0, 7, true);
+	REQUIRE(invalidTiming.getStatus(0) == warningBeforeNaN);
+	REQUIRE(invalidTiming.getStatus(std::numeric_limits<unsigned int>::max()).enemiesRemaining == 65535u);
+
+	SiegeTuning invalidTuning = fastTuning();
+	invalidTuning.warningSeconds = std::numeric_limits<float>::quiet_NaN();
+	invalidTuning.intermissionSeconds = std::numeric_limits<float>::quiet_NaN();
+	invalidTuning.totalWaves = 0;
+	invalidTuning.cyclesPerSiege = 0;
+	SiegeDirector sanitizedTuning(invalidTuning);
+	sanitizedTuning.forceWarning();
+	REQUIRE(sanitizedTuning.getStatus(0).phase == SiegePhase::Warning);
+	REQUIRE(sanitizedTuning.getStatus(0).totalWaves == 1);
+	REQUIRE(sanitizedTuning.getNextSiegeCycle() == 1);
+	REQUIRE(sanitizedTuning.getStatus(0).secondsRemaining == 45);
+
+	SiegeDirector spawnReturnOverflow(fastTuning());
+	spawnReturnOverflow.forceWarning();
+	spawnReturnOverflow.update(3.f, 8, 0, 7, true);
+	REQUIRE(spawnReturnOverflow.getStatus(0).phase == SiegePhase::Wave);
+	spawnReturnOverflow.returnSpawnRequest(std::numeric_limits<unsigned int>::max());
+	REQUIRE(spawnReturnOverflow.getPendingSpawns() == 32u);
+
 	SiegeDirector hard(fastTuning());
 	hard.setEnemyCountMultiplier(1.35f);
 	hard.update(0.1f, 1, 0, 7, true);
@@ -114,6 +143,32 @@ int main()
 	REQUIRE(clock.getCompletedCycles() == 7);
 	REQUIRE(clock.getDayPhase() == 0.25f);
 	REQUIRE(clock.update(100.0, false) == 0);
+
+	// v0.9.5: invalid or nonsensical cycle durations fall back to a finite
+	// one-second clock instead of allowing NaN to poison all day/night state.
+	WorldCycleClock nanDurationClock(std::numeric_limits<double>::quiet_NaN());
+	REQUIRE(nanDurationClock.getDayPhase() == 0.25f);
+	REQUIRE(nanDurationClock.update(1.0, true) == 1);
+	REQUIRE(nanDurationClock.getCompletedCycles() == 1);
+	REQUIRE(nanDurationClock.getDayPhase() == 0.25f);
+
+	WorldCycleClock negativeDurationClock(-10.0);
+	REQUIRE(negativeDurationClock.getDayPhase() == 0.25f);
+	REQUIRE(negativeDurationClock.update(1.0, true) == 1);
+	REQUIRE(negativeDurationClock.getCompletedCycles() == 1);
+
+	// Extreme but finite client-side frame deltas must preserve a valid phase
+	// and saturate the cycle counter instead of overflowing a uint64 conversion.
+	resetClientWorldTime();
+	setClientWorldTime(0.25f, std::numeric_limits<std::uint64_t>::max() - 1u, true);
+	updateClientWorldTime(std::numeric_limits<float>::max());
+	REQUIRE(getClientWorldDayPhase() >= 0.f);
+	REQUIRE(getClientWorldDayPhase() < 1.f);
+	REQUIRE(getClientCompletedWorldCycles() == std::numeric_limits<std::uint64_t>::max());
+	const float saturatedPhase = getClientWorldDayPhase();
+	updateClientWorldTime(std::numeric_limits<float>::quiet_NaN());
+	REQUIRE(getClientWorldDayPhase() == saturatedPhase);
+	REQUIRE(getClientCompletedWorldCycles() == std::numeric_limits<std::uint64_t>::max());
 
 	SiegeDirector cancelled(fastTuning());
 	cancelled.update(0.1f, 1, 0, 7, true);

@@ -2,16 +2,21 @@
 #include <gameplay/weaponStats.h>
 #include <random>
 #include <algorithm>
+#include <limits>
 
 struct Life
 {
-	Life() {};
+	Life() {}
 	Life(int l) { life = l; maxLife = l; }
 
 	short life = 0;
 	short maxLife = 0;
 
-	void sanitize() { if (life > maxLife) { life = maxLife; } if (life < 0) { life = 0; } }
+	void sanitize()
+	{
+		maxLife = std::max<short>(maxLife, 1);
+		life = std::clamp<short>(life, 0, maxLife);
+	}
 };
 
 // Server-authoritative survival resource. 100 points map cleanly to 10 HUD pips.
@@ -28,8 +33,9 @@ struct SurvivalStats
 
 	void addHunger(int amount)
 	{
-		int value = hunger + amount;
-		hunger = static_cast<short>(std::clamp(value, 0, static_cast<int>(maxHunger)));
+		const long long value = static_cast<long long>(hunger) + static_cast<long long>(amount);
+		const long long bounded = std::clamp(value, 0LL, static_cast<long long>(maxHunger));
+		hunger = static_cast<short>(bounded);
 	}
 };
 
@@ -44,4 +50,3 @@ struct Armour
 
 int calculateDamage(Armour armour, const WeaponStats &weaponStats, std::minstd_rand &rng
 	, float hitCorectness, float critChanceBonus, bool unaware);
-

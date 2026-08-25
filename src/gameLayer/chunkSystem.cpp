@@ -76,6 +76,14 @@ Block *ChunkSystem::getBlockAndData(glm::ivec3 blockPos, std::vector<unsigned ch
 		}
 
 	}
+	else if (type == BlockTypes::furnace)
+	{
+		auto foundBlock = chunk->blockData.getFurnaceBlock(chunkPos.x, chunkPos.y, chunkPos.z);
+		if (foundBlock)
+		{
+			foundBlock->formatIntoData(data);
+		}
+	}
 	else if (isChest(type))
 	{
 		auto foundBlock = chunk->blockData.getChestBlock(chunkPos.x, chunkPos.y, chunkPos.z);

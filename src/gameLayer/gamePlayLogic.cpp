@@ -18,6 +18,7 @@
 #endif
 #include <iostream>
 #include "multyPlayer/undoQueue.h"
+#include "multyPlayer/interactionInvalidation.h"
 #include <lightSystem.h>
 #include <structure.h>
 #include <safeSave.h>
@@ -474,32 +475,20 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			}
 		}
 
-		//undo stuff
+		// Undo/revision resynchronisation. Delayed duplicate invalidations from a
+		// revision that was already handled are stale. Current/future authoritative
+		// invalidations roll back any remaining prediction and rebase the client.
 		if (inValidateRevision)
 		{
-			if (gameData.undoQueue.events.empty())
-			{
-				permaAssert(0); // undo queue is empty but I revieved an undo message.
-			}
+			const auto invalidationPlan = mie::network::planInteractionInvalidation(
+				inValidateRevision, gameData.undoQueue.currentEventId.revision);
 
-			RevisionNumber currentRevisionNumber = gameData.undoQueue.events[0].eventId.revision;
-			for (auto &i : gameData.undoQueue.events)
+			if (invalidationPlan.apply)
 			{
-				if (i.eventId.revision != currentRevisionNumber)
+				for (auto i = gameData.undoQueue.events.size(); i > 0; --i)
 				{
-					permaAssert(0); // undo queue has inconsistent revisions
-				}
-			}
 
-			if (inValidateRevision != gameData.undoQueue.currentEventId.revision)
-			{
-				permaAssert(0 && "inconsistency between the server's revision and mine"); //inconsistency between the server's revision and mine
-			}
-
-			for (int i = gameData.undoQueue.events.size() - 1; i >= 0; i--)
-			{
-
-				auto &e = gameData.undoQueue.events[i];
+					auto &e = gameData.undoQueue.events[i - 1];
 
 				if (e.type == UndoQueueEvent::iPlacedBlock)
 				{
@@ -546,6 +535,24 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 						}
 
 					}
+					else if (e.originalBlock.getType() == BlockTypes::furnace)
+					{
+						FurnaceBlock block;
+						size_t _ = 0;
+						if (block.readFromBuffer(e.blockData.data(), e.blockData.size(), _))
+						{
+							auto *c = gameData.chunkSystem.getChunkSafeFromBlockPos(e.blockPos.x, e.blockPos.z);
+							if (c)
+							{
+								auto blockData = c->blockData.getFurnaceBlock(modBlockToChunk(e.blockPos.x), e.blockPos.y,
+									modBlockToChunk(e.blockPos.z));
+								if (blockData)
+								{
+									*blockData = block;
+								}
+							}
+						}
+					}
 					else if (isChest(e.originalBlock.getType()))
 					{
 
@@ -579,9 +586,9 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 			}
 
-			gameData.undoQueue.events.clear();
-
-			gameData.undoQueue.currentEventId.revision++;
+				gameData.undoQueue.events.clear();
+				gameData.undoQueue.currentEventId.revision = invalidationPlan.nextRevision;
+			}
 		}
 
 		//player sends updates to server
@@ -684,8 +691,20 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	}
 
 
+	const auto controllerButtons = platform::getControllerButtons();
+	const bool controllerCloseReleased =
+		controllerButtons.buttons[platform::ControllerButtons::B].released ||
+		controllerButtons.buttons[platform::ControllerButtons::Start].released;
+	const bool controllerInventoryReleased =
+		controllerButtons.buttons[platform::ControllerButtons::Y].released;
+
 	bool stopMainInput = gameData.escapePressed || gameData.killed || gameData.insideInventoryMenu ||
-		gameData.isInsideMapView || gameData.isInsideChat || gameData.interaction.blockInteractionType != 0;
+		gameData.isInsideMapView || gameData.isInsideChat || gameData.interaction.blockInteractionType != 0 ||
+		!platform::isFocused();
+
+	static bool mainInputWasStoppedLastFrame = true;
+	const bool resumeMainInputThisFrame = !stopMainInput && mainInputWasStoppedLastFrame;
+	mainInputWasStoppedLastFrame = stopMainInput;
 
 	static float moveSpeed = 7.f;
 	float isPlayerMovingSpeed = 0;
@@ -718,7 +737,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	}
 
 	if (!stopMainInput || gameData.insideInventoryMenu)
-		if (platform::isKeyReleased(platform::Button::E))
+		if (platform::isKeyReleased(platform::Button::E) || controllerInventoryReleased)
 		{
 			if (gameData.insideInventoryMenu)
 			{
@@ -932,7 +951,13 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			//gameData.entityManager.localPlayer.bodyOrientation = 
 			//gameData.entityManager.localPlayer.lookDirection = 
 
-			bool rotate = !gameData.escapePressed;
+			if (resumeMainInputThisFrame)
+			{
+				platform::setRelMousePosition(w / 2, h / 2);
+				gameData.inputCamera.lastMousePos = {w / 2, h / 2};
+			}
+
+			bool rotate = !gameData.escapePressed && !resumeMainInputThisFrame;
 			gameData.inputCamera.rotateFPS(platform::getRelMousePosition(), 0.22f * 0.02f, rotate);
 
 			if (rotate) //controller
@@ -3245,16 +3270,18 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 #pragma region esc manu
 
 	bool justPressedEsc = 0;
+	const bool closeUiReleased = platform::isKeyReleased(platform::Button::Escape) ||
+		controllerCloseReleased;
 	if (gameData.insideInventoryMenu)
 	{
-		if (platform::isKeyReleased(platform::Button::Escape))
+		if (closeUiReleased)
 		{
 			exitInventoryMenu();
 		}
 	}
 	else if (gameData.isInsideMapView)
 	{
-		if (platform::isKeyReleased(platform::Button::Escape))
+		if (closeUiReleased)
 		{
 			gameData.isInsideMapView = false;
 			gameData.mapEngine.close();
@@ -3262,7 +3289,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	}
 	else if (gameData.isInsideChat)
 	{
-		if (platform::isKeyReleased(platform::Button::Escape))
+		if (closeUiReleased)
 		{
 			gameData.isInsideChat = false;
 			gameData.chatBufferPosition = 0;
@@ -3271,14 +3298,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	}
 	else if (gameData.interaction.blockInteractionType)
 	{
-		if (platform::isKeyReleased(platform::Button::Escape))
+		if (closeUiReleased)
 		{
 			exitInventoryMenu();
 		}
 	}
 	else
 	{
-		if (platform::isKeyReleased(platform::Button::Escape) && !gameData.escapePressed)
+		if (closeUiReleased && !gameData.escapePressed)
 		{
 			gameData.escapePressed = !gameData.escapePressed;
 			justPressedEsc = true;
@@ -3353,7 +3380,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 		programData.ui.menuRenderer.End();
 
 		if (programData.ui.menuRenderer.internal.allMenuStacks[2].size() == 0 && 
-			platform::isKeyReleased(platform::Button::Escape) && !justPressedEsc)
+			closeUiReleased && !justPressedEsc)
 		{
 			gameData.escapePressed = false;
 		}
@@ -3384,7 +3411,8 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 	}
 
 	platform::showMouse(gameData.escapePressed || gameData.insideInventoryMenu ||
-		gameData.killed || gameData.isInsideMapView || gameData.interaction.blockInteractionType);
+		gameData.killed || gameData.isInsideMapView || gameData.isInsideChat ||
+		gameData.interaction.blockInteractionType || !platform::isFocused());
 
 
 #pragma endregion
