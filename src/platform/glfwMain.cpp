@@ -11,6 +11,7 @@
 #include "platformInput.h"
 #include "otherPlatformFunctions.h"
 #include "gameLayer.h"
+#include "runtimeSmoke.h"
 #include <fstream>
 #include <chrono>
 #include <profilerLib/include/profilerLib.h>
@@ -492,6 +493,13 @@ int main(int argc, char **argv)
 	{
 		return 0;
 	}
+
+	const bool runtimeSmoke = runtimeSmokeRequested();
+	if (runtimeSmoke && !beginRuntimeSmokeTest())
+	{
+		closeGame();
+		return finishRuntimeSmokeTest(false);
+	}
 #pragma endregion
 
 
@@ -536,7 +544,17 @@ int main(int argc, char **argv)
 		if (!gameLogic(augmentedDeltaTime))
 		{
 			closeGame();
-			return 0;
+			return runtimeSmoke ? finishRuntimeSmokeTest(false) : 0;
+		}
+
+		if (runtimeSmoke)
+		{
+			const RuntimeSmokeFrameResult smokeResult = runtimeSmokeFramePassed();
+			if (smokeResult != RuntimeSmokeFrameResult::running)
+			{
+				closeGame();
+				return finishRuntimeSmokeTest(smokeResult == RuntimeSmokeFrameResult::passed);
+			}
 		}
 
 	#pragma endregion
