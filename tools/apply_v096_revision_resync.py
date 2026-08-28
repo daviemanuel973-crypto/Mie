@@ -125,3 +125,4 @@ once(
 
 PATH.write_text(text, encoding="utf-8")
 print("v0.9.6 stale inventory revision resync patch applied")
+# Trigger marker after workflow creation.
