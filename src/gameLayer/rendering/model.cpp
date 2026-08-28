@@ -7,6 +7,7 @@
 #include <glm/gtx/transform.hpp>
 #include <rendering/model.h>
 #include <iostream>
+#include <algorithm>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -453,6 +454,7 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 				for (unsigned int channelIndex = 0; channelIndex < animation->mNumChannels; channelIndex++)
 				{
 					aiNodeAnim *nodeAnim = animation->mChannels[channelIndex];
+					if (!nodeAnim) { continue; }
 					std::string nodeName = nodeAnim->mNodeName.C_Str();
 
 					if (nodeIndexMap.find(nodeName) == nodeIndexMap.end())
@@ -462,28 +464,90 @@ void ModelsManager::loadAllModels(std::string path, bool reportErrors)
 
 					int nodeIndex = nodeIndexMap[nodeName];
 
-					// Read keyframes and store them
-					for (unsigned int k = 0; k < nodeAnim->mNumPositionKeys; k++)
+					// Position, rotation and scale tracks are independent in Assimp and
+					// are not required to have the same number of keys. Build a shared
+					// timeline and sample each track instead of indexing all three with
+					// the position-key index.
+					aiVector3D defaultScale, defaultPosition;
+					aiQuaternion defaultRotation;
+					scene->mRootNode->mChildren[nodeIndex]->mTransformation.Decompose(
+						defaultScale, defaultRotation, defaultPosition);
+
+					std::vector<double> keyTimes;
+					keyTimes.reserve(nodeAnim->mNumPositionKeys + nodeAnim->mNumRotationKeys +
+						nodeAnim->mNumScalingKeys);
+					for (unsigned int k = 0; k < nodeAnim->mNumPositionKeys; ++k)
 					{
+						keyTimes.push_back(nodeAnim->mPositionKeys[k].mTime);
+					}
+					for (unsigned int k = 0; k < nodeAnim->mNumRotationKeys; ++k)
+					{
+						keyTimes.push_back(nodeAnim->mRotationKeys[k].mTime);
+					}
+					for (unsigned int k = 0; k < nodeAnim->mNumScalingKeys; ++k)
+					{
+						keyTimes.push_back(nodeAnim->mScalingKeys[k].mTime);
+					}
+					std::sort(keyTimes.begin(), keyTimes.end());
+					keyTimes.erase(std::unique(keyTimes.begin(), keyTimes.end()), keyTimes.end());
+
+					auto sampleVectorTrack = [](const aiVectorKey *keys, unsigned int count,
+						double time, const aiVector3D &fallback)
+					{
+						if (!keys || count == 0) { return fallback; }
+						if (count == 1 || time <= keys[0].mTime) { return keys[0].mValue; }
+						for (unsigned int k = 1; k < count; ++k)
+						{
+							if (time <= keys[k].mTime)
+							{
+								const double span = keys[k].mTime - keys[k - 1].mTime;
+								const ai_real blend = span > 0.0
+									? static_cast<ai_real>((time - keys[k - 1].mTime) / span)
+									: static_cast<ai_real>(0);
+								return keys[k - 1].mValue +
+									(keys[k].mValue - keys[k - 1].mValue) * blend;
+							}
+						}
+						return keys[count - 1].mValue;
+					};
+
+					auto sampleRotationTrack = [](const aiQuatKey *keys, unsigned int count,
+						double time, const aiQuaternion &fallback)
+					{
+						if (!keys || count == 0) { return fallback; }
+						if (count == 1 || time <= keys[0].mTime) { return keys[0].mValue; }
+						for (unsigned int k = 1; k < count; ++k)
+						{
+							if (time <= keys[k].mTime)
+							{
+								const double span = keys[k].mTime - keys[k - 1].mTime;
+								const ai_real blend = span > 0.0
+									? static_cast<ai_real>((time - keys[k - 1].mTime) / span)
+									: static_cast<ai_real>(0);
+								aiQuaternion result;
+								aiQuaternion::Interpolate(result, keys[k - 1].mValue,
+									keys[k].mValue, blend);
+								result.Normalize();
+								return result;
+							}
+						}
+						return keys[count - 1].mValue;
+					};
+
+					for (double keyTime : keyTimes)
+					{
+						const aiVector3D position = sampleVectorTrack(nodeAnim->mPositionKeys,
+							nodeAnim->mNumPositionKeys, keyTime, defaultPosition);
+						const aiQuaternion rotation = sampleRotationTrack(nodeAnim->mRotationKeys,
+							nodeAnim->mNumRotationKeys, keyTime, defaultRotation);
+						const aiVector3D scale = sampleVectorTrack(nodeAnim->mScalingKeys,
+							nodeAnim->mNumScalingKeys, keyTime, defaultScale);
+
 						KeyFrame keyframe;
-						keyframe.timestamp = static_cast<float>(nodeAnim->mPositionKeys[k].mTime) / 1000.f;
-
-						// Position
-						keyframe.pos = glm::vec3(nodeAnim->mPositionKeys[k].mValue.x,
-							nodeAnim->mPositionKeys[k].mValue.y,
-							nodeAnim->mPositionKeys[k].mValue.z);
-
-						// Rotation
-						keyframe.rotation = glm::quat(nodeAnim->mRotationKeys[k].mValue.w,
-							nodeAnim->mRotationKeys[k].mValue.x,
-							nodeAnim->mRotationKeys[k].mValue.y,
-							nodeAnim->mRotationKeys[k].mValue.z);
-
-						// Scale
-						keyframe.scale = glm::vec3(nodeAnim->mScalingKeys[k].mValue.x,
-							nodeAnim->mScalingKeys[k].mValue.y,
-							nodeAnim->mScalingKeys[k].mValue.z);
-
+						keyframe.timestamp = static_cast<float>(keyTime) / 1000.f;
+						keyframe.pos = glm::vec3(position.x, position.y, position.z);
+						keyframe.rotation = glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
+						keyframe.scale = glm::vec3(scale.x, scale.y, scale.z);
 						anim.kayFrames[nodeIndex].push_back(keyframe);
 					}
 				}

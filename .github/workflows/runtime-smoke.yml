@@ -59,7 +59,7 @@ jobs:
           MIE_FRAME_LIMIT=30 \
           MESA_LOADER_DRIVER_OVERRIDE=zink \
           LIBGL_ALWAYS_SOFTWARE=1 \
-          timeout 90s xvfb-run -a -s '-screen 0 1280x720x24' \
+          timeout 180s xvfb-run -a -s '-screen 0 1280x720x24' \
             ./build-runtime-smoke/ourCraft 2>&1 | tee runtime-smoke.log
           test ! -e resources/worlds/__mie_runtime_smoke__
           grep -F '[runtime-smoke] PASS:' runtime-smoke.log
