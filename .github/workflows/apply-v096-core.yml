@@ -1,0 +1,46 @@
+name: Apply v0.9.6 core patches
+
+on:
+  push:
+    branches:
+      - codex/v0.9.6-stability-skins
+    paths:
+      - tools/apply_v096_core.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply-core-patches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/v0.9.6-stability-skins
+          fetch-depth: 0
+
+      - name: Apply guarded source patches
+        run: python3 tools/apply_v096_core.py
+
+      - name: Verify whitespace and skin conversion tests
+        run: |
+          git diff --check
+          g++ -std=c++17 -Wall -Wextra -Werror \
+            -Iinclude/gameLayer \
+            tests/skinFormatTests.cpp \
+            src/gameLayer/gameplay/skinFormat.cpp \
+            -o /tmp/skin-format-tests
+          /tmp/skin-format-tests
+
+      - name: Commit generated core changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/gameLayer/multyPlayer/tick.cpp src/gameLayer/chunkSystem.cpp \
+            include/gameLayer/chunkSystem.h CMakeLists.txt VERSION README.md
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "fix(v0.9.6): harden interactions and resize chunk view incrementally"
+          git push origin HEAD:codex/v0.9.6-stability-skins
