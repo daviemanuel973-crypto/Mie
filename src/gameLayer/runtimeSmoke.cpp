@@ -26,6 +26,7 @@ std::filesystem::path smokeWorldPath()
 std::chrono::steady_clock::time_point smokeStarted;
 int smokeFrames = 0;
 bool smokeBegan = false;
+bool smokeClockStarted = false;
 
 bool hasPersistedWorldData(const std::filesystem::path &root)
 {
@@ -80,7 +81,10 @@ bool beginRuntimeSmokeTest()
 
     smokeFrames = 0;
     smokeBegan = true;
-    smokeStarted = std::chrono::steady_clock::now();
+    // Start the stability window after the first complete gameplay frame.
+    // Slow software renderers can spend tens of seconds in their first frame,
+    // which is startup cost rather than a steady-state hang.
+    smokeClockStarted = false;
     return true;
 }
 
@@ -88,7 +92,13 @@ RuntimeSmokeFrameResult runtimeSmokeFramePassed()
 {
     if (!smokeBegan) { return RuntimeSmokeFrameResult::failed; }
     ++smokeFrames;
-    const auto elapsed = std::chrono::steady_clock::now() - smokeStarted;
+    const auto now = std::chrono::steady_clock::now();
+    if (!smokeClockStarted)
+    {
+        smokeStarted = now;
+        smokeClockStarted = true;
+    }
+    const auto elapsed = now - smokeStarted;
 
     if (!isServerRunning())
     {
@@ -117,6 +127,7 @@ int finishRuntimeSmokeTest(bool runtimePassed)
     }
     removeSmokeWorld();
     smokeBegan = false;
+    smokeClockStarted = false;
 
     if (runtimePassed && persisted)
     {

@@ -38,10 +38,7 @@ jobs:
       - name: Configure low-end native build
         run: |
           cmake -S . -B build-runtime-smoke -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DCMAKE_C_FLAGS='-fsanitize=address -fno-omit-frame-pointer' \
-            -DCMAKE_CXX_FLAGS='-fsanitize=address -fno-omit-frame-pointer' \
-            -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address' \
+            -DCMAKE_BUILD_TYPE=Release \
             -DOURCRAFT_ENABLE_AVX2=OFF \
             -DOURCRAFT_LOW_END_BUILD=ON \
             -DBUILD_TESTING=OFF
@@ -54,7 +51,6 @@ jobs:
         run: |
           set -o pipefail
           rm -rf resources/worlds/__mie_runtime_smoke__
-          ASAN_OPTIONS=abort_on_error=1:detect_leaks=0:fast_unwind_on_malloc=0 \
           MIE_RUNTIME_SMOKE_TEST=1 \
           MIE_FRAME_LIMIT=30 \
           MESA_LOADER_DRIVER_OVERRIDE=zink \

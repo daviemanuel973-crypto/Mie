@@ -1,7 +1,6 @@
 #include <gameplay/skinFormat.h>
 #include <stb_image/stb_image.h>
 
-#include <cstdlib>
 #include <cstring>
 
 unsigned char *mieLoadPlayerSkinImageFromMemory(const unsigned char *buffer, int len,
@@ -33,7 +32,9 @@ unsigned char *mieLoadPlayerSkinImageFromMemory(const unsigned char *buffer, int
 
 	mie::skins::flipRows(normalized.rgba, normalized.width, normalized.height);
 	const std::size_t bytes = normalized.rgba.size();
-	auto *result = static_cast<unsigned char *>(std::malloc(bytes));
+	// Return memory through the same allocator contract used by STBI_FREE.
+	// This repository configures stb_image with new[]/delete[], not malloc/free.
+	auto *result = reinterpret_cast<unsigned char *>(STBI_MALLOC(bytes));
 	if (!result) { return nullptr; }
 	std::memcpy(result, normalized.rgba.data(), bytes);
 
