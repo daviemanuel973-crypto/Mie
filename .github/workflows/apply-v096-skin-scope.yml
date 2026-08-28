@@ -1,0 +1,50 @@
+name: Apply v0.9.6 skin scope fix
+
+on:
+  push:
+    branches:
+      - codex/v0.9.6-stability-skins
+    paths:
+      - tools/apply_v096_skin_scope_fix.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply-skin-scope-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/v0.9.6-stability-skins
+          fetch-depth: 0
+
+      - name: Apply guarded skin decoder patch
+        run: python3 tools/apply_v096_skin_scope_fix.py
+
+      - name: Verify patch and skin conversion tests
+        run: |
+          git diff --check
+          ! grep -F '#define stbi_load_from_memory mieLoadPlayerSkinImageFromMemory' include/gameLayer/rendering/model.h
+          grep -F 'mieLoadPlayerSkinImageFromMemory(fileData' src/gameLayer/rendering/model.cpp
+          grep -F 'stbi_info_from_memory' src/gameLayer/gameplay/skinImageDecode.cpp
+          g++ -std=c++17 -Wall -Wextra -Werror \
+            -Iinclude/gameLayer \
+            tests/skinFormatTests.cpp \
+            src/gameLayer/gameplay/skinFormat.cpp \
+            -o /tmp/skin-format-tests
+          /tmp/skin-format-tests
+
+      - name: Commit scoped decoder integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add include/gameLayer/rendering/model.h \
+            src/gameLayer/rendering/model.cpp \
+            src/gameLayer/gameplay/skinImageDecode.cpp
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "fix(v0.9.6): scope skin decoding to player textures"
+          git push origin HEAD:codex/v0.9.6-stability-skins
