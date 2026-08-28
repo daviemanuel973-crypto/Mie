@@ -222,7 +222,7 @@ void loadCurrentSkin()
 	else
 	{
 		gameData.currentSkinTexture 
-			= loadPlayerSkin((RESOURCES_PATH "skins/" + gameData.currentSkinName + ".png").c_str());
+			= loadPlayerSkin((USER_CONTENT_PATH "skins/" + gameData.currentSkinName + ".png").c_str());
 	}
 
 	if (!gameData.currentSkinTexture.id)

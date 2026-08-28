@@ -48,12 +48,14 @@ Ele funciona offline no navegador e oferece:
 
 Fluxo recomendado:
 
-1. abra `MieSkinEditor.html`;
+1. no menu principal, abra `Change Skin` e clique em `Open Skin Editor`;
 2. crie uma skin ou importe uma skin do Minecraft;
 3. exporte `mie-skin.png`;
-4. copie o PNG para a pasta `skins` do perfil do Mie;
-5. no menu principal, abra `Change Skin` e selecione o arquivo;
-6. ao entrar em um mundo, o cliente normaliza a textura para 128×128 e a envia pelo sistema de skins multiplayer já existente.
+4. volte ao Mie, clique em `Open Skins Folder` e coloque o PNG nessa pasta;
+5. retorne ao seletor e escolha o arquivo;
+6. a escolha fica salva para as próximas execuções; ao entrar em um mundo, o cliente normaliza a textura para 128×128 e a envia pelo sistema de skins multiplayer já existente.
+
+Se o ambiente gráfico bloquear a abertura automática, o menu informa o caminho alternativo e o editor continua disponível em `resources/tools/MieSkinEditor.html`.
 
 ## Regras de compatibilidade
 

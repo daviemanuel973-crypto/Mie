@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <iostream>
 #include <platform/platformInput.h>
+#include <platform/otherPlatformFunctions.h>
 #include "multyPlayer/createConnection.h"
 #include <audioEngine.h>
 #include <safeSave.h>

@@ -15,7 +15,7 @@ float computeFog(float dist)
 	//return 1;
 	//float rez = exp(-pow(dist*(1/(u_fogDistance-32)), fogGradient));
 	float rez = exp(-pow(dist*(1/(u_viewDistance)), fogGradient));
-	if(rez > 0.9){return 1;};
+	if(rez > 0.9){return 1.0;};
 	rez = pow(rez, 16);
 	return rez;
 }

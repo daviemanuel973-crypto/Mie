@@ -1,6 +1,19 @@
 #include "otherPlatformFunctions.h"
 #include <algorithm>
 
+#ifdef _WIN32
+#include <Windows.h>
+#include <shellapi.h>
+#ifdef _MSC_VER
+#pragma comment(lib, "Shell32.lib")
+#endif
+#else
+#include <cerrno>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
 #undef max
 #undef min
 
@@ -42,4 +55,44 @@ GLFWmonitor* getCurrentMonitor(GLFWwindow* window)
 	}
 
 	return bestmonitor;
+}
+
+bool openPathWithDefaultApplication(const char *path)
+{
+	if (!path || !path[0]) { return false; }
+
+#ifdef _WIN32
+	const auto result = reinterpret_cast<INT_PTR>(
+		ShellExecuteA(nullptr, "open", path, nullptr, nullptr, SW_SHOWNORMAL));
+	return result > 32;
+#else
+	// Double-fork so the game does not retain a zombie after xdg-open/open exits.
+	const pid_t launcher = fork();
+	if (launcher < 0) { return false; }
+	if (launcher == 0)
+	{
+		const pid_t opener = fork();
+		if (opener < 0) { _exit(127); }
+		if (opener == 0)
+		{
+#if defined(__APPLE__)
+			execlp("open", "open", path, static_cast<char *>(nullptr));
+#else
+			execlp("xdg-open", "xdg-open", path, static_cast<char *>(nullptr));
+#endif
+			_exit(127);
+		}
+		_exit(0);
+	}
+
+	int status = 0;
+	pid_t waited = 0;
+	do
+	{
+		waited = waitpid(launcher, &status, 0);
+	}
+	while (waited < 0 && errno == EINTR);
+
+	return waited == launcher && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+#endif
 }
