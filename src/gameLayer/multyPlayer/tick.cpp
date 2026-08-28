@@ -1120,7 +1120,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 											)
 										{
 											// The authoritative block changed while its UI was open.
-											resyncAndCloseInteraction(*c.second);
+											resyncAndCloseInteraction(c.second);
 										}
 									}
 
