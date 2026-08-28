@@ -74,3 +74,4 @@ replace_once(
 )
 
 print("v0.9.6 skin decoder scope fix applied")
+# Touch marker: workflow created after the first script commit.
