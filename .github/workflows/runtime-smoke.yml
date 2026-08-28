@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            cmake ninja-build xvfb xauth mesa-vulkan-drivers libgl1-mesa-dri \
+            cmake ninja-build xvfb xauth mesa-vulkan-drivers libgl1-mesa-dri libgl-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libwayland-dev libxkbcommon-dev libzstd-dev
 
