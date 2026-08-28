@@ -267,12 +267,10 @@ void animatePlayerLegs(glm::mat4 *poseVector, float &currentAngle, int &directio
 gl2d::Texture loadPlayerSkin(const char *path);
 
 // v0.9.6 keeps the established 128x128 renderer/network contract while the
-// decoder accepts Mie and Minecraft PNG layouts. model.cpp is the only legacy
-// translation unit that decodes player skins through stb_image, so redirect
-// that call to the compatibility adapter without duplicating the renderer.
+// player-skin decoder accepts Mie and Minecraft PNG layouts. Keep this adapter
+// explicit so unrelated stb_image users are never redirected by a global macro.
 unsigned char *mieLoadPlayerSkinImageFromMemory(const unsigned char *buffer, int len,
 	int *x, int *y, int *channelsInFile, int desiredChannels);
-#define stbi_load_from_memory mieLoadPlayerSkinImageFromMemory
 
 constexpr static int PLAYER_SKIN_SIZE = 128;
 

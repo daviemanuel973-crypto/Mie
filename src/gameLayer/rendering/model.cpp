@@ -1116,7 +1116,7 @@ gl2d::Texture loadPlayerSkin(const char *path)
 		int height = 0;
 		int channels = 0;
 
-		const unsigned char *decodedImage = stbi_load_from_memory(fileData, (int)fileSize, &width, &height, &channels, 4);
+		unsigned char *decodedImage = mieLoadPlayerSkinImageFromMemory(fileData, (int)fileSize, &width, &height, &channels, 4);
 
 		if (width == height && width == PLAYER_SKIN_SIZE)
 		{
