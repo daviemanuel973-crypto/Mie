@@ -724,6 +724,39 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 		client.playerData.currentBlockInteractWithPosition = {0, -1, 0};
 	};
 
+	auto resyncInventoryAndCurrentInteraction = [&](Client &client)
+	{
+		// A stale inventory revision is an explicit rejection, not a packet to
+		// silently ignore. If the station lease itself expired, close it using the
+		// stronger path; otherwise resend both inventory and container state.
+		if (client.playerData.interactingWithBlock && !isCurrentBlockInteractionValid(client))
+		{
+			resyncAndCloseInteraction(client);
+			return;
+		}
+
+		sendPlayerInventoryAndIncrementRevision(client);
+		if (!client.playerData.interactingWithBlock) { return; }
+
+		const glm::ivec3 position = client.playerData.currentBlockInteractWithPosition;
+		if (client.playerData.interactingWithBlock == InteractionTypes::chestInteraction)
+		{
+			SavedChunk *containerChunk = nullptr;
+			if (ChestBlock *chest = chunkCache.getChestBlock(position, containerChunk))
+			{
+				sendChestDataToCurrentPlayer(&client, *chest, position);
+			}
+		}
+		else if (client.playerData.interactingWithBlock == InteractionTypes::furnace)
+		{
+			SavedChunk *containerChunk = nullptr;
+			if (FurnaceBlock *furnace = chunkCache.getFurnaceBlock(position, containerChunk))
+			{
+				sendFurnaceData(&client, *furnace, position, true);
+			}
+		}
+	};
+
 	// Treat an interaction as a lease. Distance, death, chunk lifetime and block
 	// identity are authoritative server state and are revalidated every tick.
 	for (auto &entry : allClients)
@@ -1235,7 +1268,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 				else if (i.t.taskType == Task::clientMovedItem)
 				{
 					auto client = getClientNotLocked(i.cid);
-					if (client && client->playerData.inventory.revisionNumber == i.t.revisionNumber)
+					if (client && client->playerData.inventory.revisionNumber != i.t.revisionNumber)
+					{
+						resyncInventoryAndCurrentInteraction(*client);
+						continue;
+					}
+					if (client)
 					{
 						ChestBlock *chestBlock = nullptr;
 						FurnaceBlock *furnaceBlock = nullptr;
@@ -1356,7 +1394,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 				else if (i.t.taskType == Task::clientSwapItems)
 				{
 					auto client = getClientNotLocked(i.cid);
-					if (client && client->playerData.inventory.revisionNumber == i.t.revisionNumber)
+					if (client && client->playerData.inventory.revisionNumber != i.t.revisionNumber)
+					{
+						resyncInventoryAndCurrentInteraction(*client);
+						continue;
+					}
+					if (client)
 					{
 						ChestBlock *chestBlock = nullptr;
 						FurnaceBlock *furnaceBlock = nullptr;
@@ -1413,10 +1456,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 					if (client)
 					{
+						if (client->playerData.inventory.revisionNumber != i.t.revisionNumber)
+						{
+							resyncInventoryAndCurrentInteraction(*client);
+							continue;
+						}
 
-
-
-						//if the revision number isn't good we don't do anything
 						if (client->playerData.inventory.revisionNumber
 							== i.t.revisionNumber
 							)
