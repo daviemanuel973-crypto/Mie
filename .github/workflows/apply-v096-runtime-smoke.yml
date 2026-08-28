@@ -1,0 +1,39 @@
+name: Apply v0.9.6 runtime smoke
+
+on:
+  push:
+    branches:
+      - codex/v0.9.6-stability-skins
+    paths:
+      - tools/apply_v096_runtime_smoke.py
+      - .github/workflows/apply-v096-runtime-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-runtime-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/v0.9.6-stability-skins
+          fetch-depth: 0
+      - name: Apply guarded runtime smoke patch
+        run: python3 tools/apply_v096_runtime_smoke.py
+      - name: Verify permanent smoke integration
+        run: |
+          grep -F '#include "runtimeSmoke.h"' src/platform/glfwMain.cpp
+          grep -F 'beginRuntimeSmokeTest()' src/platform/glfwMain.cpp
+          grep -F 'RuntimeSmokeFrameResult' include/gameLayer/runtimeSmoke.h
+          grep -F 'hostServer(SMOKE_WORLD_NAME)' src/gameLayer/runtimeSmoke.cpp
+          grep -F 'MIE_RUNTIME_SMOKE_TEST=1' .github/workflows/runtime-smoke.yml
+          git diff --check
+      - name: Commit runtime smoke integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/platform/glfwMain.cpp include/gameLayer/runtimeSmoke.h src/gameLayer/runtimeSmoke.cpp .github/workflows/runtime-smoke.yml
+          git commit -m 'test(v0.9.6): add real server client world smoke gate'
+          git push origin HEAD:codex/v0.9.6-stability-skins
