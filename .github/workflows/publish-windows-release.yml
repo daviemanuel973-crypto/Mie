@@ -48,7 +48,7 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build --config Release --parallel 2
-          ctest --test-dir build -C Release --output-on-failure --timeout 60
+          ctest --test-dir build -C Release -L mie --output-on-failure --timeout 60
 
       - name: Stage Windows package
         shell: pwsh

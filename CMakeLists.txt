@@ -486,5 +486,7 @@ if (BUILD_TESTING)
 		crafting-ui-selection
 		skin-format
 		gpu-buffer-capacity
-		PROPERTIES TIMEOUT 60)
+		PROPERTIES
+			TIMEOUT 60
+			LABELS "mie")
 endif()
