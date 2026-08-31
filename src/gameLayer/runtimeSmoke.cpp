@@ -16,7 +16,9 @@ namespace
 constexpr const char *SMOKE_WORLD_NAME = "__mie_runtime_smoke__";
 constexpr int MIN_SMOKE_FRAMES = 180;
 constexpr auto MIN_SMOKE_RUNTIME = std::chrono::seconds(3);
-constexpr auto MAX_SMOKE_RUNTIME = std::chrono::seconds(30);
+// llvmpipe on the low-end CI runner can stay below 6 FPS while baking the first
+// visible chunks. Keep the 180-frame gate and allow it enough steady-state time.
+constexpr auto MAX_SMOKE_RUNTIME = std::chrono::seconds(90);
 
 std::filesystem::path smokeWorldPath()
 {
