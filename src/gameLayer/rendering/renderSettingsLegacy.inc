@@ -852,11 +852,43 @@ void displayTexturePacksSettingsMenu(ProgramData &programData)
 
 std::string currentSkinSelected = "";
 
+namespace
+{
+	bool skinSelectionLoaded = false;
+
+	void loadSkinSelectionOnce()
+	{
+		if (skinSelectionLoaded) { return; }
+		skinSelectionLoaded = true;
+
+		sfs::SafeSafeKeyValueData data;
+		if (sfs::safeLoad(data, USER_SETTINGS_PATH "skinSettings", false) == sfs::noError)
+		{
+			data.getString("Skin", currentSkinSelected);
+		}
+
+		if (currentSkinSelected.find_first_of("/\\") != std::string::npos ||
+			currentSkinSelected.find("..") != std::string::npos)
+		{
+			currentSkinSelected.clear();
+		}
+	}
+
+	void saveSkinSelection()
+	{
+		sfs::SafeSafeKeyValueData data;
+		data.setInt("Version", 1);
+		data.setString("Skin", currentSkinSelected);
+		sfs::safeSave(data, USER_SETTINGS_PATH "skinSettings", false);
+	}
+}
+
 gl2d::Texture currentTextureLoaded;
 std::string currentTextureLoadedName = "";
 
 void loadTexture()
 {
+	loadSkinSelectionOnce();
 
 	if (currentTextureLoadedName != currentSkinSelected || !currentTextureLoaded.id)
 	{
@@ -875,7 +907,7 @@ void loadTexture()
 		else
 		{
 			currentTextureLoaded
-				= loadPlayerSkin((RESOURCES_PATH "skins/" + currentTextureLoadedName + ".png").c_str());
+				= loadPlayerSkin((USER_CONTENT_PATH "skins/" + currentTextureLoadedName + ".png").c_str());
 		}
 	}
 
@@ -883,6 +915,7 @@ void loadTexture()
 
 std::string getSkinName()
 {
+	loadSkinSelectionOnce();
 	return currentSkinSelected;
 }
 
@@ -1053,6 +1086,50 @@ void displaySkinSelectorMenu(ProgramData &programData)
 
 	programData.ui.menuRenderer.Text("Change Skin", Colors_White);
 
+	loadSkinSelectionOnce();
+	const std::filesystem::path skinsPath = USER_CONTENT_PATH "skins";
+	if (!std::filesystem::exists(skinsPath))
+	{
+		std::filesystem::create_directories(skinsPath, err);
+	}
+
+	static std::string skinToolStatus;
+	if (programData.ui.menuRenderer.Button("Open Skin Editor", Colors_Gray,
+		programData.ui.buttonTexture))
+	{
+		const std::string editorPath = RESOURCES_PATH "tools/MieSkinEditor.html";
+		if (std::filesystem::exists(editorPath) &&
+			openPathWithDefaultApplication(editorPath.c_str()))
+		{
+			skinToolStatus = "Editor opened in your browser.";
+		}
+		else
+		{
+			skinToolStatus = "Could not open the editor. Open resources/tools/MieSkinEditor.html manually.";
+		}
+	}
+
+	if (programData.ui.menuRenderer.Button("Open Skins Folder", Colors_Gray,
+		programData.ui.buttonTexture))
+	{
+		if (!err && openPathWithDefaultApplication(skinsPath.string().c_str()))
+		{
+			skinToolStatus = "Skins folder opened. Add a PNG, then return to this menu.";
+		}
+		else
+		{
+			skinToolStatus = "Could not open the skins folder.";
+		}
+	}
+
+	programData.ui.menuRenderer.Text(
+		"PNG: Mie 128x128, Minecraft 64x64/64x32 or legacy Mie 128x64.",
+		Colors_White);
+	if (!skinToolStatus.empty())
+	{
+		programData.ui.menuRenderer.Text(skinToolStatus, Colors_White);
+	}
+
 	//todo
 	//if (programData.ui.menuRenderer.Button("Open Folder", Colors_Gray))
 	//{
@@ -1083,14 +1160,9 @@ void displaySkinSelectorMenu(ProgramData &programData)
 		)
 	{
 
-		if (!std::filesystem::exists(USER_CONTENT_PATH "skins"))
-		{
-			std::filesystem::create_directories(USER_CONTENT_PATH "skins", err);
-		}
-
 		std::vector<std::string> skins;
 
-		for (auto const &d : std::filesystem::directory_iterator{USER_CONTENT_PATH "skins", err})
+		for (auto const &d : std::filesystem::directory_iterator{skinsPath, err})
 		{
 			if (!d.is_directory())
 			{
@@ -1100,6 +1172,7 @@ void displaySkinSelectorMenu(ProgramData &programData)
 				}
 			}
 		}
+		std::sort(skins.begin(), skins.end());
 
 		int posInVect = -1;
 		if (currentSkinSelected == "")
@@ -1113,11 +1186,15 @@ void displaySkinSelectorMenu(ProgramData &programData)
 			{
 				if (s == currentSkinSelected)
 				{
-					currentSkinSelected = s;
 					posInVect = index;
 					break;
 				}
 				index++;
+			}
+			if (posInVect == -1)
+			{
+				currentSkinSelected.clear();
+				saveSkinSelection();
 			}
 		}
 
@@ -1160,6 +1237,7 @@ void displaySkinSelectorMenu(ProgramData &programData)
 
 			//move cursor
 			{
+				const std::string previousSkin = currentSkinSelected;
 				if (renderButton(renderer, programData.ui.buttonTexture, left))
 				{
 					posInVect--;
@@ -1187,6 +1265,11 @@ void displaySkinSelectorMenu(ProgramData &programData)
 				else
 				{
 					currentSkinSelected = skins[posInVect];
+				}
+
+				if (currentSkinSelected != previousSkin)
+				{
+					saveSkinSelection();
 				}
 			}
 

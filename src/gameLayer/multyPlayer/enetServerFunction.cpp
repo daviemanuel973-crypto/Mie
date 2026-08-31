@@ -1,5 +1,6 @@
 #include "multyPlayer/enetServerFunction.h"
 #include <atomic>
+#include <cstdlib>
 #include <thread>
 #include <enet/enet.h>
 #include <iostream>
@@ -275,8 +276,14 @@ void updatePlayerSurvivalStats(Client &client)
 
 void addConnection(ENetHost *server, ENetEvent &event, WorldSaver &worldSaver)
 {
-	event.peer->timeoutMinimum = 10'000;
-	event.peer->timeoutMaximum = 30'000;
+	// The software-rendered runtime smoke can spend more than 30 seconds in
+	// synchronous world/resource startup before its first steady-state frames.
+	// Keep production network timeouts unchanged.
+	const char *runtimeSmoke = std::getenv("MIE_RUNTIME_SMOKE_TEST");
+	const bool extendedStartupTimeout = runtimeSmoke &&
+		runtimeSmoke[0] == '1' && runtimeSmoke[1] == '\0';
+	event.peer->timeoutMinimum = extendedStartupTimeout ? 60'000 : 10'000;
+	event.peer->timeoutMaximum = extendedStartupTimeout ? 120'000 : 30'000;
 	event.peer->timeoutLimit = 64;
 	pendingConnections.insert(event.peer);
 }

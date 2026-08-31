@@ -123,15 +123,21 @@ void ChunkSystem::init(int squareDistance)
 
 void ChunkSystem::changeRenderDistance(int squareDistance, bool notifyServer)
 {
-
-	if (squareSize == squareDistance) { return; }
 	if (squareDistance > 102) { squareDistance = 102; }
 	if (squareDistance < 2) { squareDistance = 2; }
+	if (squareSize == squareDistance && pendingSquareSize == 0) { return; }
 
+#if REMOVE_BIG_GPU_BUFFER == 1
+	// Do not tear down the complete chunk cache. update() will remap retained
+	// chunks into the new matrix and discard only the ring that left the view.
+	pendingSquareSize = squareDistance;
+	pendingRenderDistanceNotifyServer = notifyServer;
+#else
+	// The legacy arena allocates capacity from squareSize. If it is re-enabled,
+	// keep the conservative full rebuild until the arena itself supports resize.
 	cleanup(notifyServer);
-
 	init(squareDistance);
-
+#endif
 }
 
 void ChunkSystem::cleanup(bool notifyServer)
@@ -407,6 +413,81 @@ void ChunkSystem::update(glm::ivec3 playerBlockPosition, float deltaTime, UndoQu
 	//index of the chunk
 	int x = divideChunk(playerBlockPosition.x);
 	int z = divideChunk(playerBlockPosition.z);
+
+#if REMOVE_BIG_GPU_BUFFER == 1
+	if (pendingSquareSize != 0 && pendingSquareSize != squareSize)
+	{
+		const int newSquareSize = pendingSquareSize;
+		const glm::ivec2 newMinPos = glm::ivec2(x, z) -
+			glm::ivec2(newSquareSize / 2, newSquareSize / 2);
+		const glm::ivec2 newMaxPos = glm::ivec2(x, z) +
+			glm::ivec2(newSquareSize / 2 + newSquareSize % 2,
+				newSquareSize / 2 + newSquareSize % 2);
+		std::vector<Chunk *> resizedChunks(
+			static_cast<std::size_t>(newSquareSize) * newSquareSize, nullptr);
+
+		for (std::size_t i = 0; i < loadedChunks.size(); ++i)
+		{
+			Chunk *chunk = loadedChunks[i];
+			if (!chunk) { continue; }
+
+			const glm::ivec2 chunkPos(chunk->data.x, chunk->data.z);
+			const bool keep = chunkPos.x >= newMinPos.x && chunkPos.y >= newMinPos.y &&
+				chunkPos.x < newMaxPos.x && chunkPos.y < newMaxPos.y &&
+				isChunkInRadius({playerBlockPosition.x, playerBlockPosition.z},
+					chunkPos, newSquareSize);
+
+			if (keep)
+			{
+				const glm::ivec2 relative = chunkPos - newMinPos;
+				resizedChunks[static_cast<std::size_t>(relative.x) * newSquareSize +
+					relative.y] = chunk;
+				loadedChunks[i] = nullptr;
+				chunk->setDirty(true);
+				chunk->setDirtyTransparency(true);
+				continue;
+			}
+
+			if (pendingRenderDistanceNotifyServer)
+			{
+				Packet packet = {};
+				packet.cid = getConnectionData().cid;
+				packet.header = headerClientDroppedChunk;
+				Packet_ClientDroppedChunk packetData = {};
+				packetData.chunkPos = chunkPos;
+				sendPacket(getConnectionData().server, packet,
+					reinterpret_cast<char *>(&packetData), sizeof(packetData), true,
+					channelPlayerPositions);
+			}
+
+			auto &chunkData = chunk->data;
+			for (int blockX = 0; blockX < CHUNK_SIZE; ++blockX)
+				for (int blockZ = 0; blockZ < CHUNK_SIZE; ++blockZ)
+					for (int blockY = 0; blockY < CHUNK_HEIGHT; ++blockY)
+					{
+						clientEntityManager.removeBlockEntity(
+							{blockX + chunkData.x * CHUNK_SIZE, blockY,
+							 blockZ + chunkData.z * CHUNK_SIZE},
+							chunkData.blocks[blockX][blockZ][blockY].getType());
+					}
+			dropChunkAtIndexUnsafe(static_cast<int>(i), &gpuBuffer);
+		}
+
+		loadedChunks = std::move(resizedChunks);
+		squareSize = newSquareSize;
+		cornerPos = newMinPos;
+		pendingSquareSize = 0;
+		chunksToAddLight.clear(); // pending matrix coordinates belonged to the old grid
+		shouldUpdateLights = true;
+		created = 1;
+		lastX = x;
+		lastZ = z;
+	}
+	else if (pendingSquareSize == squareSize)
+	{
+		pendingSquareSize = 0;
+	}
+#endif
 
 	//bottom left most chunk and top right most chunk of my array
 	glm::ivec2 minPos = glm::ivec2(x, z) - glm::ivec2(squareSize / 2, squareSize / 2);

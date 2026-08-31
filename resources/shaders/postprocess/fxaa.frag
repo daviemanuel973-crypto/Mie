@@ -28,10 +28,10 @@ float quality(int i)
 
 	if(i < FIRST_SAMPLES_COUNT)
 	{
-		return 1;
+		return 1.0;
 	}else if(i >= FIRST_SAMPLES_COUNT + SIZE)
 	{
-		return 8;
+		return 8.0;
 	}else return r[i-FIRST_SAMPLES_COUNT];
 }
 

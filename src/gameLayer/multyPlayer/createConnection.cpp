@@ -2,6 +2,7 @@
 #include "enet/enet.h"
 #include "multyPlayer/packet.h"
 #include <iostream>
+#include <cstdlib>
 #include <multyPlayer/enetServerFunction.h>
 #include <gameplay/entityManagerClient.h>
 #include <multyPlayer/undoQueue.h>
@@ -1171,8 +1172,13 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 		return false;
 	}
 
-	clientData.server->timeoutMinimum = 10'000;
-	clientData.server->timeoutMaximum = 30'000;
+	// Match the server's extended startup allowance only in the isolated
+	// software-rendered runtime smoke. Normal multiplayer behavior is unchanged.
+	const char *runtimeSmoke = std::getenv("MIE_RUNTIME_SMOKE_TEST");
+	const bool extendedStartupTimeout = runtimeSmoke &&
+		runtimeSmoke[0] == '1' && runtimeSmoke[1] == '\0';
+	clientData.server->timeoutMinimum = extendedStartupTimeout ? 60'000 : 10'000;
+	clientData.server->timeoutMaximum = extendedStartupTimeout ? 120'000 : 30'000;
 	clientData.server->timeoutLimit = 64;
 
 	{

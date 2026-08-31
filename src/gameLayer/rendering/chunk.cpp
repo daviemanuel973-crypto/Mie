@@ -7,7 +7,9 @@
 #include <platformTools.h>
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <gameplay/entity.h>
+#include <rendering/chunkGeometryOrder.h>
 
 #undef max
 #undef min
@@ -43,31 +45,27 @@ Block *Chunk::safeGet(int x, int y, int z)
 
 void arangeData(std::vector<int> &currentVector)
 {
-	glm::ivec4 *geometryArray = reinterpret_cast<glm::ivec4 *>(currentVector.data());
 	permaAssertComment(currentVector.size() % 4 == 0, "baking vector corrupted...");
-	size_t numElements = currentVector.size() / 4;
+	using GeometryRecord = std::array<int, 4>;
+	static_assert(sizeof(GeometryRecord) == sizeof(int) * 4,
+		"Chunk geometry records must remain four packed integers");
 
-	// Custom comparator function for sorting
-	auto comparator = [](const glm::ivec4 &a, const glm::ivec4 &b)
+	const std::size_t numElements = currentVector.size() / 4;
+	std::vector<GeometryRecord> geometry(numElements);
+	if (!currentVector.empty())
 	{
-		int firstPart = ((short *)&a.x)[0];
-		int secondPart = ((short *)&b.x)[0];
+		std::memcpy(geometry.data(), currentVector.data(), currentVector.size() * sizeof(int));
+	}
 
-		//return firstPart < secondPart;
+	std::sort(geometry.begin(), geometry.end(), [](const GeometryRecord &a, const GeometryRecord &b)
+	{
+		return mie::rendering::chunkGeometryPackedLess(a[0], b[0]);
+	});
 
-		if (firstPart != secondPart)
-			return firstPart < secondPart;
-		else
-		{
-			firstPart = ((short *)&a.x)[1];
-			secondPart = ((short *)&b.x)[1];
-			return firstPart < secondPart;
-		};
-
-	};
-
-	// Sort the array of glm::ivec4
-	std::sort(geometryArray, geometryArray + numElements, comparator);
+	if (!currentVector.empty())
+	{
+		std::memcpy(currentVector.data(), geometry.data(), currentVector.size() * sizeof(int));
+	}
 
 }
 

@@ -824,7 +824,7 @@ float getBlockAO()
 
 	int pos = (v_flags & 0xF0) >> 4;
 
-	if(pos == 0){return 1;}
+	if(pos == 0){return 1.0;}
 
 	vec2 cornerDarken1 = - vec2(0.5, (sqrt(2)-1.f)/2.f) * 1.5;
 

@@ -37,6 +37,11 @@ struct ChunkSystem
 
 	std::vector<Chunk*> loadedChunks;
 	int squareSize = 4;
+	// v0.9.6: render-distance changes are staged until update(), where the
+	// ClientEntityManager is available. This lets us preserve chunks that stay
+	// inside the new radius instead of destroying/reloading the whole cache.
+	int pendingSquareSize = 0;
+	bool pendingRenderDistanceNotifyServer = true;
 	std::vector<glm::ivec2> chunksToAddLight;
 	
 	glm::ivec2 lastPlayerPos = {};

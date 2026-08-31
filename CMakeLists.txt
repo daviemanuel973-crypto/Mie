@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.9.5" CACHE STRING "Mie Survival release version")
+set(OURCRAFT_VERSION "0.9.6" CACHE STRING "Mie Survival release version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -397,6 +397,12 @@ if (BUILD_TESTING)
 	endif()
 	add_test(NAME packet-validation COMMAND packetValidationTests)
 
+	add_executable(chunkGeometryOrderTests
+		tests/chunkGeometryOrderTests.cpp)
+	target_include_directories(chunkGeometryOrderTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME chunk-geometry-order COMMAND chunkGeometryOrderTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -417,5 +423,6 @@ if (BUILD_TESTING)
 		entity-id-allocator
 		runtime-foundation
 		packet-validation
+		chunk-geometry-order
 		PROPERTIES TIMEOUT 60)
 endif()

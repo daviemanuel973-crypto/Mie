@@ -677,6 +677,98 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 		}
 	};
 
+
+	constexpr double BLOCK_INTERACTION_REACH = 21.5;
+	auto isBlockInteractionWithinReach = [&](const Client &client, const glm::ivec3 &position)
+	{
+		const glm::dvec3 delta = client.playerData.entity.position - glm::dvec3(position);
+		return glm::dot(delta, delta) <= BLOCK_INTERACTION_REACH * BLOCK_INTERACTION_REACH;
+	};
+
+	auto isCurrentBlockInteractionValid = [&](const Client &client)
+	{
+		const int interactionType = client.playerData.interactingWithBlock;
+		if (!interactionType || client.playerData.killed) { return false; }
+		const glm::ivec3 position = client.playerData.currentBlockInteractWithPosition;
+		if (!isBlockInteractionWithinReach(client, position)) { return false; }
+		Block *block = chunkCache.getBlockSafe(position);
+		return block && isInteractable(block->getType()) == interactionType;
+	};
+
+	auto resyncAndCloseInteraction = [&](Client &client)
+	{
+		const int interactionType = client.playerData.interactingWithBlock;
+		const glm::ivec3 position = client.playerData.currentBlockInteractWithPosition;
+		const unsigned char interactionRevision = client.playerData.revisionNumberInteraction;
+
+		if (interactionType == InteractionTypes::chestInteraction)
+		{
+			SavedChunk *containerChunk = nullptr;
+			if (ChestBlock *chest = chunkCache.getChestBlock(position, containerChunk))
+			{
+				sendChestDataToCurrentPlayer(&client, *chest, position);
+			}
+		}
+		else if (interactionType == InteractionTypes::furnace)
+		{
+			SavedChunk *containerChunk = nullptr;
+			if (FurnaceBlock *furnace = chunkCache.getFurnaceBlock(position, containerChunk))
+			{
+				sendFurnaceData(&client, *furnace, position, true);
+			}
+		}
+
+		sendPlayerInventoryAndIncrementRevision(client);
+		sendPlayerExitInteraction(client, interactionRevision);
+		client.playerData.interactingWithBlock = 0;
+		client.playerData.currentBlockInteractWithPosition = {0, -1, 0};
+	};
+
+	auto resyncInventoryAndCurrentInteraction = [&](Client &client)
+	{
+		// A stale inventory revision is an explicit rejection, not a packet to
+		// silently ignore. If the station lease itself expired, close it using the
+		// stronger path; otherwise resend both inventory and container state.
+		if (client.playerData.interactingWithBlock && !isCurrentBlockInteractionValid(client))
+		{
+			resyncAndCloseInteraction(client);
+			return;
+		}
+
+		sendPlayerInventoryAndIncrementRevision(client);
+		if (!client.playerData.interactingWithBlock) { return; }
+
+		const glm::ivec3 position = client.playerData.currentBlockInteractWithPosition;
+		if (client.playerData.interactingWithBlock == InteractionTypes::chestInteraction)
+		{
+			SavedChunk *containerChunk = nullptr;
+			if (ChestBlock *chest = chunkCache.getChestBlock(position, containerChunk))
+			{
+				sendChestDataToCurrentPlayer(&client, *chest, position);
+			}
+		}
+		else if (client.playerData.interactingWithBlock == InteractionTypes::furnace)
+		{
+			SavedChunk *containerChunk = nullptr;
+			if (FurnaceBlock *furnace = chunkCache.getFurnaceBlock(position, containerChunk))
+			{
+				sendFurnaceData(&client, *furnace, position, true);
+			}
+		}
+	};
+
+	// Treat an interaction as a lease. Distance, death, chunk lifetime and block
+	// identity are authoritative server state and are revalidated every tick.
+	for (auto &entry : allClients)
+	{
+		Client *client = entry.second;
+		if (client && client->playerData.interactingWithBlock &&
+			!isCurrentBlockInteractionValid(*client))
+		{
+			resyncAndCloseInteraction(*client);
+		}
+	}
+
 	// Furnace simulation is server-authoritative and runs only for chunks kept in
 	// simulation distance. Clients receive throttled snapshots for smooth progress UI.
 	for (auto &chunkEntry : chunkCache.savedChunks)
@@ -1027,10 +1119,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 											i.t.pos
 											)
 										{
-											//close interaction with block.
-											//todo close chests here.
-											c.second.playerData.interactingWithBlock = 0;
-											c.second.playerData.currentBlockInteractWithPosition = {0,-1,0};
+											// The authoritative block changed while its UI was open.
+											resyncAndCloseInteraction(c.second);
 										}
 									}
 
@@ -1178,7 +1268,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 				else if (i.t.taskType == Task::clientMovedItem)
 				{
 					auto client = getClientNotLocked(i.cid);
-					if (client && client->playerData.inventory.revisionNumber == i.t.revisionNumber)
+					if (client && client->playerData.inventory.revisionNumber != i.t.revisionNumber)
+					{
+						resyncInventoryAndCurrentInteraction(*client);
+						continue;
+					}
+					if (client)
 					{
 						ChestBlock *chestBlock = nullptr;
 						FurnaceBlock *furnaceBlock = nullptr;
@@ -1195,6 +1290,11 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 						const bool usesContainer = i.t.from >= PlayerInventory::CHEST_START_INDEX ||
 							i.t.to >= PlayerInventory::CHEST_START_INDEX;
+						if (usesContainer && !isCurrentBlockInteractionValid(*client))
+						{
+							resyncAndCloseInteraction(*client);
+							continue;
+						}
 						auto resendContainer = [&]()
 						{
 							if (chestBlock) { sendChestDataToCurrentPlayer(client, *chestBlock, containerPos); }
@@ -1294,7 +1394,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 				else if (i.t.taskType == Task::clientSwapItems)
 				{
 					auto client = getClientNotLocked(i.cid);
-					if (client && client->playerData.inventory.revisionNumber == i.t.revisionNumber)
+					if (client && client->playerData.inventory.revisionNumber != i.t.revisionNumber)
+					{
+						resyncInventoryAndCurrentInteraction(*client);
+						continue;
+					}
+					if (client)
 					{
 						ChestBlock *chestBlock = nullptr;
 						FurnaceBlock *furnaceBlock = nullptr;
@@ -1311,6 +1416,11 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 						const bool usesContainer = i.t.from >= PlayerInventory::CHEST_START_INDEX ||
 							i.t.to >= PlayerInventory::CHEST_START_INDEX;
+						if (usesContainer && !isCurrentBlockInteractionValid(*client))
+						{
+							resyncAndCloseInteraction(*client);
+							continue;
+						}
 						Item *from = client->playerData.inventory.getItemFromIndex(i.t.from, chestBlock, furnaceBlock);
 						Item *to = client->playerData.inventory.getItemFromIndex(i.t.to, chestBlock, furnaceBlock);
 						const bool allowed = !client->playerData.killed && from && to && from != to &&
@@ -1346,10 +1456,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 					if (client)
 					{
+						if (client->playerData.inventory.revisionNumber != i.t.revisionNumber)
+						{
+							resyncInventoryAndCurrentInteraction(*client);
+							continue;
+						}
 
-
-
-						//if the revision number isn't good we don't do anything
 						if (client->playerData.inventory.revisionNumber
 							== i.t.revisionNumber
 							)
@@ -1371,6 +1483,13 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								{
 
 									auto resultCrafting = getRecepieFromIndexUnsafe(craftingIndex);
+									const bool requiresActiveStation = resultCrafting.requiresWorkBench ||
+										resultCrafting.requiresCookingPot || resultCrafting.requiresGoblin;
+									if (requiresActiveStation && !isCurrentBlockInteractionValid(*client))
+									{
+										resyncAndCloseInteraction(*client);
+										continue;
+									}
 									bool correctStation = true;
 									if (resultCrafting.requiresFurnace)
 									{
@@ -1692,9 +1811,9 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 									if (b && b->getType() == blockType
 										&& isInteractable(blockType)
+										&& isBlockInteractionWithinReach(*client, i.t.pos)
 										)
 									{
-										//todo check distance.
 										allows = true;
 									}
 								}

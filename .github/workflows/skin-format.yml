@@ -1,0 +1,23 @@
+name: Skin format
+
+on:
+  push:
+    branches:
+      - main
+      - codex/v0.9.6-stability-skins
+  pull_request:
+
+jobs:
+  skin-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build skin format tests
+        run: >-
+          g++ -std=c++17 -Wall -Wextra -Werror
+          -Iinclude/gameLayer
+          tests/skinFormatTests.cpp
+          src/gameLayer/gameplay/skinFormat.cpp
+          -o skin-format-tests
+      - name: Run skin format tests
+        run: ./skin-format-tests

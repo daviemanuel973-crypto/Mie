@@ -716,9 +716,13 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 		spagettiNoise2[i] = wg.spagettiNoiseSplines.applySpline(spagettiNoise2[i]);
 	}
 
-	alignas(32) static float randomStones[1] = {};
+	// FastNoiseSIMD stores a complete SIMD lane even for a 1x1x1 request.
+	// Reserve the maximum supported lane width (AVX-512 = 16 floats) so the
+	// SSE/AVX paths cannot overwrite adjacent globals.
+	constexpr int FAST_NOISE_MAX_SIMD_LANES = 16;
+	alignas(64) static float randomStones[FAST_NOISE_MAX_SIMD_LANES] = {};
 	wg.randomStonesNoise->FillNoiseSet(randomStones, xPadd, 0, zPadd, 1, 1, 1);
-	*randomStones = std::pow(((*randomStones + 1.f) / 2.f)*0.5, 3.0);
+	randomStones[0] = std::pow(((randomStones[0] + 1.f) / 2.f)*0.5, 3.0);
 
 	
 	alignas(32) static float cavesNoise[CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE] = {};
@@ -749,7 +753,8 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 		alternativeBlocksNoise[i] /= 2;
 	}
 
-	alignas(32) static float whiteNoise[(CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)] = {};
+	alignas(64) static float whiteNoise[(CHUNK_SIZE + 1) * (CHUNK_SIZE + 1) +
+		FAST_NOISE_MAX_SIMD_LANES - 1] = {};
 	wg.whiteNoise->FillNoiseSet(whiteNoise, xPadd, 0, zPadd, CHUNK_SIZE + 1, (1), CHUNK_SIZE + 1);
 	for (int i = 0; i < (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1); i++)
 	{
@@ -757,7 +762,8 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 		whiteNoise[i] /= 2;
 	}
 
-	alignas(32) static float whiteNoise2[(CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)] = {};
+	alignas(64) static float whiteNoise2[(CHUNK_SIZE + 1) * (CHUNK_SIZE + 1) +
+		FAST_NOISE_MAX_SIMD_LANES - 1] = {};
 	wg.whiteNoise2->FillNoiseSet(whiteNoise2, xPadd, 0, zPadd, CHUNK_SIZE + 1, (1), CHUNK_SIZE + 1);
 	for (int i = 0; i < (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1); i++)
 	{
@@ -765,7 +771,8 @@ void generateChunk(ChunkData& c, WorldGenerator &wg, StructuresManager &structur
 		whiteNoise2[i] /= 2;
 	}
 
-	alignas(32) static float whiteNoise3[(CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)] = {};
+	alignas(64) static float whiteNoise3[(CHUNK_SIZE + 1) * (CHUNK_SIZE + 1) +
+		FAST_NOISE_MAX_SIMD_LANES - 1] = {};
 	wg.whiteNoise2->FillNoiseSet(whiteNoise3, xPadd, 100, zPadd, CHUNK_SIZE + 1, (1), CHUNK_SIZE + 1);
 	for (int i = 0; i < (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1); i++)
 	{
