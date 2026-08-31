@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.9.6" CACHE STRING "Mie Survival release version")
+set(OURCRAFT_VERSION "0.9.7" CACHE STRING "Mie Survival release version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -403,6 +403,60 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME chunk-geometry-order COMMAND chunkGeometryOrderTests)
 
+	add_executable(blockEntityChunkTests
+		tests/blockEntityChunkTests.cpp
+		src/gameLayer/metrics.cpp)
+	target_include_directories(blockEntityChunkTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/")
+	add_test(NAME block-entity-chunk COMMAND blockEntityChunkTests)
+
+	add_executable(actionResyncTests
+		tests/actionResyncTests.cpp)
+	target_include_directories(actionResyncTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME action-resync COMMAND actionResyncTests)
+
+	add_executable(chunkStreamingBudgetTests
+		tests/chunkStreamingBudgetTests.cpp)
+	target_include_directories(chunkStreamingBudgetTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME chunk-streaming-budget COMMAND chunkStreamingBudgetTests)
+
+	add_executable(weaponStatsRegressionTests
+		tests/weaponStatsRegressionTests.cpp
+		src/gameLayer/gameplay/weaponStats.cpp)
+	target_include_directories(weaponStatsRegressionTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME weapon-stats-regression COMMAND weaponStatsRegressionTests)
+
+	add_executable(interactionInvalidationTests
+		tests/interactionInvalidationTests.cpp)
+	target_include_directories(interactionInvalidationTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME interaction-invalidation COMMAND interactionInvalidationTests)
+
+	add_executable(craftingUiSelectionRegressionTests
+		tests/craftingUiSelectionRegressionTests.cpp)
+	add_test(NAME crafting-ui-selection COMMAND craftingUiSelectionRegressionTests)
+
+	add_executable(skinFormatTests
+		tests/skinFormatTests.cpp
+		src/gameLayer/gameplay/skinFormat.cpp)
+	target_include_directories(skinFormatTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME skin-format COMMAND skinFormatTests)
+
+	add_executable(gpuBufferCapacityTests
+		tests/gpuBufferCapacityTests.cpp)
+	target_include_directories(gpuBufferCapacityTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME gpu-buffer-capacity COMMAND gpuBufferCapacityTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -424,5 +478,13 @@ if (BUILD_TESTING)
 		runtime-foundation
 		packet-validation
 		chunk-geometry-order
+		block-entity-chunk
+		action-resync
+		chunk-streaming-budget
+		weapon-stats-regression
+		interaction-invalidation
+		crafting-ui-selection
+		skin-format
+		gpu-buffer-capacity
 		PROPERTIES TIMEOUT 60)
 endif()

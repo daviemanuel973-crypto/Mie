@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <multyPlayer/entityIdAllocator.h>
 #include <multyPlayer/dataIntegrity.h>
+#include <multyPlayer/packetValidation.h>
 
 //todo add to a struct
 ENetHost *server = 0;
@@ -473,9 +474,11 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 	if (p.header == headerClientIdentity && pendingConnections.find(event.peer) != pendingConnections.end())
 	{
-		if (!p.isCompressed() && data && size == sizeof(Packet_ClientIdentity))
+		if (!p.isCompressed() &&
+			validateClientPacketPayload(p.header, data, size, false))
 		{
-			const auto &identityPacket = *reinterpret_cast<const Packet_ClientIdentity *>(data);
+			Packet_ClientIdentity identityPacket = {};
+			std::memcpy(&identityPacket, data, sizeof(identityPacket));
 			if (identityPacket.protocolVersion == MULTIPLAYER_PROTOCOL_VERSION)
 			{
 				finishAddingConnection(event, worldSaver, identityPacket.identity);
@@ -508,6 +511,12 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		}
 
 		wasCompressed = true;
+	}
+
+	if (!validateClientPacketPayload(p.header, data, size, wasCompressed))
+	{
+		reportError("Rejected malformed client packet payload.");
+		return;
 	}
 
 	auto connection = connections.find(p.cid);
@@ -547,8 +556,8 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			const Packet_ClientDroppedChunk packetData =
-				*reinterpret_cast<const Packet_ClientDroppedChunk *>(data);
+			Packet_ClientDroppedChunk packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			connection->second.loadedChunks.erase(packetData.chunkPos);
 
 			break;
@@ -570,8 +579,8 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			const Packet_ClientPlaceBlock packetData =
-				*reinterpret_cast<const Packet_ClientPlaceBlock *>(data);
+			Packet_ClientPlaceBlock packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			if (!blockActionPositionIsValidForClient(connection->second, packetData.blockPos))
 			{
 				rejectBlockMutation(connection->second, packetData.eventId,
@@ -598,8 +607,8 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			const Packet_ClientPlaceBlockForce packetData =
-				*reinterpret_cast<const Packet_ClientPlaceBlockForce *>(data);
+			Packet_ClientPlaceBlockForce packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			if (!blockActionPositionIsValidForClient(connection->second, packetData.blockPos))
 			{
 				rejectBlockMutation(connection->second, packetData.eventId,
@@ -624,8 +633,8 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			const Packet_ClientBreakBlock packetData =
-				*reinterpret_cast<const Packet_ClientBreakBlock *>(data);
+			Packet_ClientBreakBlock packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			if (!blockActionPositionIsValidForClient(connection->second, packetData.blockPos))
 			{
 				rejectBlockMutation(connection->second, packetData.eventId,
@@ -743,18 +752,19 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packet_ClientDroppedItem *packetData = (Packet_ClientDroppedItem *)data;
+			Packet_ClientDroppedItem packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 
 			serverTask.t.taskType = Task::droppedItemEntity;
-			serverTask.t.doublePos = packetData->position;
-			serverTask.t.blockCount = packetData->count;
-			serverTask.t.from = packetData->inventorySlot;
-			serverTask.t.entityId = packetData->entityID;
-			serverTask.t.eventId = packetData->eventId;
-			serverTask.t.motionState = packetData->motionState;
-			serverTask.t.timer = packetData->timer;
-			serverTask.t.blockType = packetData->type;
-			serverTask.t.revisionNumber = packetData->revisionNumberInventory;
+			serverTask.t.doublePos = packetData.position;
+			serverTask.t.blockCount = packetData.count;
+			serverTask.t.from = packetData.inventorySlot;
+			serverTask.t.entityId = packetData.entityID;
+			serverTask.t.eventId = packetData.eventId;
+			serverTask.t.motionState = packetData.motionState;
+			serverTask.t.timer = packetData.timer;
+			serverTask.t.blockType = packetData.type;
+			serverTask.t.revisionNumber = packetData.revisionNumberInventory;
 
 			serverTasks.push_back(serverTask);
 			break;
@@ -770,14 +780,15 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				reportError("corrupted packet or something Packet_ClientMovedItem");
 				break;
 			}
-			Packet_ClientMovedItem *packetData = (Packet_ClientMovedItem *)data;
+			Packet_ClientMovedItem packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 
 			serverTask.t.taskType = Task::clientMovedItem;
-			serverTask.t.itemType = packetData->itemType;
-			serverTask.t.from = packetData->from;
-			serverTask.t.to = packetData->to;
-			serverTask.t.blockCount = packetData->counter;
-			serverTask.t.revisionNumber = packetData->revisionNumber;
+			serverTask.t.itemType = packetData.itemType;
+			serverTask.t.from = packetData.from;
+			serverTask.t.to = packetData.to;
+			serverTask.t.blockCount = packetData.counter;
+			serverTask.t.revisionNumber = packetData.revisionNumber;
 			serverTasks.push_back(serverTask);
 
 			break;
@@ -792,12 +803,13 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				reportError("corrupted packet or something Packet_ClientCraftedItem");
 				break;
 			}
-			Packet_ClientCraftedItem *packetData = (Packet_ClientCraftedItem *)data;
+			Packet_ClientCraftedItem packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 
 			serverTask.t.taskType = Task::clientCraftedItem;
-			serverTask.t.craftingRecepieIndex = packetData->recepieIndex;
-			serverTask.t.to = packetData->to;
-			serverTask.t.revisionNumber = packetData->revisionNumber;
+			serverTask.t.craftingRecepieIndex = packetData.recepieIndex;
+			serverTask.t.to = packetData.to;
+			serverTask.t.revisionNumber = packetData.revisionNumber;
 			serverTasks.push_back(serverTask);
 
 			break;
@@ -810,14 +822,15 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packet_ClientOverWriteItem *packetData = (Packet_ClientOverWriteItem *)data;
+			Packet_ClientOverWriteItem packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			serverTask.t.taskType = Task::clientOverwriteItem;
-			serverTask.t.itemType = packetData->itemType;
-			serverTask.t.to = packetData->to;
-			serverTask.t.blockCount = packetData->counter;
-			serverTask.t.revisionNumber = packetData->revisionNumber;
+			serverTask.t.itemType = packetData.itemType;
+			serverTask.t.to = packetData.to;
+			serverTask.t.blockCount = packetData.counter;
+			serverTask.t.revisionNumber = packetData.revisionNumber;
 
-			int metaDataSize = packetData->metadataSize;
+			int metaDataSize = packetData.metadataSize;
 
 			if (size - sizeof(Packet_ClientOverWriteItem) != static_cast<size_t>(metaDataSize))
 			{
@@ -840,11 +853,12 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break; //todo hard reset stuff everywhere
 			}
 
-			Packet_ClientSwapItems *packetData = (Packet_ClientSwapItems *)data;
+			Packet_ClientSwapItems packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			serverTask.t.taskType = Task::clientSwapItems;
-			serverTask.t.from = packetData->from;
-			serverTask.t.to = packetData->to;
-			serverTask.t.revisionNumber = packetData->revisionNumber;
+			serverTask.t.from = packetData.from;
+			serverTask.t.to = packetData.to;
+			serverTask.t.revisionNumber = packetData.revisionNumber;
 			serverTasks.push_back(serverTask);
 
 			break;
@@ -860,17 +874,18 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packet_ClientUsedItem *packetData = (Packet_ClientUsedItem *)data;
-			Item requestedItem(packetData->itemType);
+			Packet_ClientUsedItem packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			Item requestedItem(packetData.itemType);
 			const bool mutatesBlock = requestedItem.isPaint();
-			const bool positionalServerUse = mutatesBlock || isSpawnEggItem(packetData->itemType);
+			const bool positionalServerUse = mutatesBlock || isSpawnEggItem(packetData.itemType);
 			if (positionalServerUse &&
-				!blockActionPositionIsValidForClient(connection->second, packetData->position))
+				!blockActionPositionIsValidForClient(connection->second, packetData.position))
 			{
 				if (mutatesBlock)
 				{
-					rejectBlockMutation(connection->second, packetData->eventId,
-						packetData->position, true);
+					rejectBlockMutation(connection->second, packetData.eventId,
+						packetData.position, true);
 				}
 				else
 				{
@@ -880,11 +895,11 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 			}
 
 			serverTask.t.taskType = Task::clientUsedItem;
-			serverTask.t.from = packetData->from;
-			serverTask.t.itemType = packetData->itemType;
-			serverTask.t.pos = packetData->position;
-			serverTask.t.revisionNumber = packetData->revisionNumber;
-			serverTask.t.eventId = packetData->eventId;
+			serverTask.t.from = packetData.from;
+			serverTask.t.itemType = packetData.itemType;
+			serverTask.t.pos = packetData.position;
+			serverTask.t.revisionNumber = packetData.revisionNumber;
+			serverTask.t.eventId = packetData.eventId;
 			serverTasks.push_back(serverTask);
 
 			break;
@@ -898,17 +913,18 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packet_ClientInteractWithBlock *packetData = (Packet_ClientInteractWithBlock *)data;
-			if (!blockActionPositionIsValidForClient(connection->second, packetData->blockPos))
+			Packet_ClientInteractWithBlock packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			if (!blockActionPositionIsValidForClient(connection->second, packetData.blockPos))
 			{
-				sendPlayerExitInteraction(connection->second, packetData->interactionCounter);
+				sendPlayerExitInteraction(connection->second, packetData.interactionCounter);
 				break;
 			}
 
 			serverTask.t.taskType = Task::clientInteractedWithBlock;
-			serverTask.t.blockType = packetData->blockType;
-			serverTask.t.pos = packetData->blockPos;
-			serverTask.t.revisionNumber = packetData->interactionCounter;
+			serverTask.t.blockType = packetData.blockType;
+			serverTask.t.pos = packetData.blockPos;
+			serverTask.t.revisionNumber = packetData.interactionCounter;
 			serverTasks.push_back(serverTask);
 
 			break;
@@ -921,9 +937,10 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packet_RecieveExitBlockInteraction *packetData = (Packet_RecieveExitBlockInteraction *)data;
+			Packet_RecieveExitBlockInteraction packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			serverTask.t.taskType = Task::clientExitedInteractionWithBlock;
-			serverTask.t.revisionNumber = packetData->revisionNumber;
+			serverTask.t.revisionNumber = packetData.revisionNumber;
 			
 			serverTasks.push_back(serverTask);
 
@@ -1030,11 +1047,12 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 				break;
 			}
 
-			Packet_ClientDamageLocally *packetData = (Packet_ClientDamageLocally *)data;
-			if (packetData->damage <= 0 || packetData->damage > 1000) { break; }
+			Packet_ClientDamageLocally packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			if (packetData.damage <= 0 || packetData.damage > 1000) { break; }
 
 			serverTask.t.taskType = Task::clientRecievedDamageLocally;
-			serverTask.t.damage = packetData->damage;
+			serverTask.t.damage = packetData.damage;
 			serverTasks.push_back(serverTask);
 			break;
 		}
@@ -1085,23 +1103,66 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 		{
 			if (!data || size < sizeof(Packet_ClientChangeBlockData)) { break; }
 
-			Packet_ClientChangeBlockData *blockData = (Packet_ClientChangeBlockData*)data;
-			if (blockData->blockDataHeader.dataSize != size - sizeof(Packet_ClientChangeBlockData)) { break; }
-			if (!blockActionPositionIsValidForClient(connection->second, blockData->blockDataHeader.pos))
+			Packet_ClientChangeBlockData blockData = {};
+			std::memcpy(&blockData, data, sizeof(blockData));
+			if (blockData.blockDataHeader.dataSize != size - sizeof(Packet_ClientChangeBlockData)) { break; }
+			if (!blockActionPositionIsValidForClient(connection->second, blockData.blockDataHeader.pos))
 			{
-				rejectBlockMutation(connection->second, blockData->eventId,
-					blockData->blockDataHeader.pos, false);
+				rejectBlockMutation(connection->second, blockData.eventId,
+					blockData.blockDataHeader.pos, false);
 				break;
 			}
 
 			serverTask.t.taskType = Task::clientChangedBlockData;
-			serverTask.t.eventId = blockData->eventId;
-			serverTask.t.blockType = blockData->blockDataHeader.blockType;
-			serverTask.t.pos = blockData->blockDataHeader.pos;
-			serverTask.t.metaData.resize(blockData->blockDataHeader.dataSize);
-			memcpy(serverTask.t.metaData.data(), data + sizeof(Packet_ClientChangeBlockData), blockData->blockDataHeader.dataSize);
+			serverTask.t.eventId = blockData.eventId;
+			serverTask.t.blockType = blockData.blockDataHeader.blockType;
+			serverTask.t.pos = blockData.blockDataHeader.pos;
+			serverTask.t.metaData.resize(blockData.blockDataHeader.dataSize);
+			memcpy(serverTask.t.metaData.data(), data + sizeof(Packet_ClientChangeBlockData), blockData.blockDataHeader.dataSize);
 			serverTasks.push_back(serverTask);
 
+			break;
+		}
+
+		case headerClientRequestActionResync:
+		{
+			Packet_ClientRequestActionResync request = {};
+			std::memcpy(&request, data, sizeof(request));
+			if (request.oldestEvent.revision == 0 || request.oldestEvent.counter == 0 ||
+				request.oldestEvent.revision > connection->second.revisionNumber)
+			{
+				break;
+			}
+
+			if (connection->second.revisionNumber > request.oldestEvent.revision)
+			{
+				Packet_InValidateEvent invalidation = {};
+				invalidation.eventId = request.oldestEvent;
+				invalidation.eventId.revision = connection->second.revisionNumber - 1u;
+				sendPacket(connection->second.peer, headerInValidateEvent,
+					&invalidation, sizeof(invalidation), true, channelChunksAndBlocks);
+			}
+			else
+			{
+				computeRevisionStuff(connection->second, false, request.oldestEvent);
+			}
+
+			sendPlayerInventoryAndIncrementRevision(connection->second,
+				channelChunksAndBlocks);
+			const char *positions = data + sizeof(request);
+			for (std::uint16_t i = 0; i < request.blockPositionCount; ++i)
+			{
+				Packet_BlockPositionWire wirePosition = {};
+				std::memcpy(&wirePosition,
+					positions + static_cast<std::size_t>(i) * sizeof(wirePosition),
+					sizeof(wirePosition));
+				const glm::ivec3 blockPosition = {
+					wirePosition.x, wirePosition.y, wirePosition.z};
+				if (mie::serverValidation::isWorldBlockPositionSane(blockPosition))
+				{
+					sendAuthoritativeBlockState(connection->second, blockPosition);
+				}
+			}
 			break;
 		}
 

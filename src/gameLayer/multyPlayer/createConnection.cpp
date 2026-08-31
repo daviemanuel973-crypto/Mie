@@ -151,7 +151,9 @@ void recieveDataClient(ENetEvent &event,
 		case headerRecieveChunk:
 		{
 
-			Packet_RecieveChunk *chunkPacket = (Packet_RecieveChunk *)data;
+			Packet_RecieveChunk chunkPacketData = {};
+			std::memcpy(&chunkPacketData, data, sizeof(chunkPacketData));
+			const Packet_RecieveChunk *chunkPacket = &chunkPacketData;
 
 			if (size != sizeof(Packet_RecieveChunk))
 			{
@@ -435,7 +437,9 @@ void recieveDataClient(ENetEvent &event,
 			//todo request hard reset
 			if (size < sizeof(Packet_ChangeBlockData)) { break; }
 
-			Packet_ChangeBlockData *changeBlockData = (Packet_ChangeBlockData *)data;
+			Packet_ChangeBlockData changeBlockDataStorage = {};
+			std::memcpy(&changeBlockDataStorage, data, sizeof(changeBlockDataStorage));
+			const Packet_ChangeBlockData *changeBlockData = &changeBlockDataStorage;
 
 			//check if corupted data
 			if (changeBlockData->blockDataHeader.pos.y < 0 || changeBlockData->blockDataHeader.pos.y >= CHUNK_HEIGHT) { break; } //todo request hard reset here
@@ -508,7 +512,8 @@ void recieveDataClient(ENetEvent &event,
 
 			if (size != sizeof(Packet_TrainingDummyGotAttacked)) { break; }
 
-			Packet_TrainingDummyGotAttacked p = *(Packet_TrainingDummyGotAttacked*)data;
+			Packet_TrainingDummyGotAttacked p = {};
+			std::memcpy(&p, data, sizeof(p));
 			p.normalize();
 
 			auto pos = fromEntityIDToBlockPos(p.entityID);
@@ -705,10 +710,10 @@ void recieveDataClient(ENetEvent &event,
 
 		case headerClientUpdateTimer:
 		{
-			Packet_ClientUpdateTimer *p = (Packet_ClientUpdateTimer *)data;
 			if (sizeof(Packet_ClientUpdateTimer) != size) { break; } //todo logs or something
-
-			serverTimer = p->timer;
+			Packet_ClientUpdateTimer packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			serverTimer = packetData.timer;
 			break;
 		}
 
@@ -716,9 +721,9 @@ void recieveDataClient(ENetEvent &event,
 		{
 			if (sizeof(Packet_RemoveEntity) != size) { break; } //todo logs or something
 
-			Packet_RemoveEntity *p = (Packet_RemoveEntity *)data;
-
-			entityManager.removeEntity(p->EID);
+			Packet_RemoveEntity packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			entityManager.removeEntity(packetData.EID);
 
 			break;
 		}
@@ -726,15 +731,16 @@ void recieveDataClient(ENetEvent &event,
 		case headerKillEntity:
 		{
 			if (sizeof(Packet_KillEntity) != size) { break; } //todo logs or something
-			Packet_KillEntity *p = (Packet_KillEntity *)data;
+			Packet_KillEntity packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 
-			if (p->EID == entityManager.localPlayer.entityId)
+			if (packetData.EID == entityManager.localPlayer.entityId)
 			{
 				killedPlayer = true;
 			}
 			else
 			{
-				entityManager.killEntity(p->EID);
+				entityManager.killEntity(packetData.EID);
 			}
 
 			break;
@@ -743,13 +749,13 @@ void recieveDataClient(ENetEvent &event,
 		//disconnect other player
 		case headerDisconnectOtherPlayer:
 		{
-			Packet_DisconectOtherPlayer *eid = (Packet_DisconectOtherPlayer *)data;
-
 			if (size == sizeof(Packet_DisconectOtherPlayer))
 			{
-				entityManager.removePlayer(eid->EID);
+				Packet_DisconectOtherPlayer packetData = {};
+				std::memcpy(&packetData, data, sizeof(packetData));
+				entityManager.removePlayer(packetData.EID);
 
-				auto found = playersConnectionData.find(eid->EID);
+				auto found = playersConnectionData.find(packetData.EID);
 
 				if (found != playersConnectionData.end())
 				{
@@ -771,10 +777,11 @@ void recieveDataClient(ENetEvent &event,
 
 		case headerRecieveExitBlockInteraction:
 		{
-			Packet_RecieveExitBlockInteraction *exitInteraction = (Packet_RecieveExitBlockInteraction *)data;
 			if (size == sizeof(Packet_RecieveExitBlockInteraction))
 			{
-				if (exitInteraction->revisionNumber == revisionNumberBlockInteraction)
+				Packet_RecieveExitBlockInteraction packetData = {};
+				std::memcpy(&packetData, data, sizeof(packetData));
+				if (packetData.revisionNumber == revisionNumberBlockInteraction)
 				{
 					shouldExitBlockInteraction = true;
 				}
@@ -784,10 +791,11 @@ void recieveDataClient(ENetEvent &event,
 
 		case headerUpdateOwnOtherPlayerSettings:
 		{
-			Packet_UpdateOwnOtherPlayerSettings *packet = (Packet_UpdateOwnOtherPlayerSettings *)data;
 			if (size == sizeof(Packet_UpdateOwnOtherPlayerSettings))
 			{
-				entityManager.localPlayer.otherPlayerSettings = packet->otherPlayerSettings;
+				Packet_UpdateOwnOtherPlayerSettings packetData = {};
+				std::memcpy(&packetData, data, sizeof(packetData));
+				entityManager.localPlayer.otherPlayerSettings = packetData.otherPlayerSettings;
 			}
 
 		}
@@ -830,9 +838,9 @@ void recieveDataClient(ENetEvent &event,
 		case headerUpdateLife:
 		{
 			if (sizeof(Packet_UpdateLife) != size) { break; }
-			Packet_UpdateLife *p = (Packet_UpdateLife *)data;
-
-			entityManager.localPlayer.life = p->life;
+			Packet_UpdateLife packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			entityManager.localPlayer.life = packetData.life;
 
 			entityManager.localPlayer.lastLife = {};
 			entityManager.localPlayer.justHealedTimer = 0;
@@ -845,36 +853,40 @@ void recieveDataClient(ENetEvent &event,
 		case headerUpdateSurvivalStats:
 		{
 			if (sizeof(Packet_UpdateSurvivalStats) != size) { break; }
-			Packet_UpdateSurvivalStats *packetData = (Packet_UpdateSurvivalStats *)data;
-			packetData->stats.sanitize();
-			entityManager.localPlayer.survivalStats = packetData->stats;
+			Packet_UpdateSurvivalStats packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			packetData.stats.sanitize();
+			entityManager.localPlayer.survivalStats = packetData.stats;
 		}
 		break;
 
 		case headerUpdateSiegeStatus:
 		{
 			if (size != sizeof(Packet_UpdateSiegeStatus)) { break; }
-			const auto *packetData = reinterpret_cast<const Packet_UpdateSiegeStatus *>(data);
-			setClientSiegeStatus(packetData->status);
+			Packet_UpdateSiegeStatus packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			setClientSiegeStatus(packetData.status);
 		}
 		break;
 
 		case headerUpdateWorldTime:
 		{
 			if (size != sizeof(Packet_UpdateWorldTime)) { break; }
-			const auto *packetData = reinterpret_cast<const Packet_UpdateWorldTime *>(data);
-			setClientWorldTime(packetData->dayPhase, packetData->completedCycles,
-				packetData->advancing != 0);
+			Packet_UpdateWorldTime packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			setClientWorldTime(packetData.dayPhase, packetData.completedCycles,
+				packetData.advancing != 0);
 		}
 		break;
 
 		case headerUpdateWorldDifficulty:
 		{
 			if (size != sizeof(Packet_UpdateWorldDifficulty)) { break; }
-			const auto *packetData = reinterpret_cast<const Packet_UpdateWorldDifficulty *>(data);
+			Packet_UpdateWorldDifficulty packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 			WorldDifficultySettings settings;
-			settings.difficulty = static_cast<WorldDifficulty>(packetData->difficulty);
-			settings.hardcore = packetData->hardcore != 0;
+			settings.difficulty = static_cast<WorldDifficulty>(packetData.difficulty);
+			settings.hardcore = packetData.hardcore != 0;
 			settings.sanitize();
 			setClientWorldDifficultySettings(settings);
 		}
@@ -883,14 +895,15 @@ void recieveDataClient(ENetEvent &event,
 		case headerRecieveDamage:
 		{
 			if (sizeof(Packet_UpdateLife) != size) { break; }
-			Packet_UpdateLife *p = (Packet_UpdateLife *)data;
+			Packet_UpdateLife packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 
 			if (entityManager.localPlayer.justRecievedDamageTimer <= 0)
 			{
 				entityManager.localPlayer.lastLife = entityManager.localPlayer.life;
 			}
 
-			entityManager.localPlayer.life = p->life;
+			entityManager.localPlayer.life = packetData.life;
 
 			entityManager.localPlayer.justHealedTimer = 0;
 			entityManager.localPlayer.justRecievedDamageTimer = 0.7;
@@ -904,11 +917,12 @@ void recieveDataClient(ENetEvent &event,
 		case headerRecieveLife:
 		{
 			if (sizeof(Packet_UpdateLife) != size) { break; }
-			Packet_UpdateLife *p = (Packet_UpdateLife *)data;
+			Packet_UpdateLife packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 
 			entityManager.localPlayer.lastLife = entityManager.localPlayer.life;
 
-			entityManager.localPlayer.life = p->life;
+			entityManager.localPlayer.life = packetData.life;
 
 			entityManager.localPlayer.justHealedTimer = 0.7;
 			entityManager.localPlayer.justRecievedDamageTimer = 0;
@@ -920,14 +934,15 @@ void recieveDataClient(ENetEvent &event,
 		case headerRespawnPlayer:
 		{
 			if (sizeof(Packet_RespawnPlayer) != size) { break; }
-			Packet_RespawnPlayer *packetData = (Packet_RespawnPlayer *)data;
-			if (!mie::dataIntegrity::isFiniteWorldPosition(packetData->pos)) { break; }
+			Packet_RespawnPlayer packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
+			if (!mie::dataIntegrity::isFiniteWorldPosition(packetData.pos)) { break; }
 
 			//respawn yourself
 			if (p.cid == entityManager.localPlayer.entityId)
 			{
-				entityManager.localPlayer.entity.position = packetData->pos;
-				entityManager.localPlayer.entity.lastPosition = packetData->pos;
+				entityManager.localPlayer.entity.position = packetData.pos;
+				entityManager.localPlayer.entity.lastPosition = packetData.pos;
 				entityManager.localPlayer.entity.forces = {};
 				respawn = true;
 			}else
@@ -939,8 +954,8 @@ void recieveDataClient(ENetEvent &event,
 					found->second.wasKilled = 0;
 					found->second.flushCircularBuffer();
 
-					found->second.entityBuffered.position = packetData->pos;
-					found->second.entityBuffered.lastPosition = packetData->pos;
+					found->second.entityBuffered.position = packetData.pos;
+					found->second.entityBuffered.lastPosition = packetData.pos;
 					found->second.entityBuffered.forces = {};
 				}
 			}
@@ -951,19 +966,20 @@ void recieveDataClient(ENetEvent &event,
 		case headerUpdateEffects:
 		{
 			if (sizeof(Packet_UpdateEffects) != size) { break; }
-			Packet_UpdateEffects *packetData = (Packet_UpdateEffects *)data;
+			Packet_UpdateEffects packetData = {};
+			std::memcpy(&packetData, data, sizeof(packetData));
 
-			int timer = serverTimer - packetData->timer;
+			int timer = serverTimer - packetData.timer;
 
 			if (timer > 15'000) { break; } //probably coruption or the packet is somehow too old
 			if (timer < -4'000) { break; } //probably coruption
 
 			if (timer > 0)
 			{
-				packetData->effects.passTimeMs(timer);
+				packetData.effects.passTimeMs(timer);
 			}
 			
-			entityManager.localPlayer.effects = packetData->effects;
+			entityManager.localPlayer.effects = packetData.effects;
 
 			
 		}
@@ -1254,7 +1270,7 @@ bool createConnection(Packet_ReceiveCIDAndData &playerData, const char *c)
 				return false;
 			}
 
-			playerData = *(Packet_ReceiveCIDAndData *)data;
+			std::memcpy(&playerData, data, sizeof(playerData));
 
 			//send player own info or sthing
 			//sendPlayerData(e, true);

@@ -10,6 +10,7 @@
 #include <gameplay/pig.h>
 #include <gameplay/allentities.h>
 #include <iostream>
+#include <cstddef>
 
 struct UndoQueue;
 struct PlayerInventory;
@@ -93,6 +94,10 @@ struct ClientEntityManager : public EntityDataClient
 	void renderColiders(PointDebugRenderer &pointDebugRenderer, GyzmosRenderer &gyzmosRenderer, Camera &c);
 
 	void removeBlockEntity(glm::ivec3 pos, BlockType blockType);
+
+	// Block-backed entities are sparse. Removing them by their encoded position
+	// avoids scanning all 65,536 blocks whenever a chunk leaves render distance.
+	std::size_t removeBlockEntitiesInChunk(glm::ivec2 chunkPosition);
 
 	void addBlockEntity(glm::ivec3 pos, BlockType blockType);
 

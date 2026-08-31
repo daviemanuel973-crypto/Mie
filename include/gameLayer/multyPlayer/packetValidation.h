@@ -13,3 +13,8 @@ struct PacketPayloadRule
 bool getServerPacketPayloadRule(std::uint32_t header, PacketPayloadRule &rule);
 bool validateServerPacketPayload(std::uint32_t header, const char *data, std::size_t size);
 std::size_t maximumDecompressedServerPayload(std::uint32_t header);
+
+bool getClientPacketPayloadRule(std::uint32_t header, bool compressed,
+	PacketPayloadRule &rule);
+bool validateClientPacketPayload(std::uint32_t header, const char *data,
+	std::size_t size, bool compressed = false);

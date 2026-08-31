@@ -8,6 +8,7 @@
 #include <gameplay/items.h>
 #include <platformTools.h>
 #include <repeat.h>
+#include <gameplay/blockEntityChunk.h>
 
 
 template<class T>
@@ -576,6 +577,54 @@ void ClientEntityManager::removeBlockEntity(glm::ivec3 pos, BlockType blockType)
 
 }
 
+template<class T>
+std::size_t removeBlockEntitiesFromContainerInChunk(T &container,
+	const glm::ivec2 &chunkPosition)
+{
+	using Entity = decltype(container.begin()->second.entityBuffered);
+	if constexpr (!hasPositionBasedID<Entity>)
+	{
+		return 0;
+	}
+	else
+	{
+		std::size_t removed = 0;
+		for (auto it = container.begin(); it != container.end();)
+		{
+			const glm::ivec3 blockPosition = fromEntityIDToBlockPos(it->first);
+			if (!mie::clientEntities::blockPositionBelongsToChunk(
+				blockPosition, chunkPosition))
+			{
+				++it;
+				continue;
+			}
+
+			if constexpr (hasCleanup<decltype(it->second)>)
+			{
+				it->second.cleanup();
+			}
+			it = container.erase(it);
+			++removed;
+		}
+		return removed;
+	}
+}
+
+template <int... Is>
+std::size_t removeBlockEntitiesInChunkFromAllContainers(
+	std::integer_sequence<int, Is...>, ClientEntityManager &manager,
+	const glm::ivec2 &chunkPosition)
+{
+	return (removeBlockEntitiesFromContainerInChunk(
+		*manager.template entityGetter<Is>(), chunkPosition) + ... + 0u);
+}
+
+std::size_t ClientEntityManager::removeBlockEntitiesInChunk(glm::ivec2 chunkPosition)
+{
+	return removeBlockEntitiesInChunkFromAllContainers(
+		std::make_integer_sequence<int, EntitiesTypesCount>(), *this, chunkPosition);
+}
+
 void ClientEntityManager::addBlockEntity(glm::ivec3 pos, BlockType blockType)
 {
 
@@ -585,7 +634,6 @@ void ClientEntityManager::addBlockEntity(glm::ivec3 pos, BlockType blockType)
 	}
 
 }
-
 
 
 

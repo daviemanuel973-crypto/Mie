@@ -41,6 +41,7 @@ struct UndoQueue
 	EventId currentEventId = {1, 1};
 
 	std::deque<UndoQueueEvent> events;
+	std::uint64_t lastResyncRequestTime = 0;
 
 	void addPlaceBlockEvent(glm::ivec3 pos, Block old, Block newType, std::vector<unsigned char> data);
 	void changedBlockDataEvent(glm::ivec3 pos, Block block, std::vector<unsigned char> &dataToSteal);
@@ -49,4 +50,3 @@ struct UndoQueue
 	void addDropItemFromInventoryEvent(glm::dvec3 pos, std::uint64_t entityId);
 
 };
-

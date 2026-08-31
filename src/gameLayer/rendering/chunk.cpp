@@ -10,6 +10,7 @@
 #include <cstring>
 #include <gameplay/entity.h>
 #include <rendering/chunkGeometryOrder.h>
+#include <rendering/gpuBufferCapacity.h>
 
 #undef max
 #undef min
@@ -2038,6 +2039,8 @@ bool Chunk::bakeAndDontSendDataToOpenGl(Chunk *left,
 	if (updateGeometry)
 	{
 		setDirty(0);
+		transparentBlockPositions.clear();
+		decalBlockPositions.clear();
 		setNeighbourToLeft(left != nullptr);
 		setNeighbourToRight(right != nullptr);
 		setNeighbourToFront(front != nullptr);
@@ -2205,7 +2208,11 @@ bool Chunk::bakeAndDontSendDataToOpenGl(Chunk *left,
 					for (int y = 0; y < CHUNK_HEIGHT / 2; y++)
 					{
 						auto &b = unsafeGet(x, y, z, 1);
-						if (!b.air() && !b.isTransparentGeometry())
+						if (b.isTransparentGeometry())
+						{
+							transparentBlockPositions.push_back({x, y, z});
+						}
+						else if (!b.air())
 						{
 							blockBakeLogicForLods(x, y, z, &opaqueGeometry, b);
 						}
@@ -2219,6 +2226,14 @@ bool Chunk::bakeAndDontSendDataToOpenGl(Chunk *left,
 					for (int y = 0; y < CHUNK_HEIGHT; y++)
 					{
 						auto &b = unsafeGet(x, y, z);
+						if (b.isTransparentGeometry())
+						{
+							transparentBlockPositions.push_back({x, y, z});
+						}
+						else if (b.canHaveDecals() && b.getType() != BlockTypes::grassBlock)
+						{
+							decalBlockPositions.push_back({x, y, z});
+						}
 						if (!b.air())
 						{
 							auto type = b.getType();
@@ -2312,21 +2327,14 @@ bool Chunk::bakeAndDontSendDataToOpenGl(Chunk *left,
 
 		if (currentLod == 1)
 		{
-			for (int x = 0; x < CHUNK_SIZE/2; x++)
-				for (int z = 0; z < CHUNK_SIZE/2; z++)
-					for (int y = 0; y < CHUNK_HEIGHT/2; y++)
-					{
-						auto &b = unsafeGet(x, y, z, 1);
-
-						//transparent geometry doesn't include air
-						if (b.isTransparentGeometry())
-						{
-							glm::vec3 difference = playerPosition - glm::ivec3{x*2, y*2, z*2} - glm::ivec3{chunkPosX, 0, chunkPosZ};
-							float distance = glm::dot(difference, difference);
-							transparentCandidates.push_back({{x,y,z}, distance});
-						}
-
-					}
+			for (const glm::ivec3 &position : transparentBlockPositions)
+			{
+				glm::vec3 difference = playerPosition -
+					glm::ivec3{position.x * 2, position.y * 2, position.z * 2} -
+					glm::ivec3{chunkPosX, 0, chunkPosZ};
+				const float distance = glm::dot(difference, difference);
+				transparentCandidates.push_back({position, distance});
+			}
 
 			std::sort(transparentCandidates.begin(), transparentCandidates.end(), [](TransparentCandidate &a,
 				TransparentCandidate &b)
@@ -2343,25 +2351,19 @@ bool Chunk::bakeAndDontSendDataToOpenGl(Chunk *left,
 		}
 		else
 		{
-			for (int x = 0; x < CHUNK_SIZE; x++)
-				for (int z = 0; z < CHUNK_SIZE; z++)
-					for (int y = 0; y < CHUNK_HEIGHT; y++)
-					{
-						auto &b = unsafeGet(x, y, z);
-
-						//transparent geometry doesn't include air
-						if (b.isTransparentGeometry())
-						{
-							glm::vec3 difference = playerPosition - glm::ivec3{x, y, z} - glm::ivec3{chunkPosX, 0, chunkPosZ};
-							float distance = glm::dot(difference, difference);
-							transparentCandidates.push_back({{x,y,z}, distance});
-						}
-						else
-						{
-							blockBakeLogicForDecals(x, y, z, &transparentGeometry, b);
-						}
-						
-					}
+			for (const glm::ivec3 &position : transparentBlockPositions)
+			{
+				glm::vec3 difference = playerPosition - position -
+					glm::ivec3{chunkPosX, 0, chunkPosZ};
+				const float distance = glm::dot(difference, difference);
+				transparentCandidates.push_back({position, distance});
+			}
+			for (const glm::ivec3 &position : decalBlockPositions)
+			{
+				auto &block = unsafeGet(position.x, position.y, position.z);
+				blockBakeLogicForDecals(position.x, position.y, position.z,
+					&transparentGeometry, block);
+			}
 
 			std::sort(transparentCandidates.begin(), transparentCandidates.end(), [](TransparentCandidate &a,
 				TransparentCandidate &b)
@@ -2389,21 +2391,32 @@ void Chunk::sendDataToOpenGL(bool updateGeometry,
 	std::vector<int> &opaqueGeometry, std::vector<int> &transparentGeometry,
 	std::vector<glm::ivec4> &lights)
 {
+	auto uploadReusingCapacity = [](GLenum target, GLuint buffer, const void *data,
+		std::size_t bytes, GLenum usage, std::size_t &capacity)
+	{
+		glBindBuffer(target, buffer);
+		if (bytes > capacity)
+		{
+			capacity = mie::rendering::growGpuBufferCapacity(capacity, bytes);
+			glBufferData(target, capacity, nullptr, usage);
+		}
+		if (bytes > 0u)
+		{
+			glBufferSubData(target, 0, bytes, data);
+		}
+	};
 
 	if (updateGeometry)
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, opaqueGeometryBuffer);
-
-		//glBufferStorage(GL_ARRAY_BUFFER, opaqueGeometry.size() * sizeof(opaqueGeometry[0]),
-		//	opaqueGeometry.data(), GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT);
-		glBufferData(GL_ARRAY_BUFFER, opaqueGeometry.size() * sizeof(opaqueGeometry[0]),
-			opaqueGeometry.data(), GL_STATIC_DRAW);
+		uploadReusingCapacity(GL_ARRAY_BUFFER, opaqueGeometryBuffer,
+			opaqueGeometry.data(), opaqueGeometry.size() * sizeof(opaqueGeometry[0]),
+			GL_STATIC_DRAW, opaqueGeometryCapacityBytes);
 
 		elementCountSize = opaqueGeometry.size() / 4; //todo magic number
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsBuffer);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, lights.size() * sizeof(lights[0]),
-			lights.data(), GL_STREAM_READ);
+		uploadReusingCapacity(GL_SHADER_STORAGE_BUFFER, lightsBuffer,
+			lights.data(), lights.size() * sizeof(lights[0]), GL_STREAM_READ,
+			lightsCapacityBytes);
 		lightsElementCountSize = lights.size();
 
 		//gpuBuffer->addChunk({data.x, data.z}, opaqueGeometry);
@@ -2411,11 +2424,10 @@ void Chunk::sendDataToOpenGL(bool updateGeometry,
 
 	if (updateTransparency)
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, transparentGeometryBuffer);
-		glBufferData(GL_ARRAY_BUFFER, transparentGeometry.size() * sizeof(transparentGeometry[0]),
-			transparentGeometry.data(), GL_STATIC_DRAW);
-		//glBufferStorage(GL_ARRAY_BUFFER, transparentGeometry.size() * sizeof(transparentGeometry[0]),
-		//	transparentGeometry.data(), GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT);
+		uploadReusingCapacity(GL_ARRAY_BUFFER, transparentGeometryBuffer,
+			transparentGeometry.data(),
+			transparentGeometry.size() * sizeof(transparentGeometry[0]),
+			GL_STATIC_DRAW, transparentGeometryCapacityBytes);
 
 		transparentElementCountSize = transparentGeometry.size() / 4; //todo magic number
 	}
@@ -2527,6 +2539,9 @@ void Chunk::clearGpuData(BigGpuBuffer *gpuBuffer)
 	glDeleteBuffers(1, &lightsBuffer);
 	glDeleteVertexArrays(1, &vao);
 	glDeleteVertexArrays(1, &transparentVao);
+	opaqueGeometryCapacityBytes = 0;
+	transparentGeometryCapacityBytes = 0;
+	lightsCapacityBytes = 0;
 
 	if (gpuBuffer)
 	{

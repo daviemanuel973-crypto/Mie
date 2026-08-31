@@ -132,14 +132,21 @@ struct Chunk
 	GLuint opaqueGeometryIndex = 0;
 	GLuint vao = 0;
 	size_t elementCountSize = 0;
+	size_t opaqueGeometryCapacityBytes = 0;
 
 	GLuint transparentGeometryBuffer = 0;
 	GLuint transparentGeometryIndex = 0;
 	GLuint transparentVao = 0;
 	size_t transparentElementCountSize = 0;
+	size_t transparentGeometryCapacityBytes = 0;
+	// Rebuilt with opaque geometry. Camera movement can then re-sort only the
+	// sparse transparent/decal candidates instead of scanning every block.
+	std::vector<glm::ivec3> transparentBlockPositions;
+	std::vector<glm::ivec3> decalBlockPositions;
 
 	GLuint lightsBuffer = 0;
 	size_t lightsElementCountSize = 0;
+	size_t lightsCapacityBytes = 0;
 
 	unsigned char currentLod = 0;
 	std::bitset<16> flags = {};
@@ -238,5 +245,3 @@ struct Chunk
 };
 
 #undef DECLARE_FLAG
-
-

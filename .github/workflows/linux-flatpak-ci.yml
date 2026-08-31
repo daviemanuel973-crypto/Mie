@@ -299,6 +299,35 @@ jobs:
             -o runtimeFoundationTests
           ASAN_OPTIONS=detect_leaks=0 ./runtimeFoundationTests
 
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/actionResyncTests.cpp \
+            -o actionResyncTests
+          ./actionResyncTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/chunkStreamingBudgetTests.cpp \
+            -o chunkStreamingBudgetTests
+          ./chunkStreamingBudgetTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra \
+            -Iinclude \
+            -Iinclude/gameLayer \
+            -Ishared \
+            -Ithirdparty/glm \
+            -Ithirdparty/glad/include \
+            tests/blockEntityChunkTests.cpp \
+            src/gameLayer/metrics.cpp \
+            -o blockEntityChunkTests
+          ./blockEntityChunkTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/gpuBufferCapacityTests.cpp \
+            -o gpuBufferCapacityTests
+          ./gpuBufferCapacityTests
+
           c++ -std=c++17 -O1 -g -DNDEBUG -Wall -Wextra \
             -fsanitize=address,undefined -fno-omit-frame-pointer \
             -include include/platform/linuxLegacyCompat.h \

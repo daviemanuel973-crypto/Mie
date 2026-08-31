@@ -19,7 +19,7 @@ int main()
 {
 	REQUIRE(headerUpdateGuideProgress != headerUpdateWorldDifficulty);
 	REQUIRE(headerUpdateGuideProgress == 52);
-	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 2);
+	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 3);
 
 	Packet_PlaceBlocks oneBlock = {};
 	REQUIRE(validateServerPacketPayload(headerPlaceBlock,
@@ -73,6 +73,57 @@ int main()
 		8u * 1024u * 1024u);
 	REQUIRE(maximumDecompressedServerPayload(999999u) == 0u);
 
+	Packet_ClientDroppedItem droppedItem = {};
+	REQUIRE(validateClientPacketPayload(headerClientDroppedItem,
+		reinterpret_cast<const char *>(&droppedItem), sizeof(droppedItem)));
+	REQUIRE(!validateClientPacketPayload(headerClientDroppedItem,
+		reinterpret_cast<const char *>(&droppedItem), sizeof(droppedItem) - 1));
+	REQUIRE(validateClientPacketPayload(headerClientDroppedAllChunks, nullptr, 0));
+	REQUIRE(!validateClientPacketPayload(headerClientDroppedAllChunks,
+		reinterpret_cast<const char *>(&droppedItem), 1));
+
+	std::vector<char> overwrittenItem(sizeof(Packet_ClientOverWriteItem) + 3u);
+	Packet_ClientOverWriteItem overwrite = {};
+	overwrite.metadataSize = 3;
+	std::memcpy(overwrittenItem.data(), &overwrite, sizeof(overwrite));
+	REQUIRE(validateClientPacketPayload(headerClientOverWriteItem,
+		overwrittenItem.data(), overwrittenItem.size()));
+	overwrite.metadataSize = 4;
+	std::memcpy(overwrittenItem.data(), &overwrite, sizeof(overwrite));
+	REQUIRE(!validateClientPacketPayload(headerClientOverWriteItem,
+		overwrittenItem.data(), overwrittenItem.size()));
+
+	std::vector<char> clientBlockData(sizeof(Packet_ClientChangeBlockData) + 2u);
+	Packet_ClientChangeBlockData clientChange = {};
+	clientChange.blockDataHeader.dataSize = 2;
+	std::memcpy(clientBlockData.data(), &clientChange, sizeof(clientChange));
+	REQUIRE(validateClientPacketPayload(headerClientChangeBlockData,
+		clientBlockData.data(), clientBlockData.size()));
+	clientChange.blockDataHeader.dataSize = 1;
+	std::memcpy(clientBlockData.data(), &clientChange, sizeof(clientChange));
+	REQUIRE(!validateClientPacketPayload(headerClientChangeBlockData,
+		clientBlockData.data(), clientBlockData.size()));
+
+	REQUIRE(validateClientPacketPayload(headerSendPlayerSkin, skin.data(), skin.size(), false));
+	REQUIRE(!validateClientPacketPayload(headerSendPlayerSkin, skin.data(), skin.size() - 1, false));
+	REQUIRE(validateClientPacketPayload(headerSendPlayerSkin, skin.data(), 16, true));
+	REQUIRE(!validateClientPacketPayload(999999u,
+		reinterpret_cast<const char *>(&droppedItem), sizeof(droppedItem)));
+
+	std::vector<char> resync(sizeof(Packet_ClientRequestActionResync) +
+		2u * sizeof(Packet_BlockPositionWire));
+	Packet_ClientRequestActionResync resyncHeader = {};
+	resyncHeader.oldestEvent = {1, 1};
+	resyncHeader.blockPositionCount = 2;
+	std::memcpy(resync.data(), &resyncHeader, sizeof(resyncHeader));
+	REQUIRE(validateClientPacketPayload(headerClientRequestActionResync,
+		resync.data(), resync.size()));
+	resyncHeader.blockPositionCount = 3;
+	std::memcpy(resync.data(), &resyncHeader, sizeof(resyncHeader));
+	REQUIRE(!validateClientPacketPayload(headerClientRequestActionResync,
+		resync.data(), resync.size()));
+
+	#ifndef MIE_SKIP_COMPRESSION_TESTS
 	std::vector<char> repetitivePayload(256u * 1024u, 0);
 	size_t compressedSize = 0;
 	char *compressed = static_cast<char *>(compressDataForce(repetitivePayload.data(),
@@ -91,6 +142,7 @@ int main()
 	const char invalidFrame[] = "not-a-zstd-frame";
 	REQUIRE(unCompressDataBounded(invalidFrame, sizeof(invalidFrame), originalSize, 1024) == nullptr);
 	REQUIRE(originalSize == 0);
+	#endif
 
 	std::cout << "Packet validation tests passed.\n";
 	return 0;
