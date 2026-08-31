@@ -31,14 +31,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            cmake ninja-build xvfb xauth mesa-vulkan-drivers libgl1-mesa-dri libgl-dev \
+            cmake ninja-build gdb xvfb xauth mesa-vulkan-drivers libgl1-mesa-dri libgl-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libwayland-dev libxkbcommon-dev libzstd-dev
 
-      - name: Configure low-end native build
+      - name: Configure optimized diagnostic build
         run: |
           cmake -S . -B build-runtime-smoke -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_FLAGS_RELWITHDEBINFO='-O3 -g -DNDEBUG' \
+            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO='-O3 -g -DNDEBUG' \
             -DOURCRAFT_ENABLE_AVX2=OFF \
             -DOURCRAFT_LOW_END_BUILD=ON \
             -DBUILD_TESTING=OFF
@@ -46,7 +48,7 @@ jobs:
       - name: Build Mie
         run: cmake --build build-runtime-smoke --target ourCraft --parallel 2
 
-      - name: Run real server/client/world smoke
+      - name: Capture optimized runtime backtrace
         shell: bash
         run: |
           set -o pipefail
@@ -55,8 +57,12 @@ jobs:
           MIE_FRAME_LIMIT=30 \
           MESA_LOADER_DRIVER_OVERRIDE=zink \
           LIBGL_ALWAYS_SOFTWARE=1 \
-          timeout 120s xvfb-run -a -s '-screen 0 1280x720x24' \
-            ./build-runtime-smoke/ourCraft 2>&1 | tee runtime-smoke.log
+          timeout 180s xvfb-run -a -s '-screen 0 1280x720x24' \
+            gdb -q -batch \
+              -ex 'set pagination off' \
+              -ex run \
+              -ex 'thread apply all bt full' \
+              --args ./build-runtime-smoke/ourCraft 2>&1 | tee runtime-smoke.log
           test ! -e resources/worlds/__mie_runtime_smoke__
           grep -F '[runtime-smoke] PASS:' runtime-smoke.log
 
