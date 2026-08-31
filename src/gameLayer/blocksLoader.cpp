@@ -886,7 +886,13 @@ bool loadFromFileAndAddPadding(gl2d::Texture &t, const char *path)
 	int height = 0;
 	int channels = 0;
 
-	const unsigned char *decodedImage = stbi_load_from_memory(fileData, (int)fileSize, &width, &height, &channels, 4);
+	unsigned char *decodedImage = stbi_load_from_memory(fileData, (int)fileSize, &width, &height, &channels, 4);
+	if (!decodedImage || width <= 0 || height <= 0)
+	{
+		delete[] fileData;
+		STBI_FREE(decodedImage);
+		return false;
+	}
 
 	int PADDING = 28;
 	if (width < PADDING || height < PADDING)
@@ -895,7 +901,7 @@ bool loadFromFileAndAddPadding(gl2d::Texture &t, const char *path)
 		int newHeight = std::max(height, PADDING);
 
 		std::vector<unsigned char> newData;
-		newData.resize(4 * newWidth * newHeight, 0);
+		newData.resize(static_cast<std::size_t>(4) * newWidth * newHeight, 0);
 
 		int index = 0;
 		for (int y = 0; y < height; y++)
@@ -905,10 +911,14 @@ bool loadFromFileAndAddPadding(gl2d::Texture &t, const char *path)
 				int xx = x + std::max((PADDING - width) / 2, 0);
 				int yy = y + std::max((PADDING - height) / 2, 0);
 
-				newData[(xx + yy * newHeight) * 4 + 0] = decodedImage[index++];
-				newData[(xx + yy * newHeight) * 4 + 1] = decodedImage[index++];
-				newData[(xx + yy * newHeight) * 4 + 2] = decodedImage[index++];
-				newData[(xx + yy * newHeight) * 4 + 3] = decodedImage[index++];
+				// Rows are laid out by width. Using newHeight here overruns the
+				// destination whenever a padded texture is not square.
+				const std::size_t destination =
+					(static_cast<std::size_t>(xx) + static_cast<std::size_t>(yy) * newWidth) * 4;
+				newData[destination + 0] = decodedImage[index++];
+				newData[destination + 1] = decodedImage[index++];
+				newData[destination + 2] = decodedImage[index++];
+				newData[destination + 3] = decodedImage[index++];
 
 			}
 
