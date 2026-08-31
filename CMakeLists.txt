@@ -397,6 +397,12 @@ if (BUILD_TESTING)
 	endif()
 	add_test(NAME packet-validation COMMAND packetValidationTests)
 
+	add_executable(chunkGeometryOrderTests
+		tests/chunkGeometryOrderTests.cpp)
+	target_include_directories(chunkGeometryOrderTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME chunk-geometry-order COMMAND chunkGeometryOrderTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -417,5 +423,6 @@ if (BUILD_TESTING)
 		entity-id-allocator
 		runtime-foundation
 		packet-validation
+		chunk-geometry-order
 		PROPERTIES TIMEOUT 60)
 endif()
