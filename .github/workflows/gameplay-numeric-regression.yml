@@ -14,6 +14,8 @@ on:
       - 'src/gameLayer/gameplay/weaponStats.cpp'
       - 'src/gameLayer/gamePlayLogic.cpp'
       - 'src/gameLayer/chunkSystem.cpp'
+      - 'src/gameLayer/rendering/chunk.cpp'
+      - 'include/gameLayer/rendering/chunkGeometryOrder.h'
       - 'include/gameLayer/rendering/renderSettings.h'
       - 'src/gameLayer/gameplay/entity.cpp'
       - 'tests/entityStatsTests.cpp'
@@ -30,6 +32,8 @@ on:
       - 'src/gameLayer/gameplay/weaponStats.cpp'
       - 'src/gameLayer/gamePlayLogic.cpp'
       - 'src/gameLayer/chunkSystem.cpp'
+      - 'src/gameLayer/rendering/chunk.cpp'
+      - 'include/gameLayer/rendering/chunkGeometryOrder.h'
       - 'include/gameLayer/rendering/renderSettings.h'
       - 'src/gameLayer/gameplay/entity.cpp'
       - 'tests/entityStatsTests.cpp'
@@ -83,6 +87,16 @@ jobs:
 
       - name: Run interaction invalidation regression tests
         run: ./interactionInvalidationTests
+
+      - name: Compile optimized chunk geometry ordering regression
+        run: |
+          c++ -std=c++17 -O3 -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/chunkGeometryOrderTests.cpp \
+            -o chunkGeometryOrderTests
+
+      - name: Run optimized chunk geometry ordering regression
+        run: ./chunkGeometryOrderTests
 
       - name: Guard the negative-speed UI regression
         shell: bash
