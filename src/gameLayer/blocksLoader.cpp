@@ -939,6 +939,7 @@ void createFromFileDataWithAplhaFixing(gl2d::Texture &t, const unsigned char *im
 	int channels = 0;
 
 	unsigned char *decodedImage = stbi_load_from_memory(image_file_data, (int)image_file_size, &width, &height, &channels, 4);
+	if (!decodedImage || width <= 0 || height <= 0) { return; }
 
 	if (isNormalMap)
 	{
@@ -959,8 +960,8 @@ void createFromFileDataWithAplhaFixing(gl2d::Texture &t, const unsigned char *im
 	t.createFromBuffer((const char *)decodedImage, width, height, pixelated, useMipMaps);
 	
 
-	//Replace stbi allocators
-	free((void *)decodedImage);
+	// Match the custom stb_image new[] allocator configured by this project.
+	STBI_FREE(decodedImage);
 }
 
 bool loadFromFileWithAplhaFixing(gl2d::Texture &t, 
