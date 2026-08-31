@@ -1,0 +1,111 @@
+name: Runtime Soak
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-soak
+  cancel-in-progress: true
+
+jobs:
+  real-server-client-world-soak:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install native runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build xvfb xauth mesa-vulkan-drivers libgl1-mesa-dri libgl-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev libzstd-dev
+
+      - name: Configure low-end native build
+        run: |
+          cmake -S . -B build-runtime-soak -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOURCRAFT_ENABLE_AVX2=OFF \
+            -DOURCRAFT_LOW_END_BUILD=ON \
+            -DBUILD_TESTING=OFF
+
+      - name: Build Mie
+        run: cmake --build build-runtime-soak --target ourCraft --parallel 2
+
+      - name: Run 30-minute real world soak
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf resources/worlds/__mie_runtime_smoke__
+          MIE_RUNTIME_SMOKE_TEST=1 \
+          MIE_RUNTIME_SMOKE_SECONDS=1800 \
+          MIE_FRAME_LIMIT=30 \
+          MESA_LOADER_DRIVER_OVERRIDE=zink \
+          LIBGL_ALWAYS_SOFTWARE=1 \
+          timeout 2100s xvfb-run -a -s '-screen 0 1280x720x24' \
+            ./build-runtime-soak/ourCraft 2>&1 | tee runtime-soak.log
+          test ! -e resources/worlds/__mie_runtime_smoke__
+          grep -F '[runtime-smoke] PASS:' runtime-soak.log
+          cp mie-runtime-smoke-metrics.json runtime-soak-metrics.json
+
+      - name: Verify abrupt termination recovery
+        shell: bash
+        run: |
+          set -uo pipefail
+          rm -rf resources/worlds/__mie_runtime_smoke__
+          set +e
+          MIE_RUNTIME_SMOKE_TEST=1 \
+          MIE_RUNTIME_SMOKE_SECONDS=600 \
+          MIE_FRAME_LIMIT=30 \
+          MESA_LOADER_DRIVER_OVERRIDE=zink \
+          LIBGL_ALWAYS_SOFTWARE=1 \
+          timeout --signal=KILL 60s xvfb-run -a -s '-screen 0 1280x720x24' \
+            ./build-runtime-soak/ourCraft 2>&1 | tee runtime-recovery-crash.log
+          crash_status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$crash_status" -ne 124 && "$crash_status" -ne 137 ]]; then
+            echo "Expected forced timeout, got exit code $crash_status" >&2
+            exit 1
+          fi
+          test -d resources/worlds/__mie_runtime_smoke__
+
+          MIE_RUNTIME_SMOKE_TEST=1 \
+          MIE_RUNTIME_SMOKE_REUSE_WORLD=1 \
+          MIE_RUNTIME_SMOKE_SECONDS=3 \
+          MIE_FRAME_LIMIT=30 \
+          MESA_LOADER_DRIVER_OVERRIDE=zink \
+          LIBGL_ALWAYS_SOFTWARE=1 \
+          timeout 150s xvfb-run -a -s '-screen 0 1280x720x24' \
+            ./build-runtime-soak/ourCraft 2>&1 | tee runtime-recovery-reopen.log
+          grep -F '[runtime-smoke] PASS:' runtime-recovery-reopen.log
+          test ! -e resources/worlds/__mie_runtime_smoke__
+          cp mie-runtime-smoke-metrics.json runtime-recovery-metrics.json
+
+      - name: Upload soak log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-soak-failure-log
+          path: |
+            runtime-soak.log
+            runtime-recovery-*.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload soak frame metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-soak-frame-metrics
+          path: |
+            runtime-soak-metrics.json
+            runtime-recovery-metrics.json
+          if-no-files-found: warn
+          retention-days: 30

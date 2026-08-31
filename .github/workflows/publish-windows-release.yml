@@ -48,7 +48,7 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build --config Release --parallel 2
-          ctest --test-dir build -C Release --output-on-failure --timeout 60 -R '^(player-persistence-format|world-catalog|update-protocol|siege-director|world-difficulty|day-night-spawn-pressure|item-durability|native-systems|player-control-settings|entity-stats|survival-rules|furnace-recipes|furnace-block-runtime|recipe-discovery-persistence|recipe-book-discovery|farming-persistence|entity-id-allocator|runtime-foundation|packet-validation)$'
+          ctest --test-dir build -C Release -L mie --output-on-failure --timeout 60
 
       - name: Stage Windows package
         shell: pwsh

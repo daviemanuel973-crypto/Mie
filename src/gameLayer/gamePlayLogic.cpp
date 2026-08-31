@@ -19,6 +19,7 @@
 #include <iostream>
 #include "multyPlayer/undoQueue.h"
 #include "multyPlayer/interactionInvalidation.h"
+#include "multyPlayer/actionResync.h"
 #include <lightSystem.h>
 #include <structure.h>
 #include <safeSave.h>
@@ -44,6 +45,8 @@
 #include <cameraShaker.h>
 #include <cmath>
 #include <cstdint>
+#include <algorithm>
+#include <cstring>
 
 struct GameData
 {
@@ -423,15 +426,63 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 		if (!gameData.undoQueue.events.empty())
 		{
-			auto time = gameData.undoQueue.events[0].createTime;
-
-			//todo Request the server for a hard reset rather than a timeout?
-			//todo set networking problem effect when this happens
-			if ((getTimer() - time) > 20'000)
+			const std::uint64_t now = getTimer();
+			const auto &oldestEvent = gameData.undoQueue.events.front();
+			if (mie::network::shouldRequestActionResync(now, oldestEvent.createTime,
+				gameData.undoQueue.lastResyncRequestTime))
 			{
-				std::cout << "Client timeouted because of validate events!\n";
-				return 0;
+				constexpr std::size_t maximumBlockPositions = 64u;
+				std::vector<Packet_BlockPositionWire> blockPositions;
+				blockPositions.reserve(std::min(maximumBlockPositions,
+					gameData.undoQueue.events.size()));
+
+				for (const auto &event : gameData.undoQueue.events)
+				{
+					if (event.type != UndoQueueEvent::iPlacedBlock &&
+						event.type != UndoQueueEvent::changedBlockData)
+					{
+						continue;
+					}
+
+					const Packet_BlockPositionWire wirePosition = {
+						event.blockPos.x, event.blockPos.y, event.blockPos.z};
+					const bool alreadyIncluded = std::any_of(blockPositions.begin(),
+						blockPositions.end(), [&](const Packet_BlockPositionWire &existing)
+						{
+							return existing.x == wirePosition.x &&
+								existing.y == wirePosition.y &&
+								existing.z == wirePosition.z;
+						});
+					if (!alreadyIncluded) { blockPositions.push_back(wirePosition); }
+					if (blockPositions.size() == maximumBlockPositions) { break; }
+				}
+
+				Packet_ClientRequestActionResync request = {};
+				request.oldestEvent = oldestEvent.eventId;
+				request.blockPositionCount =
+					static_cast<std::uint16_t>(blockPositions.size());
+				std::vector<char> payload(sizeof(request) +
+					blockPositions.size() * sizeof(Packet_BlockPositionWire));
+				std::memcpy(payload.data(), &request, sizeof(request));
+				if (!blockPositions.empty())
+				{
+					std::memcpy(payload.data() + sizeof(request), blockPositions.data(),
+						blockPositions.size() * sizeof(Packet_BlockPositionWire));
+				}
+
+				sendPacket(getServer(), formatPacket(headerClientRequestActionResync),
+					payload.data(), payload.size(), true, channelChunksAndBlocks);
+				if (gameData.undoQueue.lastResyncRequestTime == 0)
+				{
+					gameData.chat.push_front("Network delay detected. Resynchronizing...");
+					gameData.chatStayOnTimer = std::max(gameData.chatStayOnTimer, 5.f);
+				}
+				gameData.undoQueue.lastResyncRequestTime = now;
 			}
+		}
+		else
+		{
+			gameData.undoQueue.lastResyncRequestTime = 0;
 		}
 
 		bool shouldExitBlockInteraction = 0;
@@ -472,6 +523,10 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				{
 					break;
 				}
+			}
+			if (gameData.undoQueue.events.empty())
+			{
+				gameData.undoQueue.lastResyncRequestTime = 0;
 			}
 		}
 
@@ -587,6 +642,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			}
 
 				gameData.undoQueue.events.clear();
+				gameData.undoQueue.lastResyncRequestTime = 0;
 				gameData.undoQueue.currentEventId.revision = invalidationPlan.nextRevision;
 			}
 		}

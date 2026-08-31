@@ -1615,17 +1615,6 @@ int ServerChunkStorer::unloadChunksThatNeedUnloading(WorldSaver &worldSaver, int
 	return unloaded;
 }
 
-bool ServerChunkStorer::entityAlreadyExists(std::uint64_t eid)
-{
-	//todo
-	//implement!
-
-	return false;
-}
-
-
-
-
 template<class T>
 std::uint64_t genericCheckEntitiesForCollisionWithBlock(T &container, glm::ivec3 position)
 {

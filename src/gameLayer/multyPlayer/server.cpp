@@ -12,6 +12,7 @@
 #include <enet/enet.h>
 #include "multyPlayer/packet.h"
 #include "multyPlayer/dataIntegrity.h"
+#include "multyPlayer/chunkStreamingBudget.h"
 #include "multyPlayer/enetServerFunction.h"
 #include <platformTools.h>
 #include <fstream>
@@ -1027,7 +1028,6 @@ void updateLoadedChunks(
 
 	constexpr const int MAX_GENERATE = 1;
 	constexpr const int MAX_LOAD = 5;
-	constexpr const int MAX_CHUNKS_PENDING = 5; //how many packets can be waiting to be sent at one time
 
 	for (auto &c : sd.chunkCache.savedChunks)
 	{
@@ -1161,8 +1161,12 @@ void updateLoadedChunks(
 
 			//number of chunks that are being sent rn
 			//stop sending more chunks than the pending number
-			int currentPendingChunks = client.chunksPacketPendingConfirmation.size();
-			if (currentPendingChunks > MAX_CHUNKS_PENDING) { canSendMoreChunks = false; }
+			const std::size_t currentPendingChunks =
+				client.chunksPacketPendingConfirmation.size();
+			if (!mie::network::canQueueAnotherChunkPacket(currentPendingChunks))
+			{
+				canSendMoreChunks = false;
+			}
 
 
 			//always generate the chunk player is in,

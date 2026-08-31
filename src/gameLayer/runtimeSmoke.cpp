@@ -8,6 +8,11 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <iomanip>
+#include <vector>
 
 bool hostServer(const std::string &path);
 
@@ -15,10 +20,11 @@ namespace
 {
 constexpr const char *SMOKE_WORLD_NAME = "__mie_runtime_smoke__";
 constexpr int MIN_SMOKE_FRAMES = 180;
-constexpr auto MIN_SMOKE_RUNTIME = std::chrono::seconds(3);
 // llvmpipe on the low-end CI runner can stay below 6 FPS while baking the first
 // visible chunks. Keep the 180-frame gate and allow it enough steady-state time.
-constexpr auto MAX_SMOKE_RUNTIME = std::chrono::seconds(90);
+constexpr auto DEFAULT_SMOKE_RUNTIME = std::chrono::seconds(3);
+constexpr auto SMOKE_STARTUP_GRACE = std::chrono::seconds(90);
+constexpr int MAX_CONFIGURED_SMOKE_SECONDS = 3'600;
 
 std::filesystem::path smokeWorldPath()
 {
@@ -29,6 +35,24 @@ std::chrono::steady_clock::time_point smokeStarted;
 int smokeFrames = 0;
 bool smokeBegan = false;
 bool smokeClockStarted = false;
+std::chrono::seconds minimumSmokeRuntime = DEFAULT_SMOKE_RUNTIME;
+std::vector<double> smokeFrameSeconds;
+
+std::chrono::seconds configuredSmokeRuntime()
+{
+    const char *value = std::getenv("MIE_RUNTIME_SMOKE_SECONDS");
+    if (!value || !*value) { return DEFAULT_SMOKE_RUNTIME; }
+    char *end = nullptr;
+    const long parsed = std::strtol(value, &end, 10);
+    if (end == value || *end != '\0' || parsed < DEFAULT_SMOKE_RUNTIME.count() ||
+        parsed > MAX_CONFIGURED_SMOKE_SECONDS)
+    {
+        std::cerr << "[runtime-smoke] invalid MIE_RUNTIME_SMOKE_SECONDS; using "
+            << DEFAULT_SMOKE_RUNTIME.count() << " seconds\n";
+        return DEFAULT_SMOKE_RUNTIME;
+    }
+    return std::chrono::seconds(parsed);
+}
 
 bool hasPersistedWorldData(const std::filesystem::path &root)
 {
@@ -50,6 +74,46 @@ void removeSmokeWorld()
         std::cerr << "[runtime-smoke] cleanup warning: " << ec.message() << "\n";
     }
 }
+
+double percentile(const std::vector<double> &sorted, double quantile)
+{
+    if (sorted.empty()) { return 0.0; }
+    const double scaled = quantile * static_cast<double>(sorted.size() - 1u);
+    const std::size_t lower = static_cast<std::size_t>(scaled);
+    const std::size_t upper = std::min(lower + 1u, sorted.size() - 1u);
+    const double fraction = scaled - static_cast<double>(lower);
+    return sorted[lower] + (sorted[upper] - sorted[lower]) * fraction;
+}
+
+void writeSmokeMetrics()
+{
+    std::vector<double> sorted = smokeFrameSeconds;
+    std::sort(sorted.begin(), sorted.end());
+    double total = 0.0;
+    for (double seconds : sorted) { total += seconds; }
+    const double averageSeconds = sorted.empty() ? 0.0 : total / sorted.size();
+    const double durationSeconds = smokeClockStarted
+        ? std::chrono::duration<double>(std::chrono::steady_clock::now() - smokeStarted).count()
+        : 0.0;
+
+    std::ofstream report("mie-runtime-smoke-metrics.json", std::ios::trunc);
+    if (!report)
+    {
+        std::cerr << "[runtime-smoke] could not write frame metrics\n";
+        return;
+    }
+    report << std::fixed << std::setprecision(6)
+        << "{\n"
+        << "  \"frames\": " << smokeFrames << ",\n"
+        << "  \"duration_seconds\": " << durationSeconds << ",\n"
+        << "  \"average_fps\": " << (averageSeconds > 0.0 ? 1.0 / averageSeconds : 0.0) << ",\n"
+        << "  \"frame_ms_average\": " << averageSeconds * 1000.0 << ",\n"
+        << "  \"frame_ms_p50\": " << percentile(sorted, 0.50) * 1000.0 << ",\n"
+        << "  \"frame_ms_p95\": " << percentile(sorted, 0.95) * 1000.0 << ",\n"
+        << "  \"frame_ms_p99\": " << percentile(sorted, 0.99) * 1000.0 << ",\n"
+        << "  \"frame_ms_max\": " << (sorted.empty() ? 0.0 : sorted.back() * 1000.0) << "\n"
+        << "}\n";
+}
 }
 
 bool runtimeSmokeRequested()
@@ -58,9 +122,24 @@ bool runtimeSmokeRequested()
     return value && std::string(value) == "1";
 }
 
+bool runtimeSmokeReusesExistingWorld()
+{
+    const char *value = std::getenv("MIE_RUNTIME_SMOKE_REUSE_WORLD");
+    return value && std::string(value) == "1";
+}
+
 bool beginRuntimeSmokeTest()
 {
-    removeSmokeWorld();
+    const bool reuseWorld = runtimeSmokeReusesExistingWorld();
+    if (!reuseWorld)
+    {
+        removeSmokeWorld();
+    }
+    else if (!hasPersistedWorldData(smokeWorldPath()))
+    {
+        std::cerr << "[runtime-smoke] recovery requested without persisted world data\n";
+        return false;
+    }
     std::error_code ec;
     std::filesystem::create_directories(smokeWorldPath(), ec);
     if (ec)
@@ -69,7 +148,8 @@ bool beginRuntimeSmokeTest()
         return false;
     }
 
-    std::cout << "[runtime-smoke] starting real local server/client world\n";
+    std::cout << "[runtime-smoke] starting real local server/client world"
+        << (reuseWorld ? " in recovery mode\n" : "\n");
     if (!hostServer(SMOKE_WORLD_NAME))
     {
         std::cerr << "[runtime-smoke] hostServer failed\n";
@@ -82,7 +162,9 @@ bool beginRuntimeSmokeTest()
     }
 
     smokeFrames = 0;
+    smokeFrameSeconds.clear();
     smokeBegan = true;
+    minimumSmokeRuntime = configuredSmokeRuntime();
     // Start the stability window after the first complete gameplay frame.
     // Slow software renderers can spend tens of seconds in their first frame,
     // which is startup cost rather than a steady-state hang.
@@ -90,7 +172,7 @@ bool beginRuntimeSmokeTest()
     return true;
 }
 
-RuntimeSmokeFrameResult runtimeSmokeFramePassed()
+RuntimeSmokeFrameResult runtimeSmokeFramePassed(double frameSeconds)
 {
     if (!smokeBegan) { return RuntimeSmokeFrameResult::failed; }
     ++smokeFrames;
@@ -100,6 +182,10 @@ RuntimeSmokeFrameResult runtimeSmokeFramePassed()
         smokeStarted = now;
         smokeClockStarted = true;
     }
+    else if (std::isfinite(frameSeconds) && frameSeconds >= 0.0)
+    {
+        smokeFrameSeconds.push_back(frameSeconds);
+    }
     const auto elapsed = now - smokeStarted;
 
     if (!isServerRunning())
@@ -107,12 +193,12 @@ RuntimeSmokeFrameResult runtimeSmokeFramePassed()
         std::cerr << "[runtime-smoke] server stopped after " << smokeFrames << " frames\n";
         return RuntimeSmokeFrameResult::failed;
     }
-    if (elapsed > MAX_SMOKE_RUNTIME)
+    if (elapsed > minimumSmokeRuntime + SMOKE_STARTUP_GRACE)
     {
         std::cerr << "[runtime-smoke] timed out before stable runtime gate\n";
         return RuntimeSmokeFrameResult::failed;
     }
-    if (smokeFrames >= MIN_SMOKE_FRAMES && elapsed >= MIN_SMOKE_RUNTIME)
+    if (smokeFrames >= MIN_SMOKE_FRAMES && elapsed >= minimumSmokeRuntime)
     {
         std::cout << "[runtime-smoke] runtime gate reached after " << smokeFrames << " frames\n";
         return RuntimeSmokeFrameResult::passed;
@@ -127,6 +213,7 @@ int finishRuntimeSmokeTest(bool runtimePassed)
     {
         std::cerr << "[runtime-smoke] no persisted world data was produced\n";
     }
+    writeSmokeMetrics();
     removeSmokeWorld();
     smokeBegan = false;
     smokeClockStarted = false;

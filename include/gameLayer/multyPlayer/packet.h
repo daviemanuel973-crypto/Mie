@@ -21,7 +21,7 @@
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
-constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 2;
+constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 3;
 
 struct EventId
 {
@@ -104,6 +104,7 @@ enum : std::uint32_t
 	headerUpdateWorldTime,
 	headerUpdateWorldDifficulty,
 	headerUpdateGuideProgress,
+	headerClientRequestActionResync,
 
 };
 
@@ -147,6 +148,20 @@ struct Packet_ClientIdentity
 {
 	std::uint32_t protocolVersion = MULTIPLAYER_PROTOCOL_VERSION;
 	PlayerIdentity identity = {};
+};
+
+struct Packet_BlockPositionWire
+{
+	std::int32_t x = 0;
+	std::int32_t y = 0;
+	std::int32_t z = 0;
+};
+
+struct Packet_ClientRequestActionResync
+{
+	EventId oldestEvent = {};
+	std::uint16_t blockPositionCount = 0;
+	// Followed by blockPositionCount Packet_BlockPositionWire records.
 };
 
 //also used for Packet_ClientDamageLocallyAndDied

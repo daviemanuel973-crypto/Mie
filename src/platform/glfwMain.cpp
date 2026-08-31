@@ -549,7 +549,7 @@ int main(int argc, char **argv)
 
 		if (runtimeSmoke)
 		{
-			const RuntimeSmokeFrameResult smokeResult = runtimeSmokeFramePassed();
+			const RuntimeSmokeFrameResult smokeResult = runtimeSmokeFramePassed(deltaTime);
 			if (smokeResult != RuntimeSmokeFrameResult::running)
 			{
 				closeGame();

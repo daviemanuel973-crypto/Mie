@@ -9,5 +9,5 @@ enum class RuntimeSmokeFrameResult
 
 bool runtimeSmokeRequested();
 bool beginRuntimeSmokeTest();
-RuntimeSmokeFrameResult runtimeSmokeFramePassed();
+RuntimeSmokeFrameResult runtimeSmokeFramePassed(double frameSeconds);
 int finishRuntimeSmokeTest(bool runtimePassed);

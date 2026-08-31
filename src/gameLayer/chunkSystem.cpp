@@ -460,16 +460,7 @@ void ChunkSystem::update(glm::ivec3 playerBlockPosition, float deltaTime, UndoQu
 					channelPlayerPositions);
 			}
 
-			auto &chunkData = chunk->data;
-			for (int blockX = 0; blockX < CHUNK_SIZE; ++blockX)
-				for (int blockZ = 0; blockZ < CHUNK_SIZE; ++blockZ)
-					for (int blockY = 0; blockY < CHUNK_HEIGHT; ++blockY)
-					{
-						clientEntityManager.removeBlockEntity(
-							{blockX + chunkData.x * CHUNK_SIZE, blockY,
-							 blockZ + chunkData.z * CHUNK_SIZE},
-							chunkData.blocks[blockX][blockZ][blockY].getType());
-					}
+			clientEntityManager.removeBlockEntitiesInChunk(chunkPos);
 			dropChunkAtIndexUnsafe(static_cast<int>(i), &gpuBuffer);
 		}
 
@@ -557,14 +548,7 @@ void ChunkSystem::update(glm::ivec3 playerBlockPosition, float deltaTime, UndoQu
 					channelPlayerPositions);
 
 
-				auto &chunkData = loadedChunks[i]->data;
-				for (int x = 0; x < CHUNK_SIZE; x++)
-					for (int z = 0; z < CHUNK_SIZE; z++)
-						for (int y = 0; y < CHUNK_HEIGHT; y++)
-						{
-							clientEntityManager.removeBlockEntity({x + chunkData.x * CHUNK_SIZE,y,z + chunkData.z * CHUNK_SIZE},
-								chunkData.blocks[x][z][y].getType());
-						}
+				clientEntityManager.removeBlockEntitiesInChunk(chunkPos);
 
 				//chunk no longer needed delete it
 				dropChunkAtIndexUnsafe(i, &gpuBuffer);
