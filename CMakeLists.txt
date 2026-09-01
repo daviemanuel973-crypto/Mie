@@ -457,6 +457,12 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME gpu-buffer-capacity COMMAND gpuBufferCapacityTests)
 
+	add_executable(randomIndexTests
+		tests/randomIndexTests.cpp)
+	target_include_directories(randomIndexTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	add_test(NAME random-index-bounds COMMAND randomIndexTests)
+
 	set_tests_properties(
 		player-persistence-format
 		world-catalog
@@ -486,6 +492,7 @@ if (BUILD_TESTING)
 		crafting-ui-selection
 		skin-format
 		gpu-buffer-capacity
+		random-index-bounds
 		PROPERTIES
 			TIMEOUT 60
 			LABELS "mie")

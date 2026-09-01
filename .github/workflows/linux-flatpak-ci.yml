@@ -328,6 +328,12 @@ jobs:
             -o gpuBufferCapacityTests
           ./gpuBufferCapacityTests
 
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
+            -Iinclude/gameLayer \
+            tests/randomIndexTests.cpp \
+            -o randomIndexTests
+          ./randomIndexTests
+
           c++ -std=c++17 -O1 -g -DNDEBUG -Wall -Wextra \
             -fsanitize=address,undefined -fno-omit-frame-pointer \
             -include include/platform/linuxLegacyCompat.h \
