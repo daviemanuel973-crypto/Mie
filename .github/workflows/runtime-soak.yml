@@ -60,8 +60,8 @@ jobs:
       - name: Install exact candidate bundle
         run: |
           flatpak install --user -y ./Mie-Survival-Linux-x86_64.flatpak
-          flatpak info --user io.github.daviemanuel973.Mie
-          test "$(flatpak info --user --show-version io.github.daviemanuel973.Mie)" = "$MIE_VERSION"
+          LC_ALL=C flatpak info --user io.github.daviemanuel973.Mie | \
+            grep -E "^[[:space:]]*Version:[[:space:]]+$MIE_VERSION$"
           flatpak run io.github.daviemanuel973.Mie --prepare-data-only
 
       - name: Run 30-minute installed Flatpak soak
