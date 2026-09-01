@@ -4,6 +4,7 @@
 #include <random>
 #include <glm/gtx/rotate_vector.hpp>
 #include <gameplay/entity.h>
+#include <gameplay/randomIndex.h>
 #include <chunk.h>
 #include <gameplay/player.h>	
 #include <array>
@@ -318,7 +319,11 @@ inline void AnimalBehaviour<E, SETTINGS>::updateAnimalBehaviour(float deltaTime,
 			{
 				//follow player.
 				waitTime = getRandomNumberFloat(rng, 4, 12); 
-				approachingPlayer = playersClose[getRandomNumber(rng, 0, playersClose.size())].first;
+				std::size_t playerIndex = 0;
+				if (trySelectRandomIndex(rng, playersClose.size(), playerIndex))
+				{
+					approachingPlayer = playersClose[playerIndex].first;
+				}
 			}
 			else
 			{
@@ -585,15 +590,10 @@ inline void AnimalBehaviour<E, SETTINGS>::updateAnimalBehaviour(float deltaTime,
 					if (lookAtPlayerFlag)
 					{
 						//look at player
-						int playerIndex = 0;
-						if (playersClose.size() > 1)
+						std::size_t playerIndex = 0;
+						if (trySelectRandomIndex(rng, playersClose.size(), playerIndex))
 						{
-							playerIndex = getRandomNumber(rng, 0, playersClose.size() - 1);
 							playerFollow = playersClose[playerIndex].first;
-						}
-						else
-						{
-							playerFollow = playersClose[0].first;
 						}
 						changeHeadTimer = getRandomNumberFloat(rng, 1, 8);
 					}
@@ -735,5 +735,4 @@ inline void AnimalBehaviour<E, SETTINGS>::configureSpawnSettings(std::minstd_ran
 	speedBase = getRandomNumberFloat(rng, SETTINGS::minSpeed, SETTINGS::maxSpeed);
 
 }
-
 

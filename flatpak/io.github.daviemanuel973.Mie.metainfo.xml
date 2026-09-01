@@ -20,6 +20,21 @@
     <name>Mie contributors</name>
   </developer>
   <releases>
+    <release version="0.9.7" date="2026-08-31">
+      <description>
+        <p>Network recovery, packet validation, chunk streaming and low-end renderer stabilization without new content.</p>
+      </description>
+    </release>
+    <release version="0.9.6" date="2026-08-31">
+      <description>
+        <p>Stability, incremental view-distance application and Minecraft-compatible skin system.</p>
+      </description>
+    </release>
+    <release version="0.9.5" date="2026-08-25">
+      <description>
+        <p>Input, camera, timing and persistence hardening for the v0.9 stabilization cycle.</p>
+      </description>
+    </release>
     <release version="0.9.4" date="2026-08-21">
       <description>
         <p>Gameplay, networking, save durability and low-end performance stabilization without new content.</p>

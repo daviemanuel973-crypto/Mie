@@ -1,6 +1,10 @@
-name: Runtime Soak
+name: Flatpak Runtime Soak
 
 on:
+  pull_request:
+    paths:
+      - 'flatpak/**'
+      - '.github/workflows/runtime-soak.yml'
   workflow_dispatch:
   schedule:
     - cron: '17 3 * * 0'
@@ -9,103 +13,141 @@ permissions:
   contents: read
 
 concurrency:
-  group: runtime-soak
+  group: flatpak-runtime-soak-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  real-server-client-world-soak:
+  installed-flatpak-server-client-world-soak:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install native runtime dependencies
+      - name: Resolve and verify release version
+        shell: bash
+        run: |
+          MIE_VERSION="$(tr -d '\r\n' < VERSION)"
+          if [[ ! "$MIE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "VERSION must contain a supported release version, got: '$MIE_VERSION'" >&2
+            exit 1
+          fi
+          echo "MIE_VERSION=$MIE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install Flatpak and headless display tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            cmake ninja-build xvfb xauth mesa-vulkan-drivers libgl1-mesa-dri libgl-dev \
-            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
-            libwayland-dev libxkbcommon-dev libzstd-dev
+          sudo apt-get install -y flatpak flatpak-builder xvfb xauth
 
-      - name: Configure low-end native build
+      - name: Configure Flathub
         run: |
-          cmake -S . -B build-runtime-soak -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DOURCRAFT_ENABLE_AVX2=OFF \
-            -DOURCRAFT_LOW_END_BUILD=ON \
-            -DBUILD_TESTING=OFF
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 
-      - name: Build Mie
-        run: cmake --build build-runtime-soak --target ourCraft --parallel 2
+      - name: Build standalone Flatpak bundle
+        shell: bash
+        run: |
+          set -o pipefail
+          flatpak-builder --user --force-clean --disable-rofiles-fuse \
+            --repo=flatpak-repo build-flatpak flatpak/io.github.daviemanuel973.Mie.yml \
+            2>&1 | tee flatpak-soak-build.log
+          flatpak build-bundle flatpak-repo Mie-Survival-Linux-x86_64.flatpak \
+            io.github.daviemanuel973.Mie stable \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          sha256sum Mie-Survival-Linux-x86_64.flatpak > \
+            Mie-Survival-Linux-x86_64.flatpak.sha256
 
-      - name: Run 30-minute real world soak
+      - name: Install exact candidate bundle
+        run: |
+          flatpak install --user -y ./Mie-Survival-Linux-x86_64.flatpak
+          LC_ALL=C flatpak info --user io.github.daviemanuel973.Mie | \
+            grep -E "^[[:space:]]*Version:[[:space:]]+$MIE_VERSION$"
+          flatpak run io.github.daviemanuel973.Mie --prepare-data-only
+
+      - name: Run 30-minute installed Flatpak soak
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf resources/worlds/__mie_runtime_smoke__
-          MIE_RUNTIME_SMOKE_TEST=1 \
-          MIE_RUNTIME_SMOKE_SECONDS=1800 \
-          MIE_FRAME_LIMIT=30 \
-          MESA_LOADER_DRIVER_OVERRIDE=zink \
-          LIBGL_ALWAYS_SOFTWARE=1 \
-          timeout 2100s xvfb-run -a -s '-screen 0 1280x720x24' \
-            ./build-runtime-soak/ourCraft 2>&1 | tee runtime-soak.log
-          test ! -e resources/worlds/__mie_runtime_smoke__
-          grep -F '[runtime-smoke] PASS:' runtime-soak.log
-          cp mie-runtime-smoke-metrics.json runtime-soak-metrics.json
+          data_root="$HOME/.var/app/io.github.daviemanuel973.Mie/data/ourcraft"
+          rm -rf "$data_root/resources/worlds/__mie_runtime_smoke__"
+          rm -f "$data_root/mie-runtime-smoke-metrics.json"
 
-      - name: Verify abrupt termination recovery
+          timeout 2100s xvfb-run -a -s '-screen 0 1280x720x24' \
+            flatpak run \
+              --env=MIE_RUNTIME_SMOKE_TEST=1 \
+              --env=MIE_RUNTIME_SMOKE_SECONDS=1800 \
+              --env=MIE_FRAME_LIMIT=30 \
+              --env=LIBGL_ALWAYS_SOFTWARE=1 \
+              io.github.daviemanuel973.Mie \
+            2>&1 | tee flatpak-runtime-soak.log
+
+          test ! -e "$data_root/resources/worlds/__mie_runtime_smoke__"
+          grep -F '[runtime-smoke] PASS:' flatpak-runtime-soak.log
+          test -s "$data_root/mie-runtime-smoke-metrics.json"
+          cp "$data_root/mie-runtime-smoke-metrics.json" flatpak-runtime-soak-metrics.json
+
+      - name: Verify Flatpak recovery after abrupt termination
         shell: bash
         run: |
-          set -uo pipefail
-          rm -rf resources/worlds/__mie_runtime_smoke__
+          set -euo pipefail
+          app_id='io.github.daviemanuel973.Mie'
+          data_root="$HOME/.var/app/$app_id/data/ourcraft"
+          rm -rf "$data_root/resources/worlds/__mie_runtime_smoke__"
+          rm -f "$data_root/mie-runtime-smoke-metrics.json"
+
           set +e
-          MIE_RUNTIME_SMOKE_TEST=1 \
-          MIE_RUNTIME_SMOKE_SECONDS=600 \
-          MIE_FRAME_LIMIT=30 \
-          MESA_LOADER_DRIVER_OVERRIDE=zink \
-          LIBGL_ALWAYS_SOFTWARE=1 \
           timeout --signal=KILL 60s xvfb-run -a -s '-screen 0 1280x720x24' \
-            ./build-runtime-soak/ourCraft 2>&1 | tee runtime-recovery-crash.log
+            flatpak run \
+              --env=MIE_RUNTIME_SMOKE_TEST=1 \
+              --env=MIE_RUNTIME_SMOKE_SECONDS=600 \
+              --env=MIE_FRAME_LIMIT=30 \
+              --env=LIBGL_ALWAYS_SOFTWARE=1 \
+              "$app_id" \
+            2>&1 | tee flatpak-recovery-crash.log
           crash_status=${PIPESTATUS[0]}
           set -e
           if [[ "$crash_status" -ne 124 && "$crash_status" -ne 137 ]]; then
             echo "Expected forced timeout, got exit code $crash_status" >&2
             exit 1
           fi
-          test -d resources/worlds/__mie_runtime_smoke__
+          flatpak kill "$app_id" 2>/dev/null || true
+          test -d "$data_root/resources/worlds/__mie_runtime_smoke__"
 
-          MIE_RUNTIME_SMOKE_TEST=1 \
-          MIE_RUNTIME_SMOKE_REUSE_WORLD=1 \
-          MIE_RUNTIME_SMOKE_SECONDS=3 \
-          MIE_FRAME_LIMIT=30 \
-          MESA_LOADER_DRIVER_OVERRIDE=zink \
-          LIBGL_ALWAYS_SOFTWARE=1 \
           timeout 150s xvfb-run -a -s '-screen 0 1280x720x24' \
-            ./build-runtime-soak/ourCraft 2>&1 | tee runtime-recovery-reopen.log
-          grep -F '[runtime-smoke] PASS:' runtime-recovery-reopen.log
-          test ! -e resources/worlds/__mie_runtime_smoke__
-          cp mie-runtime-smoke-metrics.json runtime-recovery-metrics.json
+            flatpak run \
+              --env=MIE_RUNTIME_SMOKE_TEST=1 \
+              --env=MIE_RUNTIME_SMOKE_REUSE_WORLD=1 \
+              --env=MIE_RUNTIME_SMOKE_SECONDS=3 \
+              --env=MIE_FRAME_LIMIT=30 \
+              --env=LIBGL_ALWAYS_SOFTWARE=1 \
+              "$app_id" \
+            2>&1 | tee flatpak-recovery-reopen.log
 
-      - name: Upload soak log on failure
+          grep -F '[runtime-smoke] PASS:' flatpak-recovery-reopen.log
+          test ! -e "$data_root/resources/worlds/__mie_runtime_smoke__"
+          test -s "$data_root/mie-runtime-smoke-metrics.json"
+          cp "$data_root/mie-runtime-smoke-metrics.json" flatpak-recovery-metrics.json
+
+      - name: Upload Flatpak soak diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: runtime-soak-failure-log
+          name: flatpak-runtime-soak-failure-log
           path: |
-            runtime-soak.log
-            runtime-recovery-*.log
+            flatpak-soak-build.log
+            flatpak-runtime-soak.log
+            flatpak-recovery-*.log
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Upload soak frame metrics
+      - name: Upload tested Flatpak metrics and checksum
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: runtime-soak-frame-metrics
+          name: flatpak-runtime-soak-results-v${{ env.MIE_VERSION }}
           path: |
-            runtime-soak-metrics.json
-            runtime-recovery-metrics.json
+            flatpak-runtime-soak-metrics.json
+            flatpak-recovery-metrics.json
+            Mie-Survival-Linux-x86_64.flatpak.sha256
           if-no-files-found: warn
           retention-days: 30
