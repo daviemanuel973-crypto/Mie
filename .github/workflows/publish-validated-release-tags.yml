@@ -22,7 +22,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: publish-release-tags-${{ inputs.version || '0.9.6' }}
+  group: publish-release-tags-${{ inputs.version || '0.9.7' }}
   cancel-in-progress: false
 
 jobs:
@@ -34,14 +34,14 @@ jobs:
       - name: Checkout validated commit
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.target_sha || 'b5e42c61940fca730fe0b79a8c5c4f0d92752f3a' }}
+          ref: ${{ inputs.target_sha || '19a7d2f2d5c55eca2a808e2054582eb1711a43d8' }}
           fetch-depth: 0
 
       - name: Validate version and target
         shell: bash
         env:
-          RELEASE_VERSION: ${{ inputs.version || '0.9.6' }}
-          TARGET_SHA: ${{ inputs.target_sha || 'b5e42c61940fca730fe0b79a8c5c4f0d92752f3a' }}
+          RELEASE_VERSION: ${{ inputs.version || '0.9.7' }}
+          TARGET_SHA: ${{ inputs.target_sha || '19a7d2f2d5c55eca2a808e2054582eb1711a43d8' }}
         run: |
           set -euo pipefail
 
@@ -76,8 +76,8 @@ jobs:
         id: release_tags
         shell: bash
         env:
-          RELEASE_VERSION: ${{ inputs.version || '0.9.6' }}
-          TARGET_SHA: ${{ inputs.target_sha || 'b5e42c61940fca730fe0b79a8c5c4f0d92752f3a' }}
+          RELEASE_VERSION: ${{ inputs.version || '0.9.7' }}
+          TARGET_SHA: ${{ inputs.target_sha || '19a7d2f2d5c55eca2a808e2054582eb1711a43d8' }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -114,7 +114,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_VERSION: ${{ inputs.version || '0.9.6' }}
+          RELEASE_VERSION: ${{ inputs.version || '0.9.7' }}
         run: gh workflow run publish-windows-release.yml --repo "$GH_REPO" --ref "v$RELEASE_VERSION"
 
       - name: Dispatch Flatpak repository publication
@@ -123,5 +123,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_VERSION: ${{ inputs.version || '0.9.6' }}
+          RELEASE_VERSION: ${{ inputs.version || '0.9.7' }}
         run: gh workflow run publish-flatpak-pages.yml --repo "$GH_REPO" --ref "linux-v$RELEASE_VERSION"
