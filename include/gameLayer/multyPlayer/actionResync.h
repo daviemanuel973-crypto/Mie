@@ -17,4 +17,10 @@ namespace mie::network
 		return lastRequestTime == 0 ||
 			(now >= lastRequestTime && now - lastRequestTime >= ACTION_RESYNC_RETRY_MS);
 	}
+
+	inline bool droppedItemRevisionRequiresInventoryResync(std::uint8_t serverRevision,
+		std::uint8_t requestRevision)
+	{
+		return serverRevision != requestRevision;
+	}
 }
