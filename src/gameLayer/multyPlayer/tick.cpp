@@ -1158,7 +1158,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						//we tell the player to kill that item.
 						bool killItem = 0;
 
-						if (!mie::network::droppedItemRevisionRequiresInventoryResync(
+						if (!mie::network::droppedItemRevisionIsStale(
 							client->playerData.inventory.revisionNumber, i.t.revisionNumber))
 						{
 
@@ -1252,6 +1252,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							//std::cout << "Recieved revision : "
 							//	<< (int)i.t.revisionNumber << "\n";
 
+							computeRevisionStuff(*client, false, i.t.eventId);
 							sendPlayerInventoryAndIncrementRevision(*client);
 							killItem = true;
 						}
