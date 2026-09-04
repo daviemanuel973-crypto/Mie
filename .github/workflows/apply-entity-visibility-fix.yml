@@ -1,0 +1,137 @@
+name: Apply entity visibility fix
+
+on:
+  push:
+    branches:
+      - fix/v0.10-entity-chunk-visibility
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply focused streaming/rendering fix
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          renderer_path = Path('src/gameLayer/rendering/renderer.cpp')
+          text = renderer_path.read_text(encoding='utf-8')
+
+          old = '''\tstd::minstd_rand rng{std::random_device()()};
+
+\tauto renderAllEntitiesOfOneType = [&](Model &model, auto &container, bool isPlayers = 0,
+\t\tGLuint64 playerTextureOverride = 0)
+\t{
+'''
+          new = '''\tstd::minstd_rand rng{std::random_device()()};
+
+\tauto entityChunkReadyForRendering = [&](const auto &entry)
+\t{
+\t\tglm::ivec3 blockPos = {};
+\t\tif constexpr (hasPositionBasedID<decltype(entry.second.entityBuffered)>)
+\t\t{
+\t\t\tblockPos = fromEntityIDToBlockPos(entry.first);
+\t\t}
+\t\telse
+\t\t{
+\t\t\tblockPos = from3DPointToBlock(entry.second.getRubberBandPosition());
+\t\t}
+
+\t\tChunk *chunk = chunkSystem.getChunkSafeFromChunkPos(
+\t\t\tdivideChunk(blockPos.x), divideChunk(blockPos.z));
+\t\treturn chunk && !chunk->isDontDrawYet();
+\t};
+
+\tauto renderAllEntitiesOfOneType = [&](Model &model, auto &container, bool isPlayers = 0,
+\t\tGLuint64 playerTextureOverride = 0, bool requireReadyChunk = true)
+\t{
+'''
+          if old not in text:
+              raise SystemExit('renderer anchor 1 not found')
+          text = text.replace(old, new, 1)
+
+          old = '''\t\tfor (auto &e : container)
+\t\t{
+\t\t\tPerEntityData data = {};
+'''
+          new = '''\t\tfor (auto &e : container)
+\t\t{
+\t\t\tif (requireReadyChunk && !entityChunkReadyForRendering(e)) { continue; }
+
+\t\t\tPerEntityData data = {};
+'''
+          if old not in text:
+              raise SystemExit('renderer anchor 2 not found')
+          text = text.replace(old, new, 1)
+
+          old = '''\trenderAllEntitiesOfOneType(modelsManager.human, entityManager.localPlayersForRendering,
+\t\ttrue, currentSkinBindlessTexture);
+'''
+          new = '''\trenderAllEntitiesOfOneType(modelsManager.human, entityManager.localPlayersForRendering,
+\t\ttrue, currentSkinBindlessTexture, false);
+'''
+          if old not in text:
+              raise SystemExit('renderer anchor 3 not found')
+          text = text.replace(old, new, 1)
+
+          old = '''\t\t\tfor (auto &e : entityManager.droppedItems)
+\t\t\t{
+\t\t\t\tif (!isBlock(e.second.entityBuffered.type)) { continue; }
+'''
+          new = '''\t\t\tfor (auto &e : entityManager.droppedItems)
+\t\t\t{
+\t\t\t\tif (!entityChunkReadyForRendering(e)) { continue; }
+\t\t\t\tif (!isBlock(e.second.entityBuffered.type)) { continue; }
+'''
+          if old not in text:
+              raise SystemExit('renderer anchor 4 not found')
+          text = text.replace(old, new, 1)
+
+          old = '''\t\tfor (auto &e : entityManager.droppedItems)
+\t\t{
+\t\t\t//continue;
+\t\t\tif (isBlock(e.second.entityBuffered.type)) { continue; }
+'''
+          new = '''\t\tfor (auto &e : entityManager.droppedItems)
+\t\t{
+\t\t\t//continue;
+\t\t\tif (!entityChunkReadyForRendering(e)) { continue; }
+\t\t\tif (isBlock(e.second.entityBuffered.type)) { continue; }
+'''
+          if old not in text:
+              raise SystemExit('renderer anchor 5 not found')
+          text = text.replace(old, new, 1)
+
+          renderer_path.write_text(text, encoding='utf-8')
+
+          todo_path = Path('todo.txt')
+          todo = todo_path.read_text(encoding='utf-8')
+          todo = todo.replace('entities of not visible yet chunks should not be visible to the player\n\n', '', 1)
+          todo = todo.replace('changing the view distance should not reset all the chunks\n\n\n', '', 1)
+          todo_path.write_text(todo, encoding='utf-8')
+
+          harder_path = Path('hardertodos.md')
+          harder = harder_path.read_text(encoding='utf-8')
+          harder = harder.replace('- todo: fix camera move when exiting inventory\n', '', 1)
+          harder_path.write_text(harder, encoding='utf-8')
+
+          workflow = Path('.github/workflows/apply-entity-visibility-fix.yml')
+          workflow.unlink()
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(rendering): hide entities until chunks are renderable"
+          git push origin HEAD:fix/v0.10-entity-chunk-visibility
