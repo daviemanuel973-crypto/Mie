@@ -4614,7 +4614,7 @@ void Renderer::renderEntities(
 
 	std::minstd_rand rng{std::random_device()()};
 
-	auto entityChunkReadyForRendering = [&](const auto &entry)
+	auto entityChunkReadyForRendering = [&](auto &entry)
 	{
 		glm::ivec3 blockPos = {};
 		if constexpr (hasPositionBasedID<decltype(entry.second.entityBuffered)>)
