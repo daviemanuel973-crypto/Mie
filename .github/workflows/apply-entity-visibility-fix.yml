@@ -3,14 +3,13 @@ name: Apply entity visibility fix
 on:
   push:
     branches:
-      - fix/v0.10-entity-chunk-visibility
+      - "fix/v0.10-entity-chunk-visibility"
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -125,8 +124,7 @@ jobs:
           harder = harder.replace('- todo: fix camera move when exiting inventory\n', '', 1)
           harder_path.write_text(harder, encoding='utf-8')
 
-          workflow = Path('.github/workflows/apply-entity-visibility-fix.yml')
-          workflow.unlink()
+          Path('.github/workflows/apply-entity-visibility-fix.yml').unlink()
           PY
 
           git config user.name "github-actions[bot]"
