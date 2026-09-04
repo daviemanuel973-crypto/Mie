@@ -4614,8 +4614,25 @@ void Renderer::renderEntities(
 
 	std::minstd_rand rng{std::random_device()()};
 
+	auto entityChunkReadyForRendering = [&](auto &entry)
+	{
+		glm::ivec3 blockPos = {};
+		if constexpr (hasPositionBasedID<decltype(entry.second.entityBuffered)>)
+		{
+			blockPos = fromEntityIDToBlockPos(entry.first);
+		}
+		else
+		{
+			blockPos = from3DPointToBlock(entry.second.getRubberBandPosition());
+		}
+
+		Chunk *chunk = chunkSystem.getChunkSafeFromChunkPos(
+			divideChunk(blockPos.x), divideChunk(blockPos.z));
+		return chunk && !chunk->isDontDrawYet();
+	};
+
 	auto renderAllEntitiesOfOneType = [&](Model &model, auto &container, bool isPlayers = 0,
-		GLuint64 playerTextureOverride = 0)
+		GLuint64 playerTextureOverride = 0, bool requireReadyChunk = true)
 	{
 
 		if (container.empty() || model.transforms.empty() || model.vertexCount == 0 || model.vao == 0)
@@ -4635,6 +4652,8 @@ void Renderer::renderEntities(
 
 		for (auto &e : container)
 		{
+			if (requireReadyChunk && !entityChunkReadyForRendering(e)) { continue; }
+
 			PerEntityData data = {};
 
 			glm::mat4 rotMatrix(1.f);
@@ -4821,7 +4840,7 @@ void Renderer::renderEntities(
 	entityRenderer.itemEntitiesToRender.clear();
 
 	renderAllEntitiesOfOneType(modelsManager.human, entityManager.localPlayersForRendering,
-		true, currentSkinBindlessTexture);
+		true, currentSkinBindlessTexture, false);
 	renderAllEntitiesOfOneType(modelsManager.human, entityManager.players, true);
 	renderAllEntitiesOfOneType(modelsManager.human, entityManager.zombies);
 	renderAllEntitiesOfOneType(modelsManager.pig, entityManager.pigs);
@@ -4888,6 +4907,7 @@ void Renderer::renderEntities(
 			//todo instance rendering
 			for (auto &e : entityManager.droppedItems)
 			{
+				if (!entityChunkReadyForRendering(e)) { continue; }
 				if (!isBlock(e.second.entityBuffered.type)) { continue; }
 
 				//todo something better here lol
@@ -5095,6 +5115,7 @@ void Renderer::renderEntities(
 		for (auto &e : entityManager.droppedItems)
 		{
 			//continue;
+			if (!entityChunkReadyForRendering(e)) { continue; }
 			if (isBlock(e.second.entityBuffered.type)) { continue; }
 			if (!e.second.entityBuffered.type) { continue; }
 
