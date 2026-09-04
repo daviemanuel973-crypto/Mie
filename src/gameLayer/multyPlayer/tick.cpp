@@ -16,6 +16,7 @@
 #include <gameplay/itemDurability.h>
 #include <multyPlayer/dataIntegrity.h>
 #include <multyPlayer/actionResync.h>
+#include <multyPlayer/serverActionValidation.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
