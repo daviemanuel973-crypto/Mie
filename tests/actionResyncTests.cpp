@@ -19,10 +19,10 @@ int main()
 	REQUIRE(shouldRequestActionResync(25'000, 0, 20'000));
 	REQUIRE(!shouldRequestActionResync(100, 200, 0));
 
-	using mie::network::droppedItemRevisionRequiresInventoryResync;
-	REQUIRE(!droppedItemRevisionRequiresInventoryResync(7, 7));
-	REQUIRE(droppedItemRevisionRequiresInventoryResync(7, 6));
-	REQUIRE(droppedItemRevisionRequiresInventoryResync(0, 255));
+	using mie::network::droppedItemRevisionIsStale;
+	REQUIRE(!droppedItemRevisionIsStale(7, 7));
+	REQUIRE(droppedItemRevisionIsStale(7, 6));
+	REQUIRE(droppedItemRevisionIsStale(0, 255));
 
 	std::cout << "Action resync tests passed.\n";
 	return 0;
