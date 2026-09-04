@@ -31,7 +31,7 @@ int main()
 	check(discovery.learnType(RecipeDiscovery::FirstItemType),
 		"the first legacy item type can be learned");
 	check(discovery.learnType(RecipeDiscovery::LastItemTypeExclusive - 1),
-		"the last v0.9 item type can be learned");
+		"the last v0.10 item type can be learned");
 	check(discovery.knowsType(5) &&
 		discovery.knowsType(RecipeDiscovery::FirstItemType) &&
 		discovery.knowsType(RecipeDiscovery::LastItemTypeExclusive - 1),
@@ -49,6 +49,23 @@ int main()
 		static_cast<int>(RecipeDiscovery::SerializedBytes), "a valid payload parses exactly");
 	check(decoded == discovery, "recipe discovery round-trips without losing types");
 
+	// v0.9 used discovery format 1 with a 45-byte payload. A v0.10 reader must
+	// preserve those bits and initialize only the newly appended item bits to 0.
+	auto legacyPayload = payload;
+	legacyPayload[4] = 1;
+	legacyPayload[5] = static_cast<unsigned char>(RecipeDiscovery::LegacyV09StorageBytes);
+	legacyPayload[6] = 0;
+	legacyPayload.resize(RecipeDiscovery::HeaderBytes +
+		RecipeDiscovery::LegacyV09StorageBytes);
+	RecipeDiscovery migrated;
+	check(migrated.readFromData(legacyPayload.data(), legacyPayload.size()) ==
+		static_cast<int>(legacyPayload.size()), "a v0.9 discovery payload migrates");
+	check(migrated.knowsType(5) &&
+		migrated.knowsType(RecipeDiscovery::FirstItemType),
+		"v0.9 learned material bits survive migration");
+	check(!migrated.knowsType(RecipeDiscovery::LastItemTypeExclusive - 5),
+		"v0.10 materials are not learned accidentally during migration");
+
 	for (std::size_t size = 0; size < payload.size(); ++size)
 	{
 		RecipeDiscovery truncated;
@@ -61,7 +78,7 @@ int main()
 	check(decoded.readFromData(badMagic.data(), badMagic.size()) < 0,
 		"invalid discovery magic is rejected");
 	auto badVersion = payload;
-	badVersion[4] = 2;
+	badVersion[4] = 3;
 	check(decoded.readFromData(badVersion.data(), badVersion.size()) < 0,
 		"future discovery versions are rejected safely");
 	auto badLength = payload;

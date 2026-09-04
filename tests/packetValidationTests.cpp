@@ -19,7 +19,7 @@ int main()
 {
 	REQUIRE(headerUpdateGuideProgress != headerUpdateWorldDifficulty);
 	REQUIRE(headerUpdateGuideProgress == 52);
-	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 3);
+	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 4);
 
 	Packet_PlaceBlocks oneBlock = {};
 	REQUIRE(validateServerPacketPayload(headerPlaceBlock,

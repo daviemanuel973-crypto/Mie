@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "version": "0.10.0",
+  "items": [
+    {"id": 2194, "key": "mie:item/carrot"},
+    {"id": 2195, "key": "mie:item/potato"},
+    {"id": 2196, "key": "mie:item/baked_potato"},
+    {"id": 2197, "key": "mie:item/vegetable_stew"},
+    {"id": 2198, "key": "mie:item/berry_porridge"}
+  ],
+  "crops": [
+    {"item": "mie:item/carrot", "growthSeconds": 360, "harvestCount": 2},
+    {"item": "mie:item/potato", "growthSeconds": 390, "harvestCount": 3}
+  ],
+  "recipes": [
+    {"index": 108, "key": "mie:recipe/bake_potato", "station": "mie:machine/cooking_pot"},
+    {"index": 109, "key": "mie:recipe/cook_vegetable_stew", "station": "mie:machine/cooking_pot"},
+    {"index": 110, "key": "mie:recipe/cook_berry_porridge", "station": "mie:machine/cooking_pot"}
+  ]
+}

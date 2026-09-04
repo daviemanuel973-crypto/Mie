@@ -20,6 +20,11 @@
     <name>Mie contributors</name>
   </developer>
   <releases>
+    <release version="0.10.0" date="2026-09-04">
+      <description>
+        <p>First subsistence content slice with root crops, new cooking-pot meals and save-compatible recipe discovery.</p>
+      </description>
+    </release>
     <release version="0.9.7" date="2026-08-31">
       <description>
         <p>Network recovery, packet validation, chunk streaming and low-end renderer stabilization without new content.</p>

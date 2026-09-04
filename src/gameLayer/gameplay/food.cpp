@@ -26,6 +26,14 @@ Effects getItemEffects(Item &item, PlayerInventory &inventory)
 	{
 		ret.allEffects[Effects::Saturated].timerMs = 60 * 1000;
 	}
+	if (type == vegetableStew)
+	{
+		ret.allEffects[Effects::Saturated].timerMs = 90 * 1000;
+	}
+	if (type == berryPorridge)
+	{
+		ret.allEffects[Effects::Saturated].timerMs = 45 * 1000;
+	}
 
 	if (type == regenerationPotion)
 	{ ret.allEffects[Effects::Regeneration].timerMs = 8 * 60 * 1000; } //8 minutes of regeneration
@@ -97,6 +105,9 @@ int getItemHealing(Item &item, PlayerInventory &inventory)
 	{
 		rez += 50;
 	}
+	if (type == bakedPotato) { rez += 5; }
+	if (type == vegetableStew) { rez += 12; }
+	if (type == berryPorridge) { rez += 8; }
 
 	return std::max(0, rez);
 }
@@ -118,6 +129,11 @@ int getItemHungerRestore(const Item &item)
 		case ItemTypes::pinapple: return 24;
 		case ItemTypes::strawberry: return 14;
 		case ItemTypes::applePie: return 45;
+		case ItemTypes::carrot: return 12;
+		case ItemTypes::potato: return 10;
+		case ItemTypes::bakedPotato: return 22;
+		case ItemTypes::vegetableStew: return 32;
+		case ItemTypes::berryPorridge: return 26;
 		default: return 0;
 	}
 }

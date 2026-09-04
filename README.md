@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current development version: v0.9.7 (stabilization candidate)**
+**Current development version: v0.10.0 (content development)**
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -19,6 +19,20 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.10.0 subsistence expansion
+
+v0.10.0 resumes content development on top of the published v0.9.7 stability
+baseline. Its first playable slice expands food, exploration rewards and the
+existing farming/cooking foundations without renumbering shipped content.
+
+- Barns can contain carrots and igloos can contain potatoes.
+- Carrots and potatoes are edible and supported by the persistent farm-plot model.
+- The cooking pot prepares baked potatoes, vegetable stew and berry porridge.
+- New item and recipe IDs are append-only; the recipe-discovery payload migrates from v0.9 automatically.
+- Multiplayer protocol 4 rejects older clients before incompatible item and recipe registries are exchanged.
+
+See [`docs/V0.10.0_CONTENT.md`](docs/V0.10.0_CONTENT.md).
 
 ## v0.9.4 gameplay and runtime stabilization
 

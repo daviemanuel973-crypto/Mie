@@ -20,6 +20,8 @@ int main()
 	REQUIRE(farmCropForItem(ItemTypes::wheat, crop) && crop == FarmCrop::Wheat);
 	REQUIRE(farmCropForItem(ItemTypes::strawberry, crop) && crop == FarmCrop::Strawberry);
 	REQUIRE(farmCropForItem(ItemTypes::chilliPepper, crop) && crop == FarmCrop::Chilli);
+	REQUIRE(farmCropForItem(ItemTypes::carrot, crop) && crop == FarmCrop::Carrot);
+	REQUIRE(farmCropForItem(ItemTypes::potato, crop) && crop == FarmCrop::Potato);
 	REQUIRE(!farmCropForItem(ItemTypes::apple, crop));
 
 	FarmPlotState wheat{{10, 64, -2}, FarmCrop::Wheat, 100.0};
@@ -35,6 +37,10 @@ int main()
 	REQUIRE(!farmPlotMature(wheat, 459.0));
 	REQUIRE(farmPlotMature(wheat, 460.0));
 	REQUIRE(farmHarvestItem(FarmCrop::Wheat) == ItemTypes::wheat);
+	REQUIRE(farmHarvestItem(FarmCrop::Carrot) == ItemTypes::carrot);
+	REQUIRE(farmHarvestItem(FarmCrop::Potato) == ItemTypes::potato);
+	REQUIRE(farmGrowthSeconds(FarmCrop::Carrot) == 360.0);
+	REQUIRE(farmGrowthSeconds(FarmCrop::Potato) == 390.0);
 
 	for (std::size_t size = 0; size < encoded.size(); ++size)
 	{
@@ -70,6 +76,11 @@ int main()
 	REQUIRE(harvestFarmPlot(tempRoot.string(), {20, 70, 20}, 1360.0, harvest));
 	REQUIRE(harvest.itemType == ItemTypes::wheat && harvest.count == 3);
 	REQUIRE(!queryFarmPlot(tempRoot.string(), {20, 70, 20}, reloaded));
+
+	resetFarmRuntimeCache();
+	REQUIRE(plantFarmPlot(tempRoot.string(), {21, 70, 20}, ItemTypes::potato, 2000.0));
+	REQUIRE(harvestFarmPlot(tempRoot.string(), {21, 70, 20}, 2390.0, harvest));
+	REQUIRE(harvest.itemType == ItemTypes::potato && harvest.count == 3);
 
 	std::filesystem::remove_all(tempRoot, error);
 	std::cout << "Farming persistence tests passed.\n";

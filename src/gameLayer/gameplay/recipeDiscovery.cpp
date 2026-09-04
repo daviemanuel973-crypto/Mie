@@ -7,7 +7,8 @@
 namespace
 {
 	constexpr std::array<unsigned char, 4> discoveryMagic = {'M', 'I', 'E', 'R'};
-	constexpr std::uint8_t discoveryVersion = 1;
+	constexpr std::uint8_t legacyDiscoveryVersion = 1;
+	constexpr std::uint8_t discoveryVersion = 2;
 }
 
 bool RecipeDiscovery::typeToIndex(std::uint16_t type, std::size_t &index)
@@ -87,21 +88,23 @@ std::size_t RecipeDiscovery::formatIntoData(std::vector<unsigned char> &data) co
 int RecipeDiscovery::readFromData(const void *data, std::size_t size)
 {
 	*this = {};
-	if (!data || size < SerializedBytes) { return -1; }
+	if (!data || size < HeaderBytes) { return -1; }
 	const auto *bytes = static_cast<const unsigned char *>(data);
-	if (!std::equal(discoveryMagic.begin(), discoveryMagic.end(), bytes) ||
-		bytes[discoveryMagic.size()] != discoveryVersion)
+	if (!std::equal(discoveryMagic.begin(), discoveryMagic.end(), bytes))
 	{
 		return -1;
 	}
 
+	const std::uint8_t version = bytes[discoveryMagic.size()];
 	std::uint16_t payloadSize = 0;
-	std::memcpy(&payloadSize, bytes + discoveryMagic.size() + sizeof(discoveryVersion),
+	std::memcpy(&payloadSize, bytes + discoveryMagic.size() + sizeof(version),
 		sizeof(payloadSize));
-	if (payloadSize != StorageBytes) { return -1; }
+	const bool legacyPayload = version == legacyDiscoveryVersion &&
+		payloadSize == LegacyV09StorageBytes;
+	const bool currentPayload = version == discoveryVersion && payloadSize == StorageBytes;
+	if ((!legacyPayload && !currentPayload) || size < HeaderBytes + payloadSize) { return -1; }
 
-	constexpr std::size_t headerSize = 4 + 1 + 2;
-	std::copy_n(bytes + headerSize, StorageBytes, knownTypes.begin());
+	std::copy_n(bytes + HeaderBytes, payloadSize, knownTypes.begin());
 	sanitize();
-	return static_cast<int>(SerializedBytes);
+	return static_cast<int>(HeaderBytes + payloadSize);
 }

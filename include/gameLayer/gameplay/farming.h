@@ -15,6 +15,8 @@ enum class FarmCrop : std::uint8_t
 	Wheat = 0,
 	Strawberry,
 	Chilli,
+	Carrot,
+	Potato,
 	Count,
 };
 

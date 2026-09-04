@@ -197,14 +197,24 @@ enum ItemTypes : unsigned short
 	// cloth icon and acts as a portable home marker, avoiding any block-ID migration.
 	bedroll,             // 2193
 
-	lastItem,            // 2194
+	// v0.10 subsistence content. This range is append-only so v0.9 inventories
+	// keep interpreting every persisted item ID exactly as before.
+	carrot,              // 2194
+	potato,              // 2195
+	bakedPotato,         // 2196
+	vegetableStew,       // 2197
+	berryPorridge,       // 2198
+
+	lastItem,            // 2199
 
 };
 
 static_assert(ItemTypes::fieldGuide == 2184, "v0.7 Field Guide ID changed");
 static_assert(ItemTypes::bronzeSword == 2192, "v0.7 bronze sword ID changed");
 static_assert(ItemTypes::bedroll == 2193, "v0.9 bedroll ID changed");
-static_assert(ItemTypes::lastItem == 2194, "v0.9 item range changed");
+static_assert(ItemTypes::carrot == 2194, "v0.10 item range must start after v0.9");
+static_assert(ItemTypes::berryPorridge == 2198, "v0.10 food IDs changed");
+static_assert(ItemTypes::lastItem == 2199, "v0.10 item range changed");
 
 const char *getItemTextureName(int itemId);
 

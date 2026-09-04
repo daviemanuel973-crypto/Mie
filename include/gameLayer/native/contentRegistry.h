@@ -58,7 +58,13 @@ namespace mie::native
 	// recovered worlds do not reinterpret an item after an update.
 	constexpr std::uint32_t V07_FIRST_ITEM_ID = V05_LAST_ITEM_EXCLUSIVE;
 	constexpr std::uint32_t V07_LAST_ITEM_EXCLUSIVE = V07_FIRST_ITEM_ID + 9;
+	constexpr std::uint32_t V09_FIRST_ITEM_ID = V07_LAST_ITEM_EXCLUSIVE;
+	constexpr std::uint32_t V09_LAST_ITEM_EXCLUSIVE = V09_FIRST_ITEM_ID + 1;
+	constexpr std::uint32_t V010_FIRST_ITEM_ID = V09_LAST_ITEM_EXCLUSIVE;
+	constexpr std::uint32_t V010_LAST_ITEM_EXCLUSIVE = V010_FIRST_ITEM_ID + 5;
 
 	ContentRegistry createV06ContentRegistry();
 	ContentRegistry createV07ContentRegistry();
+	ContentRegistry createV09ContentRegistry();
+	ContentRegistry createV010ContentRegistry();
 }
