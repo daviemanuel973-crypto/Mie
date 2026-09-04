@@ -29,7 +29,6 @@ todo propper line drawing for placing blocks and for drawing collisions and othe
 # Smaller:
 
 - todo: send player other info function
-- todo: start working at item dropping + survival mode, don't forget that rejecting a dropped item should recreate inventory
 
 
 # Gameplay

@@ -15,6 +15,7 @@
 #include <gameplay/worldDifficulty.h>
 #include <gameplay/itemDurability.h>
 #include <multyPlayer/dataIntegrity.h>
+#include <multyPlayer/actionResync.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
@@ -1157,9 +1158,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						//we tell the player to kill that item.
 						bool killItem = 0;
 
-						if (client->playerData.inventory.revisionNumber
-							== i.t.revisionNumber
-							)
+						if (!mie::network::droppedItemRevisionRequiresInventoryResync(
+							client->playerData.inventory.revisionNumber, i.t.revisionNumber))
 						{
 
 							auto serverAllows = settings.perClientSettings[i.cid].validateStuff;
@@ -1252,6 +1252,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							//std::cout << "Recieved revision : "
 							//	<< (int)i.t.revisionNumber << "\n";
 
+							sendPlayerInventoryAndIncrementRevision(*client);
 							killItem = true;
 						}
 
