@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Trigger the temporary branch-only patch workflow.
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
     count = text.count(old)
