@@ -61,7 +61,12 @@ bool Item::isFood()
 		type == peach ||
 		type == pinapple ||
 		type == strawberry ||
-		type == applePie;
+		type == applePie ||
+		type == carrot ||
+		type == potato ||
+		type == bakedPotato ||
+		type == vegetableStew ||
+		type == berryPorridge;
 }
 
 bool Item::isEatable()
@@ -947,6 +952,14 @@ const char *itemsNamesTextures[] =
 
 	// v0.9 bedroll intentionally reuses the shipped cloth icon.
 	"cloth.png",
+
+	// v0.10 food icons. The prepared meals deliberately reuse the cooking-pot
+	// artwork until their final inventory art lands later in the 0.10 cycle.
+	"food/carrot.png",
+	"food/potato.png",
+	"food/potato.png",
+	"../blocks/models/cookingPot.png",
+	"../blocks/models/cookingPot.png",
 };
 
 const char *itemsNames[] =
@@ -1111,6 +1124,11 @@ const char *itemsNames[] =
 	"Bronze Shovel",
 	"Bronze Sword",
 	"Bedroll",
+	"Carrot",
+	"Potato",
+	"Baked Potato",
+	"Vegetable Stew",
+	"Berry Porridge",
 };
 
 const char *getItemTextureName(int itemId)

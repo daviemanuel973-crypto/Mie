@@ -61,8 +61,8 @@ namespace
 
 int main()
 {
-	check(getCraftingRecipeCount() == 108,
-		"v0.9 appends five recipes after the 103 stable legacy packet indexes");
+	check(getCraftingRecipeCount() == 111,
+		"v0.10 appends three recipes after the 108 stable v0.9 packet indexes");
 	check(!isCraftingRecipeDiscovered(-1, {}), "negative recipe indexes are rejected");
 	check(!isCraftingRecipeDiscovered(getCraftingRecipeCount(), {}),
 		"out-of-range recipe indexes are rejected");
@@ -112,6 +112,21 @@ int main()
 		"bronze repair recipes participate in normal recipe discovery");
 	check(getRecepieFromIndexUnsafe(104).repairsDurableItem,
 		"the first appended repair recipe is explicitly metadata-tolerant");
+
+	// The first v0.10 food recipes are appended at indexes 108-110 and all use
+	// the already-shipped cooking pot station.
+	discovery.learnType(ItemTypes::potato);
+	check(isCraftingRecipeDiscovered(108, discovery),
+		"finding a potato reveals the baked potato recipe");
+	check(getRecepieFromIndexUnsafe(108).result.type == ItemTypes::bakedPotato &&
+		std::string(getCraftingRecipeStationName(getRecepieFromIndexUnsafe(108))) ==
+			"COOKING POT", "baked potatoes use the cooking pot");
+	discovery.learnType(ItemTypes::carrot);
+	check(isCraftingRecipeDiscovered(109, discovery),
+		"carrot, potato and wheat reveal vegetable stew");
+	discovery.learnType(ItemTypes::strawberry);
+	check(isCraftingRecipeDiscovered(110, discovery),
+		"wheat and strawberry reveal berry porridge");
 
 	PlayerInventory damagedInventory;
 	damagedInventory.items[0] = Item(ItemTypes::bronzePickaxe, 1);

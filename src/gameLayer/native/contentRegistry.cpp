@@ -176,4 +176,43 @@ namespace mie::native
 
 		return registry;
 	}
+
+	ContentRegistry createV09ContentRegistry()
+	{
+		ContentRegistry registry = createV07ContentRegistry();
+		registry.registerContent({ContentKind::Item, V09_FIRST_ITEM_ID,
+			"mie:item/bedroll", false});
+		return registry;
+	}
+
+	ContentRegistry createV010ContentRegistry()
+	{
+		ContentRegistry registry = createV09ContentRegistry();
+		constexpr std::array<const char *, 5> itemKeys = {
+			"mie:item/carrot",
+			"mie:item/potato",
+			"mie:item/baked_potato",
+			"mie:item/vegetable_stew",
+			"mie:item/berry_porridge",
+		};
+		for (std::uint32_t offset = 0; offset < itemKeys.size(); ++offset)
+		{
+			registry.registerContent({ContentKind::Item, V010_FIRST_ITEM_ID + offset,
+				itemKeys[offset], false});
+		}
+
+		registry.registerContent({ContentKind::Machine, 2,
+			"mie:machine/cooking_pot", false});
+		constexpr std::array<const char *, 3> recipeKeys = {
+			"mie:recipe/bake_potato",
+			"mie:recipe/cook_vegetable_stew",
+			"mie:recipe/cook_berry_porridge",
+		};
+		for (std::uint32_t offset = 0; offset < recipeKeys.size(); ++offset)
+		{
+			registry.registerContent({ContentKind::Recipe, 9u + offset,
+				recipeKeys[offset], false});
+		}
+		return registry;
+	}
 }

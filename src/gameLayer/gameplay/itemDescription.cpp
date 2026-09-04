@@ -110,7 +110,14 @@ const char *itemsDescriptions[] =
 	"A balanced early-metal sword dealing 10 base damage.",
 
 	// v0.9 home/subsistence content. Append-only after the shipped v0.7 range.
-	"A portable resting place that marks a safe home and respawn point." // bedroll (2193)
+	"A portable resting place that marks a safe home and respawn point.", // bedroll (2193)
+
+	// v0.10 subsistence loop. These descriptions follow the persisted item IDs.
+	"A crisp root crop that can be eaten or cooked.",                    // carrot (2194)
+	"A sturdy root crop. Better after cooking.",                         // potato (2195)
+	"Warm, filling and ready for the trail.",                            // baked potato (2196)
+	"A hearty mix of roots and grain.",                                 // vegetable stew (2197)
+	"A sweet bowl of berries and grain."                                 // berry porridge (2198)
 };
 
 std::string Item::getItemDescription()

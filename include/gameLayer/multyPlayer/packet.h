@@ -21,7 +21,9 @@
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
-constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 3;
+// v0.10 appends item and crafting recipe IDs. Reject older clients before they
+// can interpret the expanded registries with v0.9 packet contracts.
+constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 4;
 
 struct EventId
 {

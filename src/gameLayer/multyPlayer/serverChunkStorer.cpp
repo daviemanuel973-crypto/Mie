@@ -593,6 +593,7 @@ bool ServerChunkStorer::generateStructure(StructureToGenerate s,
 									case Structure_Barn:
 										put(2, ItemTypes::wheat, 5 + (lootSeed % 8u));
 										put(3, ItemTypes::apple, 1 + (lootSeed % 3u));
+										put(4, ItemTypes::carrot, 2 + (lootSeed % 4u));
 										break;
 									case Structure_GoblinTower:
 										put(2, ItemTypes::cloth, 2 + (lootSeed % 4u));
@@ -605,6 +606,7 @@ bool ServerChunkStorer::generateStructure(StructureToGenerate s,
 									case Structure_Igloo:
 										put(2, ItemTypes::blueBerrie, 2 + (lootSeed % 4u));
 										put(3, ItemTypes::apple, 1 + (lootSeed % 2u));
+										put(4, ItemTypes::potato, 2 + (lootSeed % 4u));
 										break;
 									case Structure_MinesDungeon:
 										put(2, ItemTypes::ironIngot, 1 + (lootSeed % 3u));

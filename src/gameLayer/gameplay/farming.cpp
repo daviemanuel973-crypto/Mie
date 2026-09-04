@@ -147,6 +147,8 @@ bool farmCropForItem(std::uint16_t itemType, FarmCrop &crop)
 		case ItemTypes::wheat: crop = FarmCrop::Wheat; return true;
 		case ItemTypes::strawberry: crop = FarmCrop::Strawberry; return true;
 		case ItemTypes::chilliPepper: crop = FarmCrop::Chilli; return true;
+		case ItemTypes::carrot: crop = FarmCrop::Carrot; return true;
+		case ItemTypes::potato: crop = FarmCrop::Potato; return true;
 		default: return false;
 	}
 }
@@ -158,6 +160,8 @@ std::uint16_t farmHarvestItem(FarmCrop crop)
 		case FarmCrop::Wheat: return ItemTypes::wheat;
 		case FarmCrop::Strawberry: return ItemTypes::strawberry;
 		case FarmCrop::Chilli: return ItemTypes::chilliPepper;
+		case FarmCrop::Carrot: return ItemTypes::carrot;
+		case FarmCrop::Potato: return ItemTypes::potato;
 		default: return 0;
 	}
 }
@@ -169,6 +173,8 @@ double farmGrowthSeconds(FarmCrop crop)
 		case FarmCrop::Wheat: return 360.0;
 		case FarmCrop::Strawberry: return 480.0;
 		case FarmCrop::Chilli: return 420.0;
+		case FarmCrop::Carrot: return 360.0;
+		case FarmCrop::Potato: return 390.0;
 		default: return std::numeric_limits<double>::infinity();
 	}
 }
@@ -292,7 +298,15 @@ bool harvestFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	}
 
 	harvest.itemType = farmHarvestItem(found->second.crop);
-	harvest.count = found->second.crop == FarmCrop::Wheat ? 3 : 2;
+	switch (found->second.crop)
+	{
+		case FarmCrop::Wheat: harvest.count = 3; break;
+		case FarmCrop::Strawberry: harvest.count = 2; break;
+		case FarmCrop::Chilli: harvest.count = 2; break;
+		case FarmCrop::Carrot: harvest.count = 2; break;
+		case FarmCrop::Potato: harvest.count = 3; break;
+		default: harvest = {}; return false;
+	}
 	const FarmPlotState removed = found->second;
 	cachedPlots.erase(found);
 	if (saveCache()) { return true; }

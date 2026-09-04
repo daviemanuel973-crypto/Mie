@@ -59,6 +59,23 @@ namespace
 		check(v07.resolve(ContentKind::Recipe, "mie:recipe/process_copper_ore") == 2 &&
 			v07.resolve(ContentKind::Recipe, "mie:recipe/alloy_bronze") == 8,
 			"v0.7 processing recipe IDs match the shipped executable");
+
+		ContentRegistry v09 = createV09ContentRegistry();
+		check(v09.resolve(ContentKind::Item, "mie:item/bedroll") == V09_FIRST_ITEM_ID,
+			"v0.9 bedroll keeps its persisted runtime ID");
+
+		ContentRegistry v010 = createV010ContentRegistry();
+		check(v010.size(ContentKind::Item) ==
+			V010_LAST_ITEM_EXCLUSIVE - V05_FIRST_ITEM_ID,
+			"v0.10 appends five items without renumbering older content");
+		check(v010.resolve(ContentKind::Item, "mie:item/carrot") == 2194 &&
+			v010.resolve(ContentKind::Item, "mie:item/berry_porridge") == 2198,
+			"v0.10 food stable keys resolve to their append-only IDs");
+		check(v010.resolve(ContentKind::Machine, "mie:machine/cooking_pot") == 2,
+			"the shipped cooking pot has a stable native machine key");
+		check(v010.resolve(ContentKind::Recipe, "mie:recipe/bake_potato") == 9 &&
+			v010.resolve(ContentKind::Recipe, "mie:recipe/cook_berry_porridge") == 11,
+			"v0.10 cooking recipes occupy new native registry IDs");
 	}
 
 	void testProcessingRecipes()
