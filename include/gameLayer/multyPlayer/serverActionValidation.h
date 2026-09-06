@@ -47,4 +47,15 @@ namespace mie::serverValidation
 		return isWorldBlockPositionSane(blockPosition) &&
 			isBlockActionWithinReach(playerPosition, blockPosition);
 	}
+
+	inline bool isAuthoritativeItemSlotUsable(std::uint16_t actualType,
+		std::uint16_t counter, std::uint16_t requestedType)
+	{
+		return counter > 0 && actualType == requestedType;
+	}
+
+	inline bool itemUseRemainsAllowedAfterAction(bool currentlyAllowed, bool actionApplied)
+	{
+		return currentlyAllowed && actionApplied;
+	}
 }

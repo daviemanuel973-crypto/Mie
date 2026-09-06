@@ -2,6 +2,7 @@
 #include <gameplay/fieldGuideProtocol.h>
 #include <multyPlayer/packet.h>
 #include <multyPlayer/packetValidation.h>
+#include <multyPlayer/serverActionValidation.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -20,6 +21,13 @@ int main()
 	REQUIRE(headerUpdateGuideProgress != headerUpdateWorldDifficulty);
 	REQUIRE(headerUpdateGuideProgress == 52);
 	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 4);
+
+	REQUIRE(mie::serverValidation::isAuthoritativeItemSlotUsable(42, 1, 42));
+	REQUIRE(!mie::serverValidation::isAuthoritativeItemSlotUsable(42, 0, 42));
+	REQUIRE(!mie::serverValidation::isAuthoritativeItemSlotUsable(42, 1, 41));
+	REQUIRE(mie::serverValidation::itemUseRemainsAllowedAfterAction(true, true));
+	REQUIRE(!mie::serverValidation::itemUseRemainsAllowedAfterAction(true, false));
+	REQUIRE(!mie::serverValidation::itemUseRemainsAllowedAfterAction(false, true));
 
 	Packet_PlaceBlocks oneBlock = {};
 	REQUIRE(validateServerPacketPayload(headerPlaceBlock,

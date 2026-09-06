@@ -16,6 +16,7 @@
 #include <gameplay/itemDurability.h>
 #include <multyPlayer/dataIntegrity.h>
 #include <multyPlayer/actionResync.h>
+#include <multyPlayer/serverActionValidation.h>
 
 template <class T, class E>
 void genericBroadcastEntityUpdateFromServerToPlayer(E &e, bool reliable,
@@ -1590,13 +1591,10 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 								if (from && !client->playerData.killed)
 								{
-									allowed = true;
+									allowed = mie::serverValidation::isAuthoritativeItemSlotUsable(
+										from->type, from->counter, i.t.itemType);
 
-									
-
-									if (from->counter <= 0) { from = {}; }
-
-									if (from->type == i.t.itemType)
+									if (allowed)
 								{
 
 									
@@ -1607,7 +1605,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										glm::dvec3 position = glm::dvec3(i.t.pos) + glm::dvec3(0.0, -0.49, 0.0);
 										p.position = position;
 										p.lastPosition = position;
-										spawnPig(chunkCache, p, worldSaver, rng);
+										allowed = mie::serverValidation::itemUseRemainsAllowedAfterAction(
+											allowed, spawnPig(chunkCache, p, worldSaver, rng));
 									}
 									else if (from->type == ItemTypes::zombieSpawnEgg)
 									{
@@ -1615,8 +1614,9 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										glm::dvec3 position = glm::dvec3(i.t.pos) + glm::dvec3(0.0, -0.49, 0.0);
 										z.position = position;
 										z.lastPosition = position;
-										spawnZombie(chunkCache, z, getEntityIdAndIncrement(worldSaver,
-											EntityType::zombies));
+										allowed = mie::serverValidation::itemUseRemainsAllowedAfterAction(
+											allowed, spawnZombie(chunkCache, z, getEntityIdAndIncrement(worldSaver,
+												EntityType::zombies)));
 									}
 									else if (from->type == ItemTypes::catSpawnEgg)
 									{
@@ -1624,7 +1624,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										glm::dvec3 position = glm::dvec3(i.t.pos) + glm::dvec3(0.0, -0.49, 0.0);
 										c.position = position;
 										c.lastPosition = position;
-										spawnCat(chunkCache, c, worldSaver, rng);
+										allowed = mie::serverValidation::itemUseRemainsAllowedAfterAction(
+											allowed, spawnCat(chunkCache, c, worldSaver, rng));
 									}
 									else if (from->type == ItemTypes::goblinSpawnEgg)
 									{
@@ -1632,7 +1633,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										glm::dvec3 position = glm::dvec3(i.t.pos) + glm::dvec3(0.0, -0.49, 0.0);
 										g.position = position;
 										g.lastPosition = position;
-										spawnGoblin(chunkCache, g, worldSaver, rng);
+										allowed = mie::serverValidation::itemUseRemainsAllowedAfterAction(
+											allowed, spawnGoblin(chunkCache, g, worldSaver, rng));
 									}
 									else if (from->type == ItemTypes::scareCrowSpawnEgg)
 									{
@@ -1640,7 +1642,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										glm::dvec3 position = glm::dvec3(i.t.pos) + glm::dvec3(0.0, -0.49, 0.0);
 										g.position = position;
 										g.lastPosition = position;
-										spawnScareCrow(chunkCache, g, worldSaver, rng);
+										allowed = mie::serverValidation::itemUseRemainsAllowedAfterAction(
+											allowed, spawnScareCrow(chunkCache, g, worldSaver, rng));
 									}
 									else if (from->isEatable())
 									{
@@ -1751,6 +1754,11 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						if (shouldUpdateRevisionStuff)
 						{
 							computeRevisionStuff(*client, allowed, i.t.eventId);
+						}
+
+						if (!allowed)
+						{
+							updatePlayerSurvivalStats(*client);
 						}
 
 						//the client might have eaten something so we update life anyway,
