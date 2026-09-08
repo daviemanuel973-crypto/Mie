@@ -167,13 +167,14 @@ static CraftingRecepie recepies[] =
 	recepie<2>(Item(ItemTypes::bronzeSword, 1), {Item(ItemTypes::bronzeSword, 1), Item(ItemTypes::bronzeIngot, 1)}).setRequiresWorkBench().setRepairsDurableItem(),
 
 	// v0.10 append-only recipes. Existing network recipe indices remain stable.
-	recepie<1>(Item(ItemTypes::bakedPotato, 1), {Item(ItemTypes::potato, 1)}).setRequiresCookingPot(),
+	recepie<1>(Item(ItemTypes::bakedPotato, 1), {Item(ItemTypes::potato, 1)}).setRequiresCampfire(),
 	recepie<3>(Item(ItemTypes::vegetableStew, 1), {Item(ItemTypes::carrot, 1), Item(ItemTypes::potato, 1), Item(ItemTypes::wheat, 1)}).setRequiresCookingPot(),
 	recepie<2>(Item(ItemTypes::berryPorridge, 1), {Item(ItemTypes::wheat, 2), Item(ItemTypes::strawberry, 2)}).setRequiresCookingPot(),
+	recepie<3>(Item(BlockTypes::campfire, 1), {Item(BlockTypes::wooden_plank, 3), Item(BlockTypes::cobblestone, 2), Item(ItemTypes::charcoal, 1)}).setAnyWood().setRequiresWorkBench(),
 };
 
 constexpr int LegacyCraftingRecipeCount = 103;
-static_assert(sizeof(recepies) / sizeof(recepies[0]) == 111,
+static_assert(sizeof(recepies) / sizeof(recepies[0]) == 112,
 	"v0.10 crafting recipes changed unexpectedly");
 
 int getCraftingRecipeCount()
@@ -195,9 +196,10 @@ std::vector<CraftingRecepieIndex> getAllPossibleRecepies(PlayerInventory &player
 			if (recepies[i].requiresFurnace && craftingStation != WorkStationType::WorkStationType_Furnace) { good = false; }
 			if (recepies[i].requiresGoblin && craftingStation != WorkStationType::WorkStationType_GoblinStitchingPost) { good = false; }
 			if (recepies[i].requiresCookingPot && craftingStation != WorkStationType::WorkStationType_CookingPot) { good = false; }
+			if (recepies[i].requiresCampfire && craftingStation != WorkStationType::WorkStationType_Campfire) { good = false; }
 			int benchesRequired = 0;
 			benchesRequired += recepies[i].requiresWorkBench + recepies[i].requiresFurnace +
-				recepies[i].requiresGoblin + recepies[i].requiresCookingPot;
+				recepies[i].requiresGoblin + recepies[i].requiresCookingPot + recepies[i].requiresCampfire;
 			assert(benchesRequired <= 1);
 			if (good) { rez.push_back({recepies[i], i}); }
 		}
@@ -268,6 +270,7 @@ const char *getCraftingRecipeStationName(const CraftingRecepie &recepie)
 	if (recepie.requiresFurnace) { return "FURNACE"; }
 	if (recepie.requiresGoblin) { return "GOBLIN STATION"; }
 	if (recepie.requiresCookingPot) { return "COOKING POT"; }
+	if (recepie.requiresCampfire) { return "CAMPFIRE"; }
 	return "HAND CRAFTING";
 }
 

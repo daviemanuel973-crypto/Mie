@@ -1,0 +1,37 @@
+# Mie v0.10 Low-profile campfire
+# Two crossed, double-sided billboards keep the station inexpensive on Intel HD 620.
+o CampfireNorthEast
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+v -0.38 0.02 -0.38
+v  0.38 0.02  0.38
+v  0.38 0.82  0.38
+v -0.38 0.82 -0.38
+f 1/1 2/2 3/3
+f 1/1 3/3 4/4
+
+o CampfireNorthEastBack
+v -0.38 0.02 -0.38
+v -0.38 0.82 -0.38
+v  0.38 0.82  0.38
+v  0.38 0.02  0.38
+f 5/1 6/4 7/3
+f 5/1 7/3 8/2
+
+o CampfireNorthWest
+v -0.38 0.02  0.38
+v  0.38 0.02 -0.38
+v  0.38 0.82 -0.38
+v -0.38 0.82  0.38
+f 9/1 10/2 11/3
+f 9/1 11/3 12/4
+
+o CampfireNorthWestBack
+v -0.38 0.02  0.38
+v -0.38 0.82  0.38
+v  0.38 0.82 -0.38
+v  0.38 0.02 -0.38
+f 13/1 14/4 15/3
+f 13/1 15/3 16/2

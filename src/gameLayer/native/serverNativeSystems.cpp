@@ -21,10 +21,13 @@
 
 namespace mie::native
 {
-	static_assert(BlockTypes::BlocksCount == V05_BLOCK_COUNT,
+	static_assert(BlockTypes::BlocksCount == V010_BLOCK_COUNT,
 		"v0.5 block IDs changed; add new blocks only after the frozen legacy range");
 	static_assert(BlockTypes::reinforcedBarricade == 210 && BlockTypes::woodenSpikeTrap == 211,
 		"v0.5 defence block IDs must remain stable");
+	static_assert(BlockTypes::wheatCrop == V010_FIRST_BLOCK_ID &&
+		BlockTypes::campfire + 1 == V010_BLOCK_COUNT,
+		"v0.10 block IDs changed; new blocks must remain append-only");
 	static_assert(ItemTypes::stick == V05_FIRST_ITEM_ID &&
 		ItemTypes::fieldGuide == V07_FIRST_ITEM_ID &&
 		ItemTypes::bronzeSword + 1 == V07_LAST_ITEM_EXCLUSIVE &&

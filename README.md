@@ -27,10 +27,13 @@ baseline. Its first playable slice expands food, exploration rewards and the
 existing farming/cooking foundations without renumbering shipped content.
 
 - Barns can contain carrots and igloos can contain potatoes.
-- Carrots and potatoes are edible and supported by the persistent farm-plot model.
-- The cooking pot prepares baked potatoes, vegetable stew and berry porridge.
+- Hold Shift and right-click dirt or grass to plant wheat, strawberries, chilli,
+  carrots or potatoes; immature and mature harvests are server-authoritative.
+- A craftable campfire is the dedicated station for baked potatoes. The cooking
+  pot prepares vegetable stew and berry porridge.
+- Crops and all five foods have distinct in-world or inventory art.
 - New item and recipe IDs are append-only; the recipe-discovery payload migrates from v0.9 automatically.
-- Multiplayer protocol 4 rejects older clients before incompatible item and recipe registries are exchanged.
+- Multiplayer protocol 5 rejects older clients before incompatible block, action and recipe registries are exchanged.
 
 See [`docs/V0.10.0_CONTENT.md`](docs/V0.10.0_CONTENT.md).
 

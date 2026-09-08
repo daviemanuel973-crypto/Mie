@@ -953,13 +953,12 @@ const char *itemsNamesTextures[] =
 	// v0.9 bedroll intentionally reuses the shipped cloth icon.
 	"cloth.png",
 
-	// v0.10 food icons. The prepared meals deliberately reuse the cooking-pot
-	// artwork until their final inventory art lands later in the 0.10 cycle.
+	// v0.10 food icons use dedicated inventory art.
 	"food/carrot.png",
 	"food/potato.png",
-	"food/potato.png",
-	"../blocks/models/cookingPot.png",
-	"../blocks/models/cookingPot.png",
+	"food/bakedPotato.png",
+	"food/vegetableStew.png",
+	"food/berryPorridge.png",
 };
 
 const char *itemsNames[] =
@@ -1476,6 +1475,12 @@ const char *blockNames[] = {
 	"Goblin stitching station",
 	"Reinforced Barricade",
 	"Wooden Spike Trap",
+	"Wheat Crop",
+	"Strawberry Crop",
+	"Chilli Crop",
+	"Carrot Crop",
+	"Potato Crop",
+	"Campfire",
 };
 
 std::string Item::getItemName()

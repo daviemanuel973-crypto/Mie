@@ -63,6 +63,21 @@ int main()
 	REQUIRE(!isFragileContainer(BlockTypes::workBench));
 	REQUIRE(getBlockBaseMineDuration(BlockTypes::crate) <
 		getBlockBaseMineDuration(BlockTypes::wooden_plank));
+	REQUIRE(BlockTypes::wheatCrop == 212 && BlockTypes::campfire == 217 &&
+		BlockTypes::BlocksCount == 218);
+	REQUIRE(isCrossMesh(BlockTypes::wheatCrop) && isAnyPlant(BlockTypes::potatoCrop));
+	REQUIRE(!isColidable(BlockTypes::carrotCrop) && !isColidable(BlockTypes::campfire));
+	REQUIRE(isLightEmitor(BlockTypes::campfire) && isAnyHotSoundingBlock(BlockTypes::campfire));
+	REQUIRE(isCraftingStation(BlockTypes::campfire) == WorkStationType_Campfire);
+	REQUIRE(isInteractable(BlockTypes::campfire) == InteractionTypes::campfire);
+	std::unordered_set<int> reorderedBlocks;
+	for (int index = 0; index < BlockTypes::BlocksCount; ++index)
+	{
+		reorderedBlocks.insert(getBlockReorder(index));
+	}
+	REQUIRE(reorderedBlocks.size() == BlockTypes::BlocksCount &&
+		reorderedBlocks.count(BlockTypes::air) == 1 &&
+		reorderedBlocks.count(BlockTypes::campfire) == 1);
 
 	glm::vec3 velocity(10.f, -20.f, 8.f);
 	glm::vec3 acceleration(4.f, -12.f, 2.f);

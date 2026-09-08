@@ -180,6 +180,12 @@ const char *texturesNames[] = {
 	"grassDecal/corner2",	//144
 	"grassDecal/full",		//145
 	"grassDecal/3sides",	//146
+	"wheat_stage7",		//147 v0.10 wheat crop
+	"sweet_berry_bush_stage3", //148 v0.10 strawberry crop
+	"nether_wart_stage2",	//149 v0.10 chilli crop
+	"carrots_stage3",		//150 v0.10 carrot crop
+	"potatoes_stage3",		//151 v0.10 potato crop
+	"campfire_log_lit_static", //152 v0.10 campfire
 
 
 };
@@ -665,6 +671,13 @@ uint16_t blocksLookupTable[] = {
 
 	7, 7, 7, 7, 7, 7, //reinforced barricade
 	7, 7, 7, 7, 7, 7, //wooden spike trap
+
+	147, 147, 147, 147, 147, 147, //wheat crop
+	148, 148, 148, 148, 148, 148, //strawberry crop
+	149, 149, 149, 149, 149, 149, //chilli crop
+	150, 150, 150, 150, 150, 150, //carrot crop
+	151, 151, 151, 151, 151, 151, //potato crop
+	152, 152, 152, 152, 152, 152, //campfire
 
 };
 

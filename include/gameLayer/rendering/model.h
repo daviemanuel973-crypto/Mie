@@ -223,6 +223,7 @@ struct ModelsManager
 		goblinTableModel,
 		goblinStitchingPostModel,
 		spikeTrapModel,
+		campfireModel,
 
 		BLOCK_MODELS_COUNT
 

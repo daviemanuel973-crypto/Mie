@@ -188,6 +188,19 @@ namespace mie::native
 	ContentRegistry createV010ContentRegistry()
 	{
 		ContentRegistry registry = createV09ContentRegistry();
+		constexpr std::array<const char *, 6> blockKeys = {
+			"mie:block/wheat_crop",
+			"mie:block/strawberry_crop",
+			"mie:block/chilli_crop",
+			"mie:block/carrot_crop",
+			"mie:block/potato_crop",
+			"mie:block/campfire",
+		};
+		for (std::uint32_t offset = 0; offset < blockKeys.size(); ++offset)
+		{
+			registry.registerContent({ContentKind::Block, V010_FIRST_BLOCK_ID + offset,
+				blockKeys[offset], false});
+		}
 		constexpr std::array<const char *, 5> itemKeys = {
 			"mie:item/carrot",
 			"mie:item/potato",
@@ -203,10 +216,15 @@ namespace mie::native
 
 		registry.registerContent({ContentKind::Machine, 2,
 			"mie:machine/cooking_pot", false});
-		constexpr std::array<const char *, 3> recipeKeys = {
+		registry.registerContent({ContentKind::Machine, 3,
+			"mie:machine/campfire", false});
+		registry.registerContent({ContentKind::Machine, 4,
+			"mie:machine/workbench", true});
+		constexpr std::array<const char *, 4> recipeKeys = {
 			"mie:recipe/bake_potato",
 			"mie:recipe/cook_vegetable_stew",
 			"mie:recipe/cook_berry_porridge",
+			"mie:recipe/craft_campfire",
 		};
 		for (std::uint32_t offset = 0; offset < recipeKeys.size(); ++offset)
 		{

@@ -876,9 +876,15 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 
 			Packet_ClientUsedItem packetData = {};
 			std::memcpy(&packetData, data, sizeof(packetData));
+			if (!isKnownItemUseAction(packetData.useAction))
+			{
+				sendPlayerInventoryNotIncrementRevision(connection->second);
+				break;
+			}
 			Item requestedItem(packetData.itemType);
 			const bool mutatesBlock = requestedItem.isPaint();
-			const bool positionalServerUse = mutatesBlock || isSpawnEggItem(packetData.itemType);
+			const bool positionalServerUse = mutatesBlock || isSpawnEggItem(packetData.itemType) ||
+				packetData.useAction == ItemUseAction::PlantCrop;
 			if (positionalServerUse &&
 				!blockActionPositionIsValidForClient(connection->second, packetData.position))
 			{
@@ -897,6 +903,7 @@ void recieveData(ENetHost *server, ENetEvent &event, std::vector<ServerTask> &se
 			serverTask.t.taskType = Task::clientUsedItem;
 			serverTask.t.from = packetData.from;
 			serverTask.t.itemType = packetData.itemType;
+			serverTask.t.itemUseAction = packetData.useAction;
 			serverTask.t.pos = packetData.position;
 			serverTask.t.revisionNumber = packetData.revisionNumber;
 			serverTask.t.eventId = packetData.eventId;

@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -23,6 +24,16 @@ int main()
 	REQUIRE(farmCropForItem(ItemTypes::carrot, crop) && crop == FarmCrop::Carrot);
 	REQUIRE(farmCropForItem(ItemTypes::potato, crop) && crop == FarmCrop::Potato);
 	REQUIRE(!farmCropForItem(ItemTypes::apple, crop));
+	REQUIRE(farmBlockForCrop(FarmCrop::Wheat) == BlockTypes::wheatCrop);
+	REQUIRE(farmBlockForCrop(FarmCrop::Potato) == BlockTypes::potatoCrop);
+	REQUIRE(farmCropForBlock(BlockTypes::carrotCrop, crop) && crop == FarmCrop::Carrot);
+	REQUIRE(!farmCropForBlock(BlockTypes::dirt, crop));
+	REQUIRE(canPlantFarmCrop(BlockTypes::dirt, BlockTypes::air, ItemTypes::wheat));
+	REQUIRE(canPlantFarmCrop(BlockTypes::grassBlock, BlockTypes::air, ItemTypes::potato));
+	REQUIRE(!canPlantFarmCrop(BlockTypes::stone, BlockTypes::air, ItemTypes::potato));
+	REQUIRE(!canPlantFarmCrop(BlockTypes::dirt, BlockTypes::grass, ItemTypes::potato));
+	REQUIRE(!canPlantFarmCrop(BlockTypes::dirt, BlockTypes::air, ItemTypes::apple));
+	FarmPlotState missingPlot;
 
 	FarmPlotState wheat{{10, 64, -2}, FarmCrop::Wheat, 100.0};
 	FarmPlotState strawberry{{11, 64, -2}, FarmCrop::Strawberry, 200.0};
@@ -64,6 +75,19 @@ int main()
 	std::filesystem::create_directories(tempRoot, error);
 	REQUIRE(!error);
 	resetFarmRuntimeCache();
+	REQUIRE(queryFarmPlotStatus(tempRoot.string(), {19, 70, 20}, missingPlot) ==
+		FarmPlotQueryStatus::Missing);
+	resetFarmRuntimeCache();
+	{
+		std::ofstream(tempRoot / "farmPlots1.bin", std::ios::binary) << "corrupt";
+		std::ofstream(tempRoot / "farmPlots2.bin", std::ios::binary) << "corrupt";
+	}
+	REQUIRE(queryFarmPlotStatus(tempRoot.string(), {19, 70, 20}, missingPlot) ==
+		FarmPlotQueryStatus::StorageError);
+	std::filesystem::remove_all(tempRoot, error);
+	std::filesystem::create_directories(tempRoot, error);
+	REQUIRE(!error);
+	resetFarmRuntimeCache();
 	REQUIRE(plantFarmPlot(tempRoot.string(), {20, 70, 20}, ItemTypes::wheat, 1000.0));
 	REQUIRE(!plantFarmPlot(tempRoot.string(), {20, 70, 20}, ItemTypes::wheat, 1000.0));
 
@@ -71,7 +95,8 @@ int main()
 	REQUIRE(!harvestFarmPlot(tempRoot.string(), {20, 70, 20}, 1200.0, harvest));
 	resetFarmRuntimeCache();
 	FarmPlotState reloaded;
-	REQUIRE(queryFarmPlot(tempRoot.string(), {20, 70, 20}, reloaded));
+	REQUIRE(queryFarmPlotStatus(tempRoot.string(), {20, 70, 20}, reloaded) ==
+		FarmPlotQueryStatus::Found);
 	REQUIRE(reloaded.crop == FarmCrop::Wheat);
 	REQUIRE(harvestFarmPlot(tempRoot.string(), {20, 70, 20}, 1360.0, harvest));
 	REQUIRE(harvest.itemType == ItemTypes::wheat && harvest.count == 3);
@@ -81,6 +106,12 @@ int main()
 	REQUIRE(plantFarmPlot(tempRoot.string(), {21, 70, 20}, ItemTypes::potato, 2000.0));
 	REQUIRE(harvestFarmPlot(tempRoot.string(), {21, 70, 20}, 2390.0, harvest));
 	REQUIRE(harvest.itemType == ItemTypes::potato && harvest.count == 3);
+
+	resetFarmRuntimeCache();
+	REQUIRE(plantFarmPlot(tempRoot.string(), {22, 70, 20}, ItemTypes::carrot, 3000.0));
+	REQUIRE(uprootFarmPlot(tempRoot.string(), {22, 70, 20}, 3010.0, harvest));
+	REQUIRE(harvest.itemType == ItemTypes::carrot && harvest.count == 1);
+	REQUIRE(!queryFarmPlot(tempRoot.string(), {22, 70, 20}, reloaded));
 
 	std::filesystem::remove_all(tempRoot, error);
 	std::cout << "Farming persistence tests passed.\n";

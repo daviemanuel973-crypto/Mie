@@ -14,6 +14,8 @@
 #include <gameplay/food.h>
 #include <gameplay/worldDifficulty.h>
 #include <gameplay/itemDurability.h>
+#include <gameplay/farming.h>
+#include <gameplay/serverSiegeRuntime.h>
 #include <multyPlayer/dataIntegrity.h>
 #include <multyPlayer/actionResync.h>
 #include <multyPlayer/serverActionValidation.h>
@@ -1032,6 +1034,47 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 								if (legal)
 								{
 									auto lastBlock = b->getType();
+									FarmHarvest farmHarvest;
+									bool harvestedFarmBlock = false;
+									FarmCrop blockCrop;
+									if (i.t.taskType == Task::breakBlock &&
+										farmCropForBlock(lastBlock, blockCrop))
+									{
+										FarmPlotState plot;
+										const auto queryStatus = queryFarmPlotStatus(worldSaver.savePath,
+											i.t.pos, plot);
+										if (queryStatus == FarmPlotQueryStatus::Missing)
+										{
+											// A crash can persist the chunk after the farm record was
+											// rolled back. Let the orphan repair itself without granting
+											// a mature yield or inventing a new persistent record.
+											farmHarvest.itemType = farmHarvestItem(blockCrop);
+											farmHarvest.count = farmHarvest.itemType ? 1 : 0;
+											legal = farmHarvest.count != 0;
+										}
+										else
+										{
+											legal = queryStatus == FarmPlotQueryStatus::Found &&
+												plot.crop == blockCrop &&
+												uprootFarmPlot(worldSaver.savePath, i.t.pos,
+													getServerWorldElapsedSeconds(), farmHarvest);
+										}
+										harvestedFarmBlock = legal;
+										if (!legal)
+										{
+											Packet packet;
+											packet.cid = i.cid;
+											packet.header = headerPlaceBlocks;
+											Packet_PlaceBlocks packetData;
+											packetData.blockPos = i.t.pos;
+											packetData.blockInfo = *b;
+											broadCastNotLocked(packet, &packetData, sizeof(packetData), nullptr,
+												true, channelChunksAndBlocks);
+										}
+									}
+
+									if (legal)
+									{
 									FurnaceBlock removedFurnace;
 									bool hadFurnaceData = false;
 									if (lastBlock == BlockTypes::furnace)
@@ -1083,7 +1126,9 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 											ms.velocity.y = 2;
 
 											spawnDroppedItemEntity(chunkCache,
-												worldSaver, 1, lastBlock, nullptr,
+												worldSaver,
+												harvestedFarmBlock ? farmHarvest.count : 1,
+												harvestedFarmBlock ? farmHarvest.itemType : lastBlock, nullptr,
 												glm::dvec3(i.t.pos), ms);
 
 											if (hadFurnaceData)
@@ -1105,6 +1150,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 											}
 										}
 
+									}
 									}
 								}
 
@@ -1487,7 +1533,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 									auto resultCrafting = getRecepieFromIndexUnsafe(craftingIndex);
 									const bool requiresActiveStation = resultCrafting.requiresWorkBench ||
-										resultCrafting.requiresCookingPot || resultCrafting.requiresGoblin;
+										resultCrafting.requiresCookingPot || resultCrafting.requiresGoblin ||
+										resultCrafting.requiresCampfire;
 									if (requiresActiveStation && !isCurrentBlockInteractionValid(*client))
 									{
 										resyncAndCloseInteraction(*client);
@@ -1511,6 +1558,11 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 									}
 									if (resultCrafting.requiresGoblin &&
 										client->playerData.interactingWithBlock != InteractionTypes::goblinStitchingPost)
+									{
+										correctStation = false;
+									}
+									if (resultCrafting.requiresCampfire &&
+										client->playerData.interactingWithBlock != InteractionTypes::campfire)
 									{
 										correctStation = false;
 									}
@@ -1597,9 +1649,39 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 									if (allowed)
 								{
 
-									
-
-									if (from->type == ItemTypes::pigSpawnEgg)
+									if (i.t.itemUseAction == ItemUseAction::PlantCrop)
+									{
+										FarmCrop crop;
+										const glm::ivec3 plantPosition = i.t.pos + glm::ivec3(0, 1, 0);
+										SavedChunk *plantChunk = nullptr;
+										Block *ground = chunkCache.getBlockSafe(i.t.pos);
+										Block *plantBlock = chunkCache.getBlockSafeAndChunk(plantPosition, plantChunk);
+										allowed = ground && plantBlock && plantChunk &&
+											farmCropForItem(from->type, crop) &&
+											canPlantFarmCrop(ground->getType(), plantBlock->getType(), from->type);
+										if (allowed)
+										{
+											const Block previousBlock = *plantBlock;
+											plantBlock->typeAndFlags = farmBlockForCrop(crop);
+											plantBlock->setColor(0);
+											allowed = plantFarmPlot(worldSaver.savePath, plantPosition, from->type,
+												getServerWorldElapsedSeconds());
+											if (!allowed) { *plantBlock = previousBlock; }
+										}
+										if (allowed)
+										{
+											plantChunk->otherData.dirty = true;
+											Packet packet;
+											packet.cid = i.cid;
+											packet.header = headerPlaceBlocks;
+											Packet_PlaceBlocks packetData;
+											packetData.blockPos = plantPosition;
+											packetData.blockInfo = *plantBlock;
+											broadCastNotLocked(packet, &packetData, sizeof(packetData), nullptr,
+												true, channelChunksAndBlocks);
+										}
+									}
+									else if (from->type == ItemTypes::pigSpawnEgg)
 									{
 										Pig p;
 										glm::dvec3 position = glm::dvec3(i.t.pos) + glm::dvec3(0.0, -0.49, 0.0);
@@ -1720,7 +1802,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 
 									if (
 										allowed &&
-										from->isConsumedAfterUse() && client->playerData.otherPlayerSettings.gameMode ==
+										(itemUseActionConsumesItem(i.t.itemUseAction) || from->isConsumedAfterUse()) &&
+										client->playerData.otherPlayerSettings.gameMode ==
 										OtherPlayerSettings::SURVIVAL)
 									{
 										from->counter--;

@@ -256,6 +256,15 @@ enum BlockTypes : unsigned short
 	reinforcedBarricade,
 	woodenSpikeTrap,
 
+	// v0.10 subsistence. The frozen v0.5 range ends at woodenSpikeTrap (211),
+	// so all new persisted block IDs must remain append-only from here.
+	wheatCrop,
+	strawberryCrop,
+	chilliCrop,
+	carrotCrop,
+	potatoCrop,
+	campfire,
+
 	BlocksCount
 };
 
@@ -389,6 +398,7 @@ enum WorkStationType
 	WorkStationType_CookingPot,
 	WorkStationType_Anvil, 
 	WorkStationType_GoblinStitchingPost,
+	WorkStationType_Campfire,
 
 	//DONT FORGET TO ALSO UPDATE TOWARDS THE BOTTOM OF THE FILE
 };
@@ -819,6 +829,7 @@ namespace InteractionTypes
 		goblinStitchingPost, //add other work stations here v...
 		structureBaseBlock,
 		chestInteraction,
+		campfire,
 	};
 
 };

@@ -504,6 +504,14 @@ std::uint64_t getServerVisibleWorldDay()
 	return state.worldClock.getVisibleDayNumber();
 }
 
+double getServerWorldElapsedSeconds()
+{
+	const double completed = static_cast<double>(state.worldClock.getCompletedCycles());
+	const double total = completed * state.worldClock.getCycleDurationSeconds() +
+		state.worldClock.getCycleProgressSeconds();
+	return std::isfinite(total) && total >= 0.0 ? total : 0.0;
+}
+
 bool isServerSiegeWaveActive()
 {
 	return getServerSiegeStatus().phase == SiegePhase::Wave;
