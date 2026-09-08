@@ -3,7 +3,13 @@ name: Flatpak Runtime Soak
 on:
   pull_request:
     paths:
+      - 'src/**'
+      - 'include/**'
+      - 'shared/**'
+      - 'resources/**'
       - 'flatpak/**'
+      - 'CMakeLists.txt'
+      - 'VERSION'
       - '.github/workflows/runtime-soak.yml'
   workflow_dispatch:
   schedule:
