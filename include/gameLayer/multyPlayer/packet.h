@@ -21,9 +21,25 @@
 
 using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
-// v0.10 appends item and crafting recipe IDs. Reject older clients before they
-// can interpret the expanded registries with v0.9 packet contracts.
-constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 4;
+// v0.10 appends block/item/recipe IDs and adds an explicit item-use action.
+// Reject older clients before either side can interpret the new packet layout.
+constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 5;
+
+enum class ItemUseAction : std::uint8_t
+{
+	Default = 0,
+	PlantCrop = 1,
+};
+
+constexpr bool isKnownItemUseAction(ItemUseAction action)
+{
+	return action == ItemUseAction::Default || action == ItemUseAction::PlantCrop;
+}
+
+constexpr bool itemUseActionConsumesItem(ItemUseAction action)
+{
+	return action == ItemUseAction::PlantCrop;
+}
 
 struct EventId
 {
@@ -182,6 +198,7 @@ struct Packet_ClientUsedItem
 	glm::ivec3 position = {};
 	EventId eventId = {}; //used when interacting with blocks
 	unsigned short itemType = 0;
+	ItemUseAction useAction = ItemUseAction::Default;
 	unsigned char from = 0;
 	unsigned char revisionNumber = 0;
 };

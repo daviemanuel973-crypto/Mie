@@ -18,6 +18,7 @@ void updateServerSiegeRuntime(float deltaTime, ServerChunkStorer &chunkStorer,
 SiegeStatus getServerSiegeStatus();
 float getServerWorldDayPhase();
 std::uint64_t getServerVisibleWorldDay();
+double getServerWorldElapsedSeconds();
 bool isServerSiegeWaveActive();
 bool isServerSiegeEnemy(std::uint64_t entityId);
 bool forceServerSiegeWarning();

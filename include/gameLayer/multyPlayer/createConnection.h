@@ -52,6 +52,7 @@ struct Task
 	MotionState motionState;
 	std::uint64_t timer;
 	unsigned short itemType = 0;
+	ItemUseAction itemUseAction = ItemUseAction::Default;
 	unsigned char from;
 	unsigned char to;
 	unsigned char revisionNumber = 0;

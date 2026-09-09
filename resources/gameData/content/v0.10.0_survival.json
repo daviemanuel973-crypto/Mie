@@ -8,13 +8,25 @@
     {"id": 2197, "key": "mie:item/vegetable_stew"},
     {"id": 2198, "key": "mie:item/berry_porridge"}
   ],
+  "blocks": [
+    {"id": 212, "key": "mie:block/wheat_crop"},
+    {"id": 213, "key": "mie:block/strawberry_crop"},
+    {"id": 214, "key": "mie:block/chilli_crop"},
+    {"id": 215, "key": "mie:block/carrot_crop"},
+    {"id": 216, "key": "mie:block/potato_crop"},
+    {"id": 217, "key": "mie:block/campfire"}
+  ],
   "crops": [
-    {"item": "mie:item/carrot", "growthSeconds": 360, "harvestCount": 2},
-    {"item": "mie:item/potato", "growthSeconds": 390, "harvestCount": 3}
+    {"item": "mie:item/v0.5/2163", "block": "mie:block/wheat_crop", "growthSeconds": 360, "harvestCount": 3},
+    {"item": "mie:item/v0.5/2118", "block": "mie:block/strawberry_crop", "growthSeconds": 480, "harvestCount": 2},
+    {"item": "mie:item/v0.5/2112", "block": "mie:block/chilli_crop", "growthSeconds": 420, "harvestCount": 2},
+    {"item": "mie:item/carrot", "block": "mie:block/carrot_crop", "growthSeconds": 360, "harvestCount": 2},
+    {"item": "mie:item/potato", "block": "mie:block/potato_crop", "growthSeconds": 390, "harvestCount": 3}
   ],
   "recipes": [
-    {"index": 108, "key": "mie:recipe/bake_potato", "station": "mie:machine/cooking_pot"},
+    {"index": 108, "key": "mie:recipe/bake_potato", "station": "mie:machine/campfire"},
     {"index": 109, "key": "mie:recipe/cook_vegetable_stew", "station": "mie:machine/cooking_pot"},
-    {"index": 110, "key": "mie:recipe/cook_berry_porridge", "station": "mie:machine/cooking_pot"}
+    {"index": 110, "key": "mie:recipe/cook_berry_porridge", "station": "mie:machine/cooking_pot"},
+    {"index": 111, "key": "mie:recipe/craft_campfire", "station": "mie:machine/workbench"}
   ]
 }

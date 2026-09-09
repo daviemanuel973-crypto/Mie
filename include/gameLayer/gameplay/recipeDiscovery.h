@@ -6,18 +6,19 @@
 #include <vector>
 
 // The persisted v0.7 content ranges are compacted into one discovery bit set.
-// Blocks occupy IDs [0, 211]. Items are append-only from 2048. v0.10 grows the
-// payload by one byte; the reader accepts the v0.9 45-byte payload and zero-fills
-// the new discovery bits so existing players migrate without losing progress.
+// Blocks occupy IDs [0, 217]. Items are append-only from 2048. Format 3 remaps
+// the item-bit offset used by the 212-block v0.9/early-v0.10 payloads so adding
+// visible crop blocks cannot reinterpret a player's learned materials.
 struct RecipeDiscovery
 {
-	static constexpr std::uint16_t BlockTypeCount = 212;
+	static constexpr std::uint16_t BlockTypeCount = 218;
 	static constexpr std::uint16_t FirstItemType = 2048;
 	static constexpr std::uint16_t LastItemTypeExclusive = 2199;
 	static constexpr std::size_t KnownTypeCount = BlockTypeCount +
 		(LastItemTypeExclusive - FirstItemType);
 	static constexpr std::size_t StorageBytes = (KnownTypeCount + 7) / 8;
 	static constexpr std::size_t LegacyV09StorageBytes = 45;
+	static constexpr std::size_t LegacyV010StorageBytes = 46;
 	static constexpr std::size_t HeaderBytes = 4 + 1 + 2;
 	static constexpr std::size_t SerializedBytes = 4 + 1 + 2 + StorageBytes;
 
@@ -37,7 +38,7 @@ private:
 	std::array<unsigned char, StorageBytes> knownTypes = {};
 };
 
-static_assert(RecipeDiscovery::KnownTypeCount == 363,
+static_assert(RecipeDiscovery::KnownTypeCount == 369,
 	"v0.10 recipe discovery ranges changed without a migration");
-static_assert(RecipeDiscovery::StorageBytes == 46,
-	"v0.10 discovery payload must grow by exactly one byte");
+static_assert(RecipeDiscovery::StorageBytes == 47,
+	"v0.10 block discovery payload must grow by exactly one byte");

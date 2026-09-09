@@ -52,6 +52,8 @@ namespace mie::native
 	constexpr std::uint32_t V05_FIRST_ITEM_ID = 2048;
 	constexpr std::uint32_t V05_LAST_ITEM_EXCLUSIVE = 2184;
 	constexpr std::uint32_t V05_ENTITY_TYPE_COUNT = 8;
+	constexpr std::uint32_t V010_FIRST_BLOCK_ID = V05_BLOCK_COUNT;
+	constexpr std::uint32_t V010_BLOCK_COUNT = V010_FIRST_BLOCK_ID + 6;
 
 	// The shipped v0.7.0 binary appended nine survival-progression items after
 	// the frozen v0.5 item range. Keep these IDs stable so old inventories and

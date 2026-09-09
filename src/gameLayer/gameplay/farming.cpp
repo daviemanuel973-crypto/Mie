@@ -153,6 +153,40 @@ bool farmCropForItem(std::uint16_t itemType, FarmCrop &crop)
 	}
 }
 
+BlockType farmBlockForCrop(FarmCrop crop)
+{
+	switch (crop)
+	{
+		case FarmCrop::Wheat: return BlockTypes::wheatCrop;
+		case FarmCrop::Strawberry: return BlockTypes::strawberryCrop;
+		case FarmCrop::Chilli: return BlockTypes::chilliCrop;
+		case FarmCrop::Carrot: return BlockTypes::carrotCrop;
+		case FarmCrop::Potato: return BlockTypes::potatoCrop;
+		default: return BlockTypes::air;
+	}
+}
+
+bool farmCropForBlock(BlockType blockType, FarmCrop &crop)
+{
+	switch (blockType)
+	{
+		case BlockTypes::wheatCrop: crop = FarmCrop::Wheat; return true;
+		case BlockTypes::strawberryCrop: crop = FarmCrop::Strawberry; return true;
+		case BlockTypes::chilliCrop: crop = FarmCrop::Chilli; return true;
+		case BlockTypes::carrotCrop: crop = FarmCrop::Carrot; return true;
+		case BlockTypes::potatoCrop: crop = FarmCrop::Potato; return true;
+		default: return false;
+	}
+}
+
+bool canPlantFarmCrop(BlockType groundType, BlockType targetType, std::uint16_t itemType)
+{
+	FarmCrop crop;
+	return (groundType == BlockTypes::dirt || groundType == BlockTypes::grassBlock) &&
+		targetType == BlockTypes::air && farmCropForItem(itemType, crop) &&
+		farmBlockForCrop(crop) != BlockTypes::air;
+}
+
 std::uint16_t farmHarvestItem(FarmCrop crop)
 {
 	switch (crop)
@@ -315,14 +349,55 @@ bool harvestFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	return false;
 }
 
+bool uprootFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
+	double currentWorldSeconds, FarmHarvest &harvest)
+{
+	harvest = {};
+	if (!ensureLoaded(worldSavePath) || !std::isfinite(currentWorldSeconds)) { return false; }
+	auto found = cachedPlots.find(position);
+	if (found == cachedPlots.end()) { return false; }
+
+	harvest.itemType = farmHarvestItem(found->second.crop);
+	if (!harvest.itemType) { return false; }
+	if (farmPlotMature(found->second, currentWorldSeconds))
+	{
+		switch (found->second.crop)
+		{
+			case FarmCrop::Wheat: harvest.count = 3; break;
+			case FarmCrop::Strawberry: harvest.count = 2; break;
+			case FarmCrop::Chilli: harvest.count = 2; break;
+			case FarmCrop::Carrot: harvest.count = 2; break;
+			case FarmCrop::Potato: harvest.count = 3; break;
+			default: harvest = {}; return false;
+		}
+	}
+	else
+	{
+		harvest.count = 1;
+	}
+
+	const FarmPlotState removed = found->second;
+	cachedPlots.erase(found);
+	if (saveCache()) { return true; }
+	cachedPlots.emplace(removed.position, removed);
+	harvest = {};
+	return false;
+}
+
+FarmPlotQueryStatus queryFarmPlotStatus(const std::string &worldSavePath,
+	glm::ivec3 position, FarmPlotState &plot)
+{
+	if (!ensureLoaded(worldSavePath)) { return FarmPlotQueryStatus::StorageError; }
+	auto found = cachedPlots.find(position);
+	if (found == cachedPlots.end()) { return FarmPlotQueryStatus::Missing; }
+	plot = found->second;
+	return FarmPlotQueryStatus::Found;
+}
+
 bool queryFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	FarmPlotState &plot)
 {
-	if (!ensureLoaded(worldSavePath)) { return false; }
-	auto found = cachedPlots.find(position);
-	if (found == cachedPlots.end()) { return false; }
-	plot = found->second;
-	return true;
+	return queryFarmPlotStatus(worldSavePath, position, plot) == FarmPlotQueryStatus::Found;
 }
 
 void resetFarmRuntimeCache()

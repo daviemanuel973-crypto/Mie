@@ -6,10 +6,11 @@
 #include <vector>
 
 #include <glm/vec3.hpp>
+#include <blocks.h>
 
-// v0.9 farming deliberately reuses existing produce item IDs and ordinary dirt
-// blocks. Farm plots are world records keyed by position, so old chunks and the
-// frozen v0.7 block-ID range need no migration.
+// Farm crops preserve their original enum values and are stored as world records
+// keyed by position. v0.10 adds append-only visible crop block IDs without
+// changing any shipped terrain or item ID.
 enum class FarmCrop : std::uint8_t
 {
 	Wheat = 0,
@@ -39,7 +40,17 @@ struct FarmHarvest
 	std::uint16_t count = 0;
 };
 
+enum class FarmPlotQueryStatus : std::uint8_t
+{
+	Found = 0,
+	Missing,
+	StorageError,
+};
+
 bool farmCropForItem(std::uint16_t itemType, FarmCrop &crop);
+BlockType farmBlockForCrop(FarmCrop crop);
+bool farmCropForBlock(BlockType blockType, FarmCrop &crop);
+bool canPlantFarmCrop(BlockType groundType, BlockType targetType, std::uint16_t itemType);
 std::uint16_t farmHarvestItem(FarmCrop crop);
 double farmGrowthSeconds(FarmCrop crop);
 float farmGrowthFraction(const FarmPlotState &plot, double currentWorldSeconds);
@@ -54,6 +65,12 @@ bool plantFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	std::uint16_t itemType, double currentWorldSeconds);
 bool harvestFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	double currentWorldSeconds, FarmHarvest &harvest);
+// Removes a planted crop at any growth stage. Mature crops use their normal
+// yield; an uprooted immature crop returns one plantable item.
+bool uprootFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
+	double currentWorldSeconds, FarmHarvest &harvest);
+FarmPlotQueryStatus queryFarmPlotStatus(const std::string &worldSavePath,
+	glm::ivec3 position, FarmPlotState &plot);
 bool queryFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	FarmPlotState &plot);
 void resetFarmRuntimeCache();

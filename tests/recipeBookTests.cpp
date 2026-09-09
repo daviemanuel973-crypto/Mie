@@ -1,6 +1,7 @@
 #include <gameplay/crafting.h>
 #include <gameplay/itemDurability.h>
 
+#include <algorithm>
 #include <iostream>
 
 // Keep this contract focused on the recipe registry and discovery rules. The
@@ -61,8 +62,8 @@ namespace
 
 int main()
 {
-	check(getCraftingRecipeCount() == 111,
-		"v0.10 appends three recipes after the 108 stable v0.9 packet indexes");
+	check(getCraftingRecipeCount() == 112,
+		"v0.10 appends four recipes after the 108 stable v0.9 packet indexes");
 	check(!isCraftingRecipeDiscovered(-1, {}), "negative recipe indexes are rejected");
 	check(!isCraftingRecipeDiscovered(getCraftingRecipeCount(), {}),
 		"out-of-range recipe indexes are rejected");
@@ -113,20 +114,44 @@ int main()
 	check(getRecepieFromIndexUnsafe(104).repairsDurableItem,
 		"the first appended repair recipe is explicitly metadata-tolerant");
 
-	// The first v0.10 food recipes are appended at indexes 108-110 and all use
-	// the already-shipped cooking pot station.
+	// The first v0.10 food recipes remain at indexes 108-110. Baked potatoes use
+	// the dedicated campfire while the two prepared meals use the cooking pot.
 	discovery.learnType(ItemTypes::potato);
 	check(isCraftingRecipeDiscovered(108, discovery),
 		"finding a potato reveals the baked potato recipe");
 	check(getRecepieFromIndexUnsafe(108).result.type == ItemTypes::bakedPotato &&
 		std::string(getCraftingRecipeStationName(getRecepieFromIndexUnsafe(108))) ==
-			"COOKING POT", "baked potatoes use the cooking pot");
+			"CAMPFIRE", "baked potatoes use the dedicated campfire");
 	discovery.learnType(ItemTypes::carrot);
 	check(isCraftingRecipeDiscovered(109, discovery),
 		"carrot, potato and wheat reveal vegetable stew");
 	discovery.learnType(ItemTypes::strawberry);
 	check(isCraftingRecipeDiscovered(110, discovery),
 		"wheat and strawberry reveal berry porridge");
+	discovery.learnType(ItemTypes::charcoal);
+	check(isCraftingRecipeDiscovered(111, discovery) &&
+		getRecepieFromIndexUnsafe(111).result.type == BlockTypes::campfire,
+		"the append-only campfire recipe is discoverable without moving food indexes");
+
+	PlayerInventory campfireCookingInventory;
+	campfireCookingInventory.items[0] = Item(ItemTypes::potato, 1);
+	auto campfireRecipes = getAllPossibleRecepies(campfireCookingInventory,
+		WorkStationType_Campfire);
+	auto cookingPotRecipes = getAllPossibleRecepies(campfireCookingInventory,
+		WorkStationType_CookingPot);
+	check(std::any_of(campfireRecipes.begin(), campfireRecipes.end(), [](const auto &recipe)
+		{ return recipe.index == 108; }), "a potato can be baked at a campfire");
+	check(std::none_of(cookingPotRecipes.begin(), cookingPotRecipes.end(), [](const auto &recipe)
+		{ return recipe.index == 108; }), "a cooking pot cannot bypass the campfire requirement");
+
+	PlayerInventory campfireCraftingInventory;
+	campfireCraftingInventory.items[0] = Item(BlockTypes::birchPlanks, 3);
+	campfireCraftingInventory.items[1] = Item(BlockTypes::cobblestone, 2);
+	campfireCraftingInventory.items[2] = Item(ItemTypes::charcoal, 1);
+	auto workbenchRecipes = getAllPossibleRecepies(campfireCraftingInventory,
+		WorkStationType_WorkBench);
+	check(std::any_of(workbenchRecipes.begin(), workbenchRecipes.end(), [](const auto &recipe)
+		{ return recipe.index == 111; }), "any plank family can craft a campfire at a workbench");
 
 	PlayerInventory damagedInventory;
 	damagedInventory.items[0] = Item(ItemTypes::bronzePickaxe, 1);

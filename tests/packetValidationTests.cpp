@@ -20,7 +20,15 @@ int main()
 {
 	REQUIRE(headerUpdateGuideProgress != headerUpdateWorldDifficulty);
 	REQUIRE(headerUpdateGuideProgress == 52);
-	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 4);
+	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 5);
+	Packet_ClientUsedItem plant = {};
+	plant.useAction = ItemUseAction::PlantCrop;
+	REQUIRE(isKnownItemUseAction(plant.useAction));
+	REQUIRE(!isKnownItemUseAction(static_cast<ItemUseAction>(255)));
+	REQUIRE(itemUseActionConsumesItem(plant.useAction));
+	REQUIRE(!itemUseActionConsumesItem(ItemUseAction::Default));
+	REQUIRE(validateClientPacketPayload(headerClientUsedItem,
+		reinterpret_cast<const char *>(&plant), sizeof(plant)));
 
 	REQUIRE(mie::serverValidation::isAuthoritativeItemSlotUsable(42, 1, 42));
 	REQUIRE(!mie::serverValidation::isAuthoritativeItemSlotUsable(42, 0, 42));

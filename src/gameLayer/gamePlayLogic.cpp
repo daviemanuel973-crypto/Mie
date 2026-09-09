@@ -36,6 +36,7 @@
 #include <gameplay/mapEngine.h>
 #include <gameplay/battleUI.h>
 #include <gameplay/food.h>
+#include <gameplay/farming.h>
 #include <gameplay/playerControlSettings.h>
 #include <gameplay/fieldGuide.h>
 #include <gameplay/siege.h>
@@ -1510,9 +1511,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 								gameData.insideInventoryMenu = false;
 								gameData.currentInventoryTab = 0;
 
-								if (actionType >= InteractionTypes::craftingTable &&
-									actionType < InteractionTypes::structureBaseBlock
-									)
+								if (isCraftingStation(b->getType()) != WorkStationType_None)
 								{
 									gameData.insideInventoryMenu = true;
 									gameData.currentInventoryTab = INVENTORY_TAB_CRAFTING;
@@ -1533,16 +1532,40 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 
 						if (!didAction)
 						{
+							FarmCrop crop;
+							const bool wantsToPlant = platform::isKeyHeld(platform::Button::LeftShift) &&
+								b && (b->getType() == BlockTypes::dirt ||
+									b->getType() == BlockTypes::grassBlock) &&
+								farmCropForItem(item.type, crop);
+							if (wantsToPlant)
+							{
+								Packet_ClientUsedItem data;
+								data.position = rayCastPos;
+								data.from = gameData.currentItemSelected;
+								data.itemType = item.type;
+								data.useAction = ItemUseAction::PlantCrop;
+								data.revisionNumber = player.inventory.revisionNumber;
+								sendPacket(getServer(), headerClientUsedItem, player.entityId,
+									&data, sizeof(data), true, channelChunksAndBlocks);
+
+								if (itemUseActionConsumesItem(data.useAction) &&
+									player.otherPlayerSettings.gameMode == OtherPlayerSettings::SURVIVAL)
+								{
+									item.counter--;
+									if (item.counter <= 0) { item = {}; }
+								}
+								didAction = true;
+							}
 
 							//TODO
 							//also send the time so the server can know from when to simulate that.
-							if (item.type == ItemTypes::fieldGuide)
+							if (!didAction && item.type == ItemTypes::fieldGuide)
 							{
 								gameData.interaction = {};
 								gameData.insideInventoryMenu = true;
 								gameData.currentInventoryTab = INVENTORY_TAB_FIELD_GUIDE;
 							}
-							else if (item.isEatable())
+							else if (!didAction && item.isEatable())
 							{
 
 								bool allowed = true;
@@ -1586,7 +1609,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 								};
 
 							}else
-							if (item.isItemThatCanBeUsed())
+							if (!didAction && item.isItemThatCanBeUsed())
 							{
 
 								Packet_ClientUsedItem data;
@@ -1628,7 +1651,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 								
 
 							}
-							else if (blockToPlace && item.isBlock())
+							else if (!didAction && blockToPlace && item.isBlock())
 							{
 								bool dontPlace = false;
 

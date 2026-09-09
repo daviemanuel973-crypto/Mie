@@ -49,7 +49,10 @@ int blockReorder[] = {
 
 	// Structures & Functional Blocks
 	workBench, furnace, cookingPot, ladder, trainingDummy, target,
-	reinforcedBarricade, woodenSpikeTrap,
+	reinforcedBarricade, woodenSpikeTrap, campfire,
+
+	// v0.10 crops
+	wheatCrop, strawberryCrop, chilliCrop, carrotCrop, potatoCrop,
 
 	// Furniture
 	bookShelf,
@@ -201,7 +204,9 @@ bool isWallMesh(BlockType type)
 
 bool isCrossMesh(BlockType type)
 {
-	return isGrassMesh(type) || type == cobweb;
+	return isGrassMesh(type) || type == cobweb ||
+		type == wheatCrop || type == strawberryCrop || type == chilliCrop ||
+		type == carrotCrop || type == potatoCrop;
 }
 
 bool isControlBlock(BlockType type)
@@ -288,6 +293,7 @@ bool isDecorativeFurniture(BlockType type)
 		type == goblinTable ||
 		type == goblinStitchingPost ||
 		type == woodenSpikeTrap ||
+		type == campfire ||
 		type == globe
 		
 		;
@@ -301,7 +307,8 @@ bool isLightEmitor(BlockType type)
 		|| type == BlockTypes::goblinTorch
 		|| type == BlockTypes::lamp
 		|| type == BlockTypes::candleHolder
-		|| type == BlockTypes::skullTorch;
+		|| type == BlockTypes::skullTorch
+		|| type == BlockTypes::campfire;
 }
 
 bool isTransparentGeometry(BlockType type)
@@ -351,6 +358,12 @@ bool isColidable(BlockType type)
 		type != BlockTypes::craftingItems &&
 		type != BlockTypes::target &&
 		type != BlockTypes::woodenSpikeTrap &&
+		type != BlockTypes::campfire &&
+		type != BlockTypes::wheatCrop &&
+		type != BlockTypes::strawberryCrop &&
+		type != BlockTypes::chilliCrop &&
+		type != BlockTypes::carrotCrop &&
+		type != BlockTypes::potatoCrop &&
 		type != BlockTypes::mug;
 }
 
@@ -405,7 +418,8 @@ bool isAnyWoddenBlock(BlockType type)
 		type == strippedSpruceLog ||
 		type == logWall ||
 		type == reinforcedBarricade ||
-		type == woodenSpikeTrap;
+		type == woodenSpikeTrap ||
+		type == campfire;
 		
 }
 
@@ -612,7 +626,12 @@ bool isAnyPlant(BlockType type)
 		type == rose ||
 		type == dead_bush ||
 		type == vines ||
-		type == cactus_bud;
+		type == cactus_bud ||
+		type == wheatCrop ||
+		type == strawberryCrop ||
+		type == chilliCrop ||
+		type == carrotCrop ||
+		type == potatoCrop;
 }
 
 bool isAnyGlass(BlockType type)
@@ -651,7 +670,7 @@ bool isAnyUnbreakable(BlockType type)
 
 bool isAnyHotSoundingBlock(BlockType type)
 {
-	return type == volcanicHotRock;
+	return type == volcanicHotRock || type == campfire;
 }
 
 bool isAnyLeaves(BlockType type)
@@ -676,6 +695,10 @@ unsigned char isInteractable(BlockType type)
 
 	if (craftingStation)
 	{
+		if (craftingStation == WorkStationType_Campfire)
+		{
+			return InteractionTypes::campfire;
+		}
 		return craftingStation;
 	}else if (type == BlockTypes::structureBase)
 	{
@@ -739,6 +762,7 @@ int isCraftingStation(unsigned short type)
 	case cookingPot: return WorkStationType_CookingPot;
 	case furnace: return WorkStationType_Furnace;
 	case goblinStitchingPost: return WorkStationType_GoblinStitchingPost;
+	case campfire: return WorkStationType_Campfire;
 
 	}
 

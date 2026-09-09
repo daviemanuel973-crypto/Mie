@@ -7,8 +7,18 @@
 namespace
 {
 	constexpr std::array<unsigned char, 4> discoveryMagic = {'M', 'I', 'E', 'R'};
-	constexpr std::uint8_t legacyDiscoveryVersion = 1;
-	constexpr std::uint8_t discoveryVersion = 2;
+	constexpr std::uint8_t legacyV09DiscoveryVersion = 1;
+	constexpr std::uint8_t legacyV010DiscoveryVersion = 2;
+	constexpr std::uint8_t discoveryVersion = 3;
+	constexpr std::uint16_t legacyBlockTypeCount = 212;
+	constexpr std::uint16_t legacyV09LastItemExclusive = 2194;
+
+	bool sourceBitIsSet(const unsigned char *bytes, std::size_t payloadSize,
+		std::size_t index)
+	{
+		return index / 8 < payloadSize &&
+			(bytes[index / 8] & static_cast<unsigned char>(1u << (index % 8))) != 0;
+	}
 }
 
 bool RecipeDiscovery::typeToIndex(std::uint16_t type, std::size_t &index)
@@ -99,12 +109,34 @@ int RecipeDiscovery::readFromData(const void *data, std::size_t size)
 	std::uint16_t payloadSize = 0;
 	std::memcpy(&payloadSize, bytes + discoveryMagic.size() + sizeof(version),
 		sizeof(payloadSize));
-	const bool legacyPayload = version == legacyDiscoveryVersion &&
+	const bool legacyV09Payload = version == legacyV09DiscoveryVersion &&
 		payloadSize == LegacyV09StorageBytes;
+	const bool legacyV010Payload = version == legacyV010DiscoveryVersion &&
+		payloadSize == LegacyV010StorageBytes;
 	const bool currentPayload = version == discoveryVersion && payloadSize == StorageBytes;
-	if ((!legacyPayload && !currentPayload) || size < HeaderBytes + payloadSize) { return -1; }
+	if ((!legacyV09Payload && !legacyV010Payload && !currentPayload) ||
+		size < HeaderBytes + payloadSize) { return -1; }
 
-	std::copy_n(bytes + HeaderBytes, payloadSize, knownTypes.begin());
+	if (currentPayload)
+	{
+		std::copy_n(bytes + HeaderBytes, payloadSize, knownTypes.begin());
+	}
+	else
+	{
+		const unsigned char *legacy = bytes + HeaderBytes;
+		for (std::uint16_t type = 1; type < legacyBlockTypeCount; ++type)
+		{
+			if (sourceBitIsSet(legacy, payloadSize, type)) { learnType(type); }
+		}
+		const std::uint16_t legacyLastItem = legacyV09Payload ?
+			legacyV09LastItemExclusive : LastItemTypeExclusive;
+		for (std::uint16_t type = FirstItemType; type < legacyLastItem; ++type)
+		{
+			const std::size_t oldIndex = legacyBlockTypeCount +
+				static_cast<std::size_t>(type - FirstItemType);
+			if (sourceBitIsSet(legacy, payloadSize, oldIndex)) { learnType(type); }
+		}
+	}
 	sanitize();
 	return static_cast<int>(HeaderBytes + payloadSize);
 }

@@ -15,6 +15,12 @@ namespace
 			++failures;
 		}
 	}
+
+	void setPayloadBit(std::vector<unsigned char> &payload, std::size_t index)
+	{
+		payload[RecipeDiscovery::HeaderBytes + index / 8] |=
+			static_cast<unsigned char>(1u << (index % 8));
+	}
 }
 
 int main()
@@ -49,14 +55,16 @@ int main()
 		static_cast<int>(RecipeDiscovery::SerializedBytes), "a valid payload parses exactly");
 	check(decoded == discovery, "recipe discovery round-trips without losing types");
 
-	// v0.9 used discovery format 1 with a 45-byte payload. A v0.10 reader must
-	// preserve those bits and initialize only the newly appended item bits to 0.
-	auto legacyPayload = payload;
+	// v0.9 used 212 block bits followed by item bits. Build an authentic old
+	// payload and verify that format 3 remaps, rather than merely copies, items.
+	std::vector<unsigned char> legacyPayload(RecipeDiscovery::HeaderBytes +
+		RecipeDiscovery::LegacyV09StorageBytes, 0);
+	legacyPayload[0] = 'M'; legacyPayload[1] = 'I';
+	legacyPayload[2] = 'E'; legacyPayload[3] = 'R';
 	legacyPayload[4] = 1;
 	legacyPayload[5] = static_cast<unsigned char>(RecipeDiscovery::LegacyV09StorageBytes);
-	legacyPayload[6] = 0;
-	legacyPayload.resize(RecipeDiscovery::HeaderBytes +
-		RecipeDiscovery::LegacyV09StorageBytes);
+	setPayloadBit(legacyPayload, 5);
+	setPayloadBit(legacyPayload, 212);
 	RecipeDiscovery migrated;
 	check(migrated.readFromData(legacyPayload.data(), legacyPayload.size()) ==
 		static_cast<int>(legacyPayload.size()), "a v0.9 discovery payload migrates");
@@ -65,6 +73,21 @@ int main()
 		"v0.9 learned material bits survive migration");
 	check(!migrated.knowsType(RecipeDiscovery::LastItemTypeExclusive - 5),
 		"v0.10 materials are not learned accidentally during migration");
+
+	// Early v0.10 format 2 contains all five new foods but still starts item bits
+	// after block 211. Their learned state must survive the six-block insertion.
+	std::vector<unsigned char> earlyV010(RecipeDiscovery::HeaderBytes +
+		RecipeDiscovery::LegacyV010StorageBytes, 0);
+	earlyV010[0] = 'M'; earlyV010[1] = 'I'; earlyV010[2] = 'E'; earlyV010[3] = 'R';
+	earlyV010[4] = 2;
+	earlyV010[5] = static_cast<unsigned char>(RecipeDiscovery::LegacyV010StorageBytes);
+	setPayloadBit(earlyV010, 212 +
+		(RecipeDiscovery::LastItemTypeExclusive - 1 - RecipeDiscovery::FirstItemType));
+	RecipeDiscovery migratedEarlyV010;
+	check(migratedEarlyV010.readFromData(earlyV010.data(), earlyV010.size()) ==
+		static_cast<int>(earlyV010.size()), "an early v0.10 discovery payload migrates");
+	check(migratedEarlyV010.knowsType(RecipeDiscovery::LastItemTypeExclusive - 1),
+		"early v0.10 food discoveries survive the block-bit offset migration");
 
 	for (std::size_t size = 0; size < payload.size(); ++size)
 	{
@@ -78,7 +101,7 @@ int main()
 	check(decoded.readFromData(badMagic.data(), badMagic.size()) < 0,
 		"invalid discovery magic is rejected");
 	auto badVersion = payload;
-	badVersion[4] = 3;
+	badVersion[4] = 4;
 	check(decoded.readFromData(badVersion.data(), badVersion.size()) < 0,
 		"future discovery versions are rejected safely");
 	auto badLength = payload;

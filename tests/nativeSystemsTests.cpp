@@ -65,6 +65,11 @@ namespace
 			"v0.9 bedroll keeps its persisted runtime ID");
 
 		ContentRegistry v010 = createV010ContentRegistry();
+		check(v010.size(ContentKind::Block) == V010_BLOCK_COUNT,
+			"v0.10 appends six visible blocks without renumbering v0.5");
+		check(v010.resolve(ContentKind::Block, "mie:block/wheat_crop") == 212 &&
+			v010.resolve(ContentKind::Block, "mie:block/campfire") == 217,
+			"v0.10 block stable keys resolve to their append-only IDs");
 		check(v010.size(ContentKind::Item) ==
 			V010_LAST_ITEM_EXCLUSIVE - V05_FIRST_ITEM_ID,
 			"v0.10 appends five items without renumbering older content");
@@ -73,8 +78,13 @@ namespace
 			"v0.10 food stable keys resolve to their append-only IDs");
 		check(v010.resolve(ContentKind::Machine, "mie:machine/cooking_pot") == 2,
 			"the shipped cooking pot has a stable native machine key");
+		check(v010.resolve(ContentKind::Machine, "mie:machine/campfire") == 3,
+			"the v0.10 campfire has a stable native machine key");
+		check(v010.resolve(ContentKind::Machine, "mie:machine/workbench") == 4,
+			"the shipped workbench has a stable native machine key for content data");
 		check(v010.resolve(ContentKind::Recipe, "mie:recipe/bake_potato") == 9 &&
-			v010.resolve(ContentKind::Recipe, "mie:recipe/cook_berry_porridge") == 11,
+			v010.resolve(ContentKind::Recipe, "mie:recipe/cook_berry_porridge") == 11 &&
+			v010.resolve(ContentKind::Recipe, "mie:recipe/craft_campfire") == 12,
 			"v0.10 cooking recipes occupy new native registry IDs");
 	}
 
