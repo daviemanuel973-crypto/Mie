@@ -744,7 +744,7 @@ void ChunkSystem::update(glm::ivec3 playerBlockPosition, float deltaTime, UndoQu
 		std::partial_sort(chunkVectorCopyNoNullsOnlyToBake.begin(),
 			chunkVectorCopyNoNullsOnlyToBake.begin() + taskLimit,
 			chunkVectorCopyNoNullsOnlyToBake.end(), byDistance);
-		chunkVectorCopyNoNullsOnlyToBake.resize(taskLimit);
+		chunkVectorCopyNoNullsOnlyToBake.resize(100 + threadPool.currentCounter);
 	}
 	else
 	{
