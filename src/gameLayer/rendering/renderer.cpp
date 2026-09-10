@@ -1,3 +1,4 @@
+#include <rendering/chunkDistanceOrder.h>
 #include "rendering/renderer.h"
 #include <ctime>
 #include "blocks.h"
@@ -2806,13 +2807,20 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 // region frustum culling and sorting
 
 	//chunk vector copy has only valid non culled chunks!
-	std::vector<Chunk*> chunkVectorCopy;
+	static std::vector<Chunk*> chunkVectorCopy;
+	chunkVectorCopy.clear();
 	chunkVectorCopy.reserve(chunkSystem.loadedChunks.size());
 
 	FrustumVolume cameraFrustum(c.getViewProjectionWithPositionMatrixDouble());
 
-	for (auto c : chunkSystem.loadedChunks)
+	static mie::rendering::ChunkDistanceOrder chunkDistanceOrder;
+	const auto &chunkOrder = chunkDistanceOrder.backToFront(chunkSystem.squareSize,
+		divideChunk(blockPosition.x) - chunkSystem.cornerPos.x,
+		divideChunk(blockPosition.z) - chunkSystem.cornerPos.y);
+	for (int index : chunkOrder)
 	{
+		if (static_cast<std::size_t>(index) >= chunkSystem.loadedChunks.size()) { continue; }
+		auto c = chunkSystem.loadedChunks[index];
 		if (c)
 		{
 			bool culled = 0;
@@ -2841,28 +2849,6 @@ void Renderer::renderFromBakedData(SunShadow &sunShadow, ChunkSystem &chunkSyste
 				chunkVectorCopy.push_back(c);
 			}
 		}
-	}
-
-	//sort chunks
-	{
-		std::sort(chunkVectorCopy.begin(), chunkVectorCopy.end(),
-			[x = divideChunk(blockPosition.x), z = divideChunk(blockPosition.z)](Chunk *b, Chunk *a)
-		{
-			if (a == nullptr) { return false; }
-			if (b == nullptr) { return true; }
-
-			int ax = a->data.x - x;
-			int az = a->data.z - z;
-
-			int bx = b->data.x - x;
-			int bz = b->data.z - z;
-
-			unsigned long reza = ax * ax + az * az;
-			unsigned long rezb = bx * bx + bz * bz;
-
-			return reza < rezb;
-		}
-		);
 	}
 
 // endregion

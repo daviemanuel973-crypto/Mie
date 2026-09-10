@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -142,11 +143,6 @@ namespace mie::native
 			return true;
 		}
 
-		VillagerProfile *find(std::uint64_t id)
-		{
-			auto found = villagers.find(id);
-			return found == villagers.end() ? nullptr : &found->second;
-		}
 
 		const VillagerProfile *find(std::uint64_t id) const
 		{
@@ -156,17 +152,19 @@ namespace mie::native
 
 		bool setSimulationLevel(std::uint64_t id, SimulationLevel level)
 		{
-			VillagerProfile *profile = find(id);
+			VillagerProfile *profile = findMutable(id);
 			if (!profile || static_cast<unsigned int>(level) > 3u) { return false; }
 			if (profile->simulationLevel == level) { return true; }
+			scheduled.erase({profile->nextUpdateTick, id});
 			profile->simulationLevel = level;
+			if (level != SimulationLevel::Unloaded) { scheduled.emplace(profile->nextUpdateTick, id); }
 			persistenceDirty = true;
 			return true;
 		}
 
 		bool changeReputation(std::uint64_t villagerId, std::uint64_t playerId, int delta)
 		{
-			VillagerProfile *profile = find(villagerId);
+			VillagerProfile *profile = findMutable(villagerId);
 			if (!profile || playerId == 0 || delta == 0) { return false; }
 			for (VillagerReputation &entry : profile->reputations)
 			{
@@ -198,21 +196,21 @@ namespace mie::native
 		void update(std::uint64_t currentTick, std::uint64_t budget)
 		{
 			std::uint64_t executed = 0;
+			if (currentTick == std::numeric_limits<std::uint64_t>::max()) { return; }
 			const std::uint64_t timeOfDay = currentTick % 24'000u;
 			const bool workHours = timeOfDay >= 6'000u && timeOfDay < 18'000u;
-			for (auto &entry : villagers)
+			while (!scheduled.empty() && scheduled.begin()->first <= currentTick)
 			{
-				VillagerProfile &profile = entry.second;
-				if (profile.simulationLevel == SimulationLevel::Unloaded ||
-					profile.nextUpdateTick > currentTick)
-				{
-					continue;
-				}
 				if (executed >= budget)
 				{
-					++runtimeMetrics.updatesDeferred;
-					continue;
+					// Only overdue entries contribute; dormant/future profiles are not scanned.
+					const auto end = scheduled.upper_bound({currentTick,
+						std::numeric_limits<std::uint64_t>::max()});
+					runtimeMetrics.updatesDeferred += std::distance(scheduled.begin(), end);
+					break;
 				}
+				auto deadline = scheduled.extract(scheduled.begin());
+				VillagerProfile &profile = villagers.at(deadline.value().second);
 
 				if (workHours)
 				{
@@ -224,8 +222,11 @@ namespace mie::native
 					profile.activity = VillagerActivity::Idle;
 					profile.energy = static_cast<std::uint8_t>(std::min<int>(100, profile.energy + 2));
 				}
-				profile.nextUpdateTick = currentTick +
-					20u * simulationIntervalMultiplier(profile.simulationLevel);
+				const std::uint64_t interval = 20u * simulationIntervalMultiplier(profile.simulationLevel);
+				profile.nextUpdateTick = currentTick > std::numeric_limits<std::uint64_t>::max() - interval ?
+					std::numeric_limits<std::uint64_t>::max() : currentTick + interval;
+				deadline.value().first = profile.nextUpdateTick;
+				scheduled.insert(std::move(deadline));
 				++executed;
 				++runtimeMetrics.updatesExecuted;
 				persistenceDirty = true;
@@ -366,7 +367,16 @@ namespace mie::native
 				}
 			}
 			if (offset != size) { return false; }
+			std::set<std::pair<std::uint64_t, std::uint64_t>> candidateSchedule;
+			for (const auto &entry : candidate)
+			{
+				if (entry.second.simulationLevel != SimulationLevel::Unloaded)
+				{
+					candidateSchedule.emplace(entry.second.nextUpdateTick, entry.first);
+				}
+			}
 			villagers.swap(candidate);
+			scheduled.swap(candidateSchedule);
 			persistenceDirty = false;
 			return true;
 		}
@@ -388,11 +398,18 @@ namespace mie::native
 		void clear()
 		{
 			villagers.clear();
+			scheduled.clear();
 			runtimeMetrics = {};
 			persistenceDirty = true;
 		}
 
 	private:
+		VillagerProfile *findMutable(std::uint64_t id)
+		{
+			auto found = villagers.find(id);
+			return found == villagers.end() ? nullptr : &found->second;
+		}
+
 		template <class T>
 		static void append(std::vector<unsigned char> &data, const T &value)
 		{
@@ -415,6 +432,7 @@ namespace mie::native
 		}
 
 		std::unordered_map<std::uint64_t, VillagerProfile> villagers;
+		std::set<std::pair<std::uint64_t, std::uint64_t>> scheduled;
 		bool persistenceDirty = false;
 		VillagerSocietyMetrics runtimeMetrics;
 	};

@@ -6,16 +6,29 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <limits>
+#include <mutex>
 #include <unordered_map>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace
 {
 	constexpr std::array<unsigned char, 8> farmMagic = {'M','I','E','F','A','R','M',0};
 	constexpr std::uint32_t farmFormatVersion = 1;
 	constexpr std::uint32_t maxFarmPlots = 250'000;
+	constexpr std::size_t farmRecordBytes = sizeof(std::int32_t) * 3 + sizeof(std::uint8_t) + sizeof(double);
 
 	struct Ivec3Hash
 	{
@@ -31,6 +44,44 @@ namespace
 	std::string cachedWorldPath;
 	bool cacheLoaded = false;
 	std::unordered_map<glm::ivec3, FarmPlotState, Ivec3Hash> cachedPlots;
+	// Region ticks may plant/harvest concurrently. Cache changes and their disk
+	// commit form one transaction; no second worker can observe a partial change.
+	std::mutex cacheMutex;
+
+	bool writeFarmCopy(const std::vector<unsigned char> &data, const std::string &path)
+	{
+		const std::string temp = path + ".tmp";
+		std::FILE *file = std::fopen(temp.c_str(), "wb");
+		if (!file) { return false; }
+		// Same FNV-1a trailer as safeSave v1: existing primary/backup files and
+		// older readers keep their exact byte format.
+		std::uint64_t checksum = 0xcbf29ce484222325ULL;
+		for (unsigned char byte : data) { checksum = (checksum ^ byte) * 0x100000001b3ULL; }
+		bool success = std::fwrite(data.data(), 1, data.size(), file) == data.size();
+		if (success) { success = std::fwrite(&checksum, 1, sizeof(checksum), file) == sizeof(checksum); }
+		if (success) { success = std::fflush(file) == 0; }
+#ifdef _WIN32
+		if (success) { success = ::_commit(::_fileno(file)) == 0; }
+#else
+		if (success) { success = ::fsync(::fileno(file)) == 0; }
+#endif
+		if (std::fclose(file) != 0) { success = false; }
+		if (success)
+		{
+#ifdef _WIN32
+			success = ::MoveFileExA(temp.c_str(), path.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#else
+			success = std::rename(temp.c_str(), path.c_str()) == 0;
+#endif
+		}
+		if (!success)
+		{
+			std::error_code error;
+			std::filesystem::remove(temp, error);
+		}
+		return success;
+	}
 
 	template <class T>
 	void appendValue(std::vector<unsigned char> &data, const T &value)
@@ -102,20 +153,35 @@ namespace
 		// safeSave treats this as a base name and persists two checksum-protected
 		// copies as <base>1.bin and <base>2.bin. Checking only the base path makes
 		// every fresh process incorrectly look like it has no farming data.
-		if (!std::filesystem::exists(path + "1.bin") &&
-			!std::filesystem::exists(path + "2.bin"))
+		std::error_code error;
+		const bool primaryExists = std::filesystem::exists(path + "1.bin", error);
+		if (error) { return false; }
+		const bool backupExists = std::filesystem::exists(path + "2.bin", error);
+		if (error) { return false; }
+		if (!primaryExists && !backupExists)
 		{
 			cacheLoaded = true;
 			return true;
 		}
 
-		std::vector<char> data;
-		if (sfs::safeLoad(data, path.c_str(), false) != sfs::noError) { return false; }
-		std::vector<FarmPlotState> parsed;
-		if (!parseFarmPlots(data.data(), data.size(), parsed)) { return false; }
-		for (const auto &plot : parsed) { cachedPlots.emplace(plot.position, plot); }
-		cacheLoaded = true;
-		return true;
+		// Bound file allocation and reject directories/truncation before calling
+		// the legacy reader. A semantically invalid primary may still have a valid backup.
+		constexpr std::uintmax_t maxFileBytes = 24 + maxFarmPlots * farmRecordBytes;
+		for (const auto &candidate : {path + "1.bin", path + "2.bin"})
+		{
+			error.clear();
+			const auto fileBytes = std::filesystem::file_size(candidate, error);
+			if (error || fileBytes < 24 || fileBytes > maxFileBytes) { continue; }
+			std::vector<char> data;
+			if (sfs::readEntireFileWithCheckSum(data, candidate.c_str()) != sfs::noError) { continue; }
+			std::vector<FarmPlotState> parsed;
+			if (!parseFarmPlots(data.data(), data.size(), parsed)) { continue; }
+			cachedPlots.reserve(parsed.size());
+			for (const auto &plot : parsed) { cachedPlots.emplace(plot.position, plot); }
+			cacheLoaded = true;
+			return true;
+		}
+		return false;
 	}
 
 	bool saveCache()
@@ -135,8 +201,12 @@ namespace
 		std::error_code error;
 		std::filesystem::create_directories(cachedWorldPath, error);
 		if (error) { return false; }
-		return sfs::safeSave(data.data(), data.size(), farmSavePath(cachedWorldPath).c_str(), true)
-			== sfs::noError;
+		const auto path = farmSavePath(cachedWorldPath);
+		if (!writeFarmCopy(data, path + "1.bin")) { return false; }
+		// The primary rename is the commit point. A backup error must never roll
+		// inventory/cache back after the new plot was already committed on disk.
+		writeFarmCopy(data, path + "2.bin");
+		return true;
 	}
 }
 
@@ -233,6 +303,7 @@ std::vector<unsigned char> formatFarmPlots(const std::vector<FarmPlotState> &plo
 	for (const auto &plot : plots) { if (!validPlot(plot)) { return {}; } }
 
 	std::vector<unsigned char> data;
+	data.reserve(farmMagic.size() + sizeof(std::uint32_t) * 2 + plots.size() * farmRecordBytes);
 	data.insert(data.end(), farmMagic.begin(), farmMagic.end());
 	appendValue(data, farmFormatVersion);
 	const std::uint32_t count = static_cast<std::uint32_t>(plots.size());
@@ -266,7 +337,10 @@ bool parseFarmPlots(const void *data, std::size_t size, std::vector<FarmPlotStat
 		return false;
 	}
 
+	// Validate the exact bounded payload before allocating from a file's count.
+	if (reader.remaining() != static_cast<std::size_t>(count) * farmRecordBytes) { return false; }
 	std::unordered_map<glm::ivec3, bool, Ivec3Hash> seen;
+	seen.reserve(count);
 	plots.reserve(count);
 	for (std::uint32_t i = 0; i < count; ++i)
 	{
@@ -302,6 +376,7 @@ bool parseFarmPlots(const void *data, std::size_t size, std::vector<FarmPlotStat
 bool plantFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	std::uint16_t itemType, double currentWorldSeconds)
 {
+	const std::lock_guard<std::mutex> lock(cacheMutex);
 	FarmCrop crop;
 	if (!farmCropForItem(itemType, crop) || !validPosition(position) ||
 		!std::isfinite(currentWorldSeconds) || currentWorldSeconds < 0.0 ||
@@ -323,6 +398,7 @@ bool plantFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 bool harvestFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	double currentWorldSeconds, FarmHarvest &harvest)
 {
+	const std::lock_guard<std::mutex> lock(cacheMutex);
 	harvest = {};
 	if (!ensureLoaded(worldSavePath)) { return false; }
 	auto found = cachedPlots.find(position);
@@ -352,6 +428,7 @@ bool harvestFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 bool uprootFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 	double currentWorldSeconds, FarmHarvest &harvest)
 {
+	const std::lock_guard<std::mutex> lock(cacheMutex);
 	harvest = {};
 	if (!ensureLoaded(worldSavePath) || !std::isfinite(currentWorldSeconds)) { return false; }
 	auto found = cachedPlots.find(position);
@@ -387,6 +464,7 @@ bool uprootFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 FarmPlotQueryStatus queryFarmPlotStatus(const std::string &worldSavePath,
 	glm::ivec3 position, FarmPlotState &plot)
 {
+	const std::lock_guard<std::mutex> lock(cacheMutex);
 	if (!ensureLoaded(worldSavePath)) { return FarmPlotQueryStatus::StorageError; }
 	auto found = cachedPlots.find(position);
 	if (found == cachedPlots.end()) { return FarmPlotQueryStatus::Missing; }
@@ -402,6 +480,7 @@ bool queryFarmPlot(const std::string &worldSavePath, glm::ivec3 position,
 
 void resetFarmRuntimeCache()
 {
+	const std::lock_guard<std::mutex> lock(cacheMutex);
 	cachedWorldPath.clear();
 	cacheLoaded = false;
 	cachedPlots.clear();

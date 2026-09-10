@@ -227,7 +227,7 @@ jobs:
             tests/farmingTests.cpp \
             src/gameLayer/gameplay/farming.cpp \
             thirdparty/safeSave/src/safeSave.cpp \
-            -o farmingTests
+            -pthread -o farmingTests
           ./farmingTests
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
@@ -241,6 +241,24 @@ jobs:
             src/gameLayer/native/worldSchema.cpp \
             -o nativeSystemsTests
           ./nativeSystemsTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude/gameLayer -isystem thirdparty/glm \
+            tests/optimizationTests.cpp src/gameLayer/native/gameplayScheduler.cpp \
+            -o optimizationTests
+          ./optimizationTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude/gameLayer -isystem thirdparty/glm \
+            tests/navigationFieldTests.cpp -o navigationFieldTests
+          ./navigationFieldTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pthread \
+            -Iinclude/gameLayer tests/threadPoolTests.cpp src/gameLayer/threadPool.cpp \
+            -o threadPoolTests
+          timeout 20s ./threadPoolTests
+
+
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -pedantic \
             -Iinclude/gameLayer \

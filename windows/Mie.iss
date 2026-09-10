@@ -1,6 +1,6 @@
 #define MyAppName "Mie Survival"
 #ifndef MyAppVersion
-#define MyAppVersion "0.10.0"
+#define MyAppVersion "0.10.1"
 #endif
 #define MyAppPublisher "Mie contributors"
 #define MyAppExeName "Mie.exe"

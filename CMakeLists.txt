@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.10.0" CACHE STRING "Mie Survival release version")
+set(OURCRAFT_VERSION "0.10.1" CACHE STRING "Mie Survival release version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -268,6 +268,29 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
 	add_test(NAME native-systems COMMAND nativeSystemsTests)
 
+	add_executable(optimizationTests tests/optimizationTests.cpp
+		src/gameLayer/native/gameplayScheduler.cpp)
+	target_include_directories(optimizationTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	target_link_libraries(optimizationTests PRIVATE glm)
+	add_test(NAME low-first-optimization COMMAND optimizationTests)
+
+	add_executable(navigationFieldTests tests/navigationFieldTests.cpp)
+	target_include_directories(navigationFieldTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	target_link_libraries(navigationFieldTests PRIVATE glm)
+	add_test(NAME navigation-field COMMAND navigationFieldTests)
+
+	find_package(Threads REQUIRED)
+	add_executable(threadPoolTests tests/threadPoolTests.cpp src/gameLayer/threadPool.cpp)
+	target_include_directories(threadPoolTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/")
+	target_link_libraries(threadPoolTests PRIVATE Threads::Threads)
+	add_test(NAME thread-pool COMMAND threadPoolTests)
+	set_tests_properties(thread-pool PROPERTIES TIMEOUT 20)
+
+
+
 	add_executable(playerControlSettingsTests
 		tests/playerControlSettingsTests.cpp
 		src/gameLayer/gameplay/playerControlSettings.cpp)
@@ -347,7 +370,8 @@ if (BUILD_TESTING)
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/"
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/safeSave/include/")
-	target_link_libraries(farmingTests PRIVATE safeSave glm)
+	find_package(Threads REQUIRED)
+	target_link_libraries(farmingTests PRIVATE safeSave glm Threads::Threads)
 	add_test(NAME farming-persistence COMMAND farmingTests)
 
 
@@ -472,6 +496,9 @@ if (BUILD_TESTING)
 		day-night-spawn-pressure
 		item-durability
 		native-systems
+		low-first-optimization
+		navigation-field
+		thread-pool
 		player-control-settings
 		entity-stats
 		survival-rules

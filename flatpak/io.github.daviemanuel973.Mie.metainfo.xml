@@ -20,6 +20,11 @@
     <name>Mie contributors</name>
   </developer>
   <releases>
+    <release version="0.10.1" date="2026-09-10">
+      <description>
+        <p>Low-first CPU optimizations for chunk rendering, bounded navigation, and scheduled native simulation. Save IDs, content and multiplayer protocol are preserved.</p>
+      </description>
+    </release>
     <release version="0.10.0" date="2026-09-04">
       <description>
         <p>First subsistence content slice with root crops, new cooking-pot meals and save-compatible recipe discovery.</p>

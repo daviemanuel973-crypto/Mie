@@ -72,14 +72,7 @@ bool readData(std::ifstream &f, void *data, size_t size);
 
 
 
-struct PathFindingNode
-{
-	glm::ivec3 returnPos = {};
-	int level = 0;
-};
-
-using PathFindingField = std::unordered_map<glm::ivec3, PathFindingNode>;
-using PathFindingFieldView = std::unordered_map<std::uint64_t, const PathFindingField *>;
+#include <gameplay/navigationField.h>
 
 struct PositionAndEID
 {

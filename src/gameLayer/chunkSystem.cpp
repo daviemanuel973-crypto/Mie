@@ -348,59 +348,17 @@ struct PerThreadData
 
 void bakeWorkerThread(int index, ThreadPool &threadPool)
 {
-
-	//std::cout << "Weaked up thread CHUNK BAKER! " << index << "\n";
-
-	while (threadPool.running[index])
+	while (threadPool.waitForWork(index))
 	{
-		//wait for work...
-		if (threadPool.threIsWork[index])
-		{
-			//while (true)
-			{
-				//if (!threadPool.running[index]) 
-				//{
-				//	//early exit in case the game wants us to close
-				//	threadPool.threIsWork[index] = false;
-				//	break;  
-				//}
-
-				auto &data = perThreadData[index];
-				data.chunk = nullptr;
-
-				bakeLogicForOneThread(threadPool, data.transparentCandidates, 
-					data.opaqueGeometry, data.transparentGeometry, data.lights, false, 
-					&data.updateTransparency, &data.updateGeometry, 
-					&data.chunk);
-
-				//
-				////std::cout << index << " took task " << taskIndex << '\n';
-				//Profiler *p = 0;
-				//if (taskIndex == 0) { p = &gameTickProfiler; }
-				//
-				////tick
-				//doGameTick(tickDeltaTime, tickDeltaTimeMs, currentTimer,
-				//	chunkRegionsData[taskIndex].chunkCache,
-				//	chunkRegionsData[taskIndex].orphanEntities,
-				//	chunkRegionsData[taskIndex].seed,
-				//	chunkRegionsData[taskIndex].waitingTasks,
-				//	*worldSaver, p
-				//);
-
-			
-			}
-
-			//done work
-			threadPool.threIsWork[index] = false;
-		}
-
-
+		auto &data = perThreadData[index];
+		data.chunk = nullptr;
+		bakeLogicForOneThread(threadPool, data.transparentCandidates,
+			data.opaqueGeometry, data.transparentGeometry, data.lights, false,
+			&data.updateTransparency, &data.updateGeometry, &data.chunk);
+		threadPool.markWorkFinished(index);
 	}
-
-	//std::cout << "CLOSED THREAD CHUNK BAKER! " << index << "\n";
 }
 
-//x and z are the block positions of the player
 void ChunkSystem::update(glm::ivec3 playerBlockPosition, float deltaTime, UndoQueue &undoQueue
 	, LightSystem &lightSystem, InteractionData &interaction, ThreadPool &threadPool, Renderer &renderer
 	, ClientEntityManager &clientEntityManager)
@@ -766,61 +724,68 @@ void ChunkSystem::update(glm::ivec3 playerBlockPosition, float deltaTime, UndoQu
 		chunkRatio = (float)notLoadedChunks / (float)totalChunks;
 	}
 	
-	std::sort(chunkVectorCopyNoNullsOnlyToBake.begin(), chunkVectorCopyNoNullsOnlyToBake.end(),
-		[x, z](ChunkTask & a, ChunkTask & b)
-			{
-				//if (a == nullptr) { return false; }
-				//if (b == nullptr) { return true; }
-				
-				int ax = a.chunk->data.x - x;
-				int az = a.chunk->data.z - z;
-	
-				int bx = b.chunk->data.x - x;
-				int bz = b.chunk->data.z - z;
-	
-				unsigned long reza = ax * ax + az * az;
-				unsigned long rezb = bx * bx + bz * bz;
-	
-				return reza < rezb;
-			}
-		);
-
-	//we only keep a few chunks as tasks
-	if (chunkVectorCopyNoNullsOnlyToBake.size() > 100 + threadPool.currentCounter)
+	// Order only the bounded prefix that workers can consume this frame.
+	const std::size_t taskLimit = static_cast<std::size_t>(100 + threadPool.currentCounter);
+	const auto byDistance = [x, z](const ChunkTask &a, const ChunkTask &b)
 	{
-		chunkVectorCopyNoNullsOnlyToBake.resize(100 + threadPool.currentCounter);
-	}
-	
-	threadPool.taskTaken.resize(chunkVectorCopyNoNullsOnlyToBake.size());
-	for (auto &i : threadPool.taskTaken) { i = 0; }
-
-
-	//launch work!
-
-	threadPool.setThrerIsWork();
-
-	static std::vector<TransparentCandidate> transparentCandidates;
-	static std::vector<int> opaqueGeometry;
-	static std::vector<int> transparentGeometry;
-	static std::vector<glm::ivec4> lights;
-	bakeLogicForOneThread(threadPool, transparentCandidates, 
-		opaqueGeometry, transparentGeometry, lights, true, 0,0,0);
-
-	threadPool.waitForEveryoneToFinish();
-
-	//send the rest of the data to OpenGL!
-	for (int t = 0; t < threadPool.currentCounter; t++)
-	{
-		auto &data = perThreadData[t];
-		if (data.chunk)
+		const auto distance = [x, z](const Chunk *chunk)
 		{
-			data.chunk->sendDataToOpenGL(data.updateGeometry, data.updateTransparency,
-				data.transparentCandidates, data.opaqueGeometry, data.transparentGeometry,
-				data.lights);
+			const double dx = static_cast<double>(chunk->data.x) - x;
+			const double dz = static_cast<double>(chunk->data.z) - z;
+			return dx * dx + dz * dz;
+		};
+		const double da = distance(a.chunk), db = distance(b.chunk);
+		if (da != db) { return da < db; }
+		if (a.chunk->data.x != b.chunk->data.x) { return a.chunk->data.x < b.chunk->data.x; }
+		return a.chunk->data.z < b.chunk->data.z;
+	};
+	if (chunkVectorCopyNoNullsOnlyToBake.size() > taskLimit)
+	{
+		std::partial_sort(chunkVectorCopyNoNullsOnlyToBake.begin(),
+			chunkVectorCopyNoNullsOnlyToBake.begin() + taskLimit,
+			chunkVectorCopyNoNullsOnlyToBake.end(), byDistance);
+		chunkVectorCopyNoNullsOnlyToBake.resize(taskLimit);
+	}
+	else
+	{
+		std::sort(chunkVectorCopyNoNullsOnlyToBake.begin(),
+			chunkVectorCopyNoNullsOnlyToBake.end(), byDistance);
+	}
+
+	// No mesh work means no worker wakeups and no batch barrier.
+	if (!chunkVectorCopyNoNullsOnlyToBake.empty())
+	{
+		threadPool.taskTaken.resize(chunkVectorCopyNoNullsOnlyToBake.size());
+		for (auto &i : threadPool.taskTaken) { i = 0; }
+
+
+		//launch work!
+
+		threadPool.setThrerIsWork();
+
+		static std::vector<TransparentCandidate> transparentCandidates;
+		static std::vector<int> opaqueGeometry;
+		static std::vector<int> transparentGeometry;
+		static std::vector<glm::ivec4> lights;
+		bakeLogicForOneThread(threadPool, transparentCandidates,
+			opaqueGeometry, transparentGeometry, lights, true, 0,0,0);
+
+		threadPool.waitForEveryoneToFinish();
+
+		//send the rest of the data to OpenGL!
+		for (int t = 0; t < threadPool.currentCounter; t++)
+		{
+			auto &data = perThreadData[t];
+			if (data.chunk)
+			{
+				data.chunk->sendDataToOpenGL(data.updateGeometry, data.updateTransparency,
+					data.transparentCandidates, data.opaqueGeometry, data.transparentGeometry,
+					data.lights);
+			}
+
 		}
 
 	}
-
 
 	//update worker threads
 	int maxThreads = getShadingSettings().workerThreadsForBaking;

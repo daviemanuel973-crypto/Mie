@@ -1,11 +1,14 @@
 #include <gameplay/farming.h>
 #include <gameplay/items.h>
+#include <safeSave.h>
 
 #include <cmath>
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <thread>
 #include <vector>
 
 namespace
@@ -91,6 +94,17 @@ int main()
 	REQUIRE(plantFarmPlot(tempRoot.string(), {20, 70, 20}, ItemTypes::wheat, 1000.0));
 	REQUIRE(!plantFarmPlot(tempRoot.string(), {20, 70, 20}, ItemTypes::wheat, 1000.0));
 
+	// A valid checksum cannot make an invalid schema authoritative over a good backup.
+	auto badSchema = encoded;
+	badSchema[8] = 99;
+	REQUIRE(sfs::writeEntireFileWithCheckSum(badSchema.data(), badSchema.size(),
+		(tempRoot / "farmPlots1.bin").string().c_str()) == sfs::noError);
+	resetFarmRuntimeCache();
+	REQUIRE(queryFarmPlot(tempRoot.string(), {20, 70, 20}, missingPlot));
+	std::filesystem::copy_file(tempRoot / "farmPlots2.bin", tempRoot / "farmPlots1.bin",
+		std::filesystem::copy_options::overwrite_existing);
+
+
 	FarmHarvest harvest;
 	REQUIRE(!harvestFarmPlot(tempRoot.string(), {20, 70, 20}, 1200.0, harvest));
 	resetFarmRuntimeCache();
@@ -112,6 +126,62 @@ int main()
 	REQUIRE(uprootFarmPlot(tempRoot.string(), {22, 70, 20}, 3010.0, harvest));
 	REQUIRE(harvest.itemType == ItemTypes::carrot && harvest.count == 1);
 	REQUIRE(!queryFarmPlot(tempRoot.string(), {22, 70, 20}, reloaded));
+
+	// Region workers share one farm cache. Every acknowledged concurrent write
+	// must survive a fresh load, and competing placements consume only once.
+	std::array<std::thread, 4> workers;
+	std::array<int, 4> planted{};
+	for (int worker = 0; worker < 4; ++worker)
+	{
+		workers[worker] = std::thread([&, worker]()
+		{
+			for (int plot = 0; plot < 4; ++plot)
+			{
+				if (plantFarmPlot(tempRoot.string(), {100 + worker, 70, plot}, ItemTypes::wheat, 4000.0))
+				{
+					++planted[worker];
+				}
+			}
+		});
+	}
+	for (auto &worker : workers) { worker.join(); }
+	resetFarmRuntimeCache();
+	for (int worker = 0; worker < 4; ++worker)
+	{
+		REQUIRE(planted[worker] == 4);
+		for (int plot = 0; plot < 4; ++plot)
+		{
+			REQUIRE(queryFarmPlot(tempRoot.string(), {100 + worker, 70, plot}, reloaded));
+		}
+	}
+	for (int worker = 0; worker < 4; ++worker)
+	{
+		workers[worker] = std::thread([&, worker]()
+		{
+			planted[worker] = plantFarmPlot(tempRoot.string(), {200, 70, 0}, ItemTypes::wheat, 4000.0) ? 1 : 0;
+		});
+	}
+	for (auto &worker : workers) { worker.join(); }
+	REQUIRE(planted[0] + planted[1] + planted[2] + planted[3] == 1);
+
+	// Failure before the primary commit must leave both cache and persisted state unchanged.
+	std::filesystem::rename(tempRoot / "farmPlots1.bin", tempRoot / "saved-primary.bin");
+	std::filesystem::create_directory(tempRoot / "farmPlots1.bin");
+	REQUIRE(!plantFarmPlot(tempRoot.string(), {201, 70, 0}, ItemTypes::wheat, 4000.0));
+	REQUIRE(!queryFarmPlot(tempRoot.string(), {201, 70, 0}, reloaded));
+	std::filesystem::remove(tempRoot / "farmPlots1.bin");
+	std::filesystem::rename(tempRoot / "saved-primary.bin", tempRoot / "farmPlots1.bin");
+	resetFarmRuntimeCache();
+	REQUIRE(!queryFarmPlot(tempRoot.string(), {201, 70, 0}, reloaded));
+
+	// Failure of the backup after the primary commit cannot undo an acknowledged action.
+	std::filesystem::remove(tempRoot / "farmPlots2.bin");
+	std::filesystem::create_directory(tempRoot / "farmPlots2.bin");
+	REQUIRE(plantFarmPlot(tempRoot.string(), {202, 70, 0}, ItemTypes::wheat, 4000.0));
+	resetFarmRuntimeCache();
+	REQUIRE(queryFarmPlot(tempRoot.string(), {202, 70, 0}, reloaded));
+	REQUIRE(!std::filesystem::exists(tempRoot / "farmPlots1.bin.tmp"));
+	REQUIRE(!std::filesystem::exists(tempRoot / "farmPlots2.bin.tmp"));
 
 	std::filesystem::remove_all(tempRoot, error);
 	std::cout << "Farming persistence tests passed.\n";
