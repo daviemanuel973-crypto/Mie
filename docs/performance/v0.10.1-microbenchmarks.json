@@ -1,0 +1,158 @@
+{
+  "baseline_commit": "5383e9e62c02962a74908c7120d4689b807979c4",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.39",
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+  "scope": "Subsystem CPU microbenchmarks; excludes GPU, disk and target-hardware FPS.",
+  "results": {
+    "baseline": [
+      {
+        "case": "scheduler_50000_sleeping",
+        "iterations": 2000,
+        "repetitions": 7,
+        "median_us": 67.1131,
+        "min_us": 65.8754,
+        "max_us": 68.9629,
+        "checksum": 0
+      },
+      {
+        "case": "scheduler_2048_due_budget64",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 229.299,
+        "min_us": 220.943,
+        "max_us": 253.135,
+        "checksum": 470559488
+      },
+      {
+        "case": "villagers_2048_unloaded",
+        "iterations": 3000,
+        "repetitions": 7,
+        "median_us": 5.69664,
+        "min_us": 5.51919,
+        "max_us": 6.85066,
+        "checksum": 0
+      },
+      {
+        "case": "chunk_order_100",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 1.80222,
+        "min_us": 1.74377,
+        "max_us": 1.95519,
+        "checksum": 12959849746834780816
+      },
+      {
+        "case": "chunk_order_900",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 25.5288,
+        "min_us": 25.2395,
+        "max_us": 26.4286,
+        "checksum": 16936151651345174832
+      },
+      {
+        "case": "chunk_order_10404",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 911.66,
+        "min_us": 882.816,
+        "max_us": 948.996,
+        "checksum": 12269542842596478576
+      }
+    ],
+    "candidate": [
+      {
+        "case": "scheduler_50000_sleeping",
+        "iterations": 2000,
+        "repetitions": 7,
+        "median_us": 0.0061295,
+        "min_us": 0.005999,
+        "max_us": 0.0102605,
+        "checksum": 0
+      },
+      {
+        "case": "scheduler_2048_due_budget64",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 24.0544,
+        "min_us": 22.9733,
+        "max_us": 26.9431,
+        "checksum": 470559488
+      },
+      {
+        "case": "villagers_2048_unloaded",
+        "iterations": 3000,
+        "repetitions": 7,
+        "median_us": 0.00397267,
+        "min_us": 0.00298467,
+        "max_us": 0.00527133,
+        "checksum": 0
+      },
+      {
+        "case": "chunk_order_100",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 0.088543,
+        "min_us": 0.071296,
+        "max_us": 0.116674,
+        "checksum": 12959849746834780816
+      },
+      {
+        "case": "chunk_order_900",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 1.17762,
+        "min_us": 0.820496,
+        "max_us": 1.6013,
+        "checksum": 16936151651345174832
+      },
+      {
+        "case": "chunk_order_10404",
+        "iterations": 1000,
+        "repetitions": 7,
+        "median_us": 10.5245,
+        "min_us": 10.3889,
+        "max_us": 11.4558,
+        "checksum": 12269542842596478576
+      }
+    ]
+  },
+  "comparisons": [
+    {
+      "case": "scheduler_50000_sleeping",
+      "baseline_median_us": 67.1131,
+      "candidate_median_us": 0.0061295,
+      "reduction_percent": 99.99
+    },
+    {
+      "case": "scheduler_2048_due_budget64",
+      "baseline_median_us": 229.299,
+      "candidate_median_us": 24.0544,
+      "reduction_percent": 89.51
+    },
+    {
+      "case": "villagers_2048_unloaded",
+      "baseline_median_us": 5.69664,
+      "candidate_median_us": 0.00397267,
+      "reduction_percent": 99.93
+    },
+    {
+      "case": "chunk_order_100",
+      "baseline_median_us": 1.80222,
+      "candidate_median_us": 0.088543,
+      "reduction_percent": 95.09
+    },
+    {
+      "case": "chunk_order_900",
+      "baseline_median_us": 25.5288,
+      "candidate_median_us": 1.17762,
+      "reduction_percent": 95.39
+    },
+    {
+      "case": "chunk_order_10404",
+      "baseline_median_us": 911.66,
+      "candidate_median_us": 10.5245,
+      "reduction_percent": 98.85
+    }
+  ]
+}

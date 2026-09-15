@@ -19,11 +19,17 @@ namespace mie::native
 
 	std::uint64_t GameplayScheduler::schedule(ScheduledGameplayJob job)
 	{
+		if (static_cast<unsigned int>(job.priority) > 3u ||
+			static_cast<unsigned int>(job.category) >=
+				static_cast<unsigned int>(GameplayJobCategory::Count) ||
+			static_cast<unsigned int>(job.simulationLevel) > 3u) { return 0; }
+		while (nextJobId == 0 || jobs.find(nextJobId) != jobs.end()) { ++nextJobId; }
 		job.id = nextJobId++;
 		if (nextJobId == 0) { nextJobId = 1; }
 		job.intervalTicks = std::max(job.intervalTicks, 1u);
 		job.estimatedCost = std::max(job.estimatedCost, 1u);
 		jobs[job.id] = job;
+		deadlines[static_cast<std::size_t>(job.priority)].emplace(job.nextTick, job.id);
 		schedulerMetrics.peakQueueSize = std::max(schedulerMetrics.peakQueueSize,
 			static_cast<std::uint32_t>(jobs.size()));
 		return job.id;
@@ -31,13 +37,19 @@ namespace mie::native
 
 	bool GameplayScheduler::cancel(std::uint64_t jobId)
 	{
-		return jobs.erase(jobId) != 0;
+		const auto found = jobs.find(jobId);
+		if (found == jobs.end()) { return false; }
+		const auto &job = found->second;
+		deadlines[static_cast<std::size_t>(job.priority)].erase({job.nextTick, job.id});
+		jobs.erase(found);
+		return true;
 	}
 
 	bool GameplayScheduler::setSimulationLevel(std::uint64_t jobId, SimulationLevel level)
 	{
 		auto found = jobs.find(jobId);
 		if (found == jobs.end()) { return false; }
+		if (static_cast<unsigned int>(level) > 3u) { return false; }
 		found->second.simulationLevel = level;
 		return true;
 	}
@@ -46,38 +58,42 @@ namespace mie::native
 	{
 		auto found = jobs.find(jobId);
 		if (found == jobs.end()) { return false; }
+		auto &queue = deadlines[static_cast<std::size_t>(found->second.priority)];
+		auto node = queue.extract({found->second.nextTick, jobId});
 		found->second.nextTick = nextTick;
+		node.value().first = nextTick;
+		queue.insert(std::move(node));
 		return true;
 	}
 
 	SchedulerRunResult GameplayScheduler::run(std::uint64_t currentTick, std::uint32_t budget)
 	{
-		std::vector<std::uint64_t> due;
-		due.reserve(jobs.size());
-		for (const auto &entry : jobs)
+		// Snapshot only due IDs, in the same priority/tick/ID order as v0.10.0.
+		// A recurring job executes at most once per call, even at UINT64_MAX.
+		dueJobs.clear();
+		for (const auto &queue : deadlines)
 		{
-			if (entry.second.nextTick <= currentTick) { due.push_back(entry.first); }
+			for (auto it = queue.begin(); it != queue.end() && it->first <= currentTick; ++it)
+			{
+				dueJobs.push_back(it->second);
+			}
 		}
-		std::sort(due.begin(), due.end(), [&](std::uint64_t leftId, std::uint64_t rightId)
-		{
-			const ScheduledGameplayJob &left = jobs.at(leftId);
-			const ScheduledGameplayJob &right = jobs.at(rightId);
-			if (left.priority != right.priority) { return left.priority < right.priority; }
-			if (left.nextTick != right.nextTick) { return left.nextTick < right.nextTick; }
-			return left.id < right.id;
-		});
 
 		SchedulerRunResult result;
-		for (std::uint64_t jobId : due)
+		for (std::uint64_t jobId : dueJobs)
 		{
+			++schedulerMetrics.jobsExamined;
 			auto found = jobs.find(jobId);
 			if (found == jobs.end()) { continue; }
 			ScheduledGameplayJob &job = found->second;
 			const std::uint64_t interval = static_cast<std::uint64_t>(job.intervalTicks) *
 				simulationIntervalMultiplier(job.simulationLevel);
+			const std::uint64_t nextTick = currentTick >
+				std::numeric_limits<std::uint64_t>::max() - interval ?
+				std::numeric_limits<std::uint64_t>::max() : currentTick + interval;
 			if (job.simulationLevel == SimulationLevel::Unloaded)
 			{
-				job.nextTick = currentTick + interval;
+				setNextTick(jobId, nextTick);
 				++schedulerMetrics.jobsDiscarded;
 				continue;
 			}
@@ -95,11 +111,13 @@ namespace mie::native
 			}
 
 			result.executed.push_back(jobId);
-			result.costUsed += job.estimatedCost;
+			result.costUsed = job.estimatedCost >
+				std::numeric_limits<std::uint32_t>::max() - result.costUsed ?
+				std::numeric_limits<std::uint32_t>::max() : result.costUsed + job.estimatedCost;
 			++schedulerMetrics.jobsExecuted;
 			++schedulerMetrics.executedByCategory[static_cast<std::size_t>(job.category)];
-			if (job.recurring) { job.nextTick = currentTick + interval; }
-			else { jobs.erase(found); }
+			if (job.recurring) { setNextTick(jobId, nextTick); }
+			else { cancel(jobId); }
 		}
 		return result;
 	}
@@ -107,6 +125,8 @@ namespace mie::native
 	void GameplayScheduler::clear()
 	{
 		jobs.clear();
+		for (auto &queue : deadlines) { queue.clear(); }
+		std::vector<std::uint64_t>().swap(dueJobs);
 		nextJobId = 1;
 		schedulerMetrics = {};
 	}

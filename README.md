@@ -1,6 +1,8 @@
 # Mie Survival
 
-**Current development version: v0.10.0 (content development)**
+**Current development version: v0.10.1 (optimization candidate)**
+
+Latest published stable version: [v0.10.0](https://github.com/daviemanuel973-crypto/Mie/releases/tag/v0.10.0).
 
 Mie Survival is the survival-focused evolution of the original ourCraft codebase. It keeps the voxel sandbox, multiplayer and rendering foundation while adding survival progression, world persistence, combat, base defence and native gameplay systems.
 
@@ -19,6 +21,17 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.10.1 Low-first optimization
+
+This corrective update preserves all v0.10.0 content, saves, stable IDs and
+multiplayer protocol 5. It reduces repeated chunk sorting, bounds navigation work,
+and replaces scans of sleeping native jobs/villagers with indexed deadlines.
+Farming writes are serialized between region workers and commit atomically before
+acknowledging the action. Low remains mechanically complete at 1280x720, targeting
+i5-7200U / HD 620 / 8 GB / HDD with the same 20 Hz simulation and 30/15 FPS caps.
+
+See [changes, measured subsystem costs and validation](docs/V0.10.1_OPTIMIZATION.md).
 
 ## v0.10.0 subsistence expansion
 

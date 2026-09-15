@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -53,6 +54,7 @@ namespace mie::native
 		std::uint64_t jobsExecuted = 0;
 		std::uint64_t jobsDeferred = 0;
 		std::uint64_t jobsDiscarded = 0;
+		std::uint64_t jobsExamined = 0;
 		std::uint32_t peakQueueSize = 0;
 		std::array<std::uint64_t,
 			static_cast<std::size_t>(GameplayJobCategory::Count)> executedByCategory{};
@@ -82,6 +84,10 @@ namespace mie::native
 	private:
 		std::uint64_t nextJobId = 1;
 		std::unordered_map<std::uint64_t, ScheduledGameplayJob> jobs;
+		// One indexed deadline per job; sleeping jobs are never scanned by run().
+		using Deadline = std::pair<std::uint64_t, std::uint64_t>; // tick, id
+		std::array<std::set<Deadline>, 4> deadlines;
+		std::vector<std::uint64_t> dueJobs;
 		SchedulerMetrics schedulerMetrics;
 	};
 }

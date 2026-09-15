@@ -6,7 +6,6 @@
 #include <iostream>
 #include <multyPlayer/enetServerFunction.h>
 #include <multyPlayer/server.h>
-#include <deque>
 #include <type_traits>
 #include <platformTools.h>
 #include <gameplay/gameplayRules.h>
@@ -2688,95 +2687,9 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 	PathFindingFieldView pathFindingSurvivalClients;
 
 	{
-		std::deque<PathFindingNode> queue;
+		static thread_local std::vector<PathFindingNode> queue;
 		PathFindingField *positions = nullptr;
 		
-		auto addNode = [&](PathFindingNode node, glm::ivec3 displacement)
-		{
-			PathFindingNode newEntry;
-			newEntry.returnPos = node.returnPos;
-			newEntry.level = node.level + 1;
-
-			if (!positions || positions->size() >= 4096) { return; }
-			(*positions)[node.returnPos + displacement] = newEntry;
-
-			if (node.level < 40)
-			{
-				newEntry.returnPos = node.returnPos + displacement;
-				queue.push_back(newEntry);
-			}
-		};
-
-		auto checkDown = [&](PathFindingNode node, glm::ivec3 disp) //-> bool
-		{
-			glm::ivec3 displacement = glm::ivec3(0, -1, 0) + disp;
-
-			auto found = positions->find(node.returnPos + displacement);
-			if (found == positions->end())
-			{
-				auto b = chunkCache.getBlockSafe(node.returnPos + displacement);
-				if (b && !b->isColidable())
-				{
-					auto b2 = chunkCache.getBlockSafe(node.returnPos + displacement + glm::ivec3(0, -1, 0));
-					if (b2 && b2->isColidable())
-					{
-						addNode(node, displacement);
-					}
-				}
-				//else
-				//{
-				//	return true;
-				//}
-			}
-
-			//return false;
-		};
-
-		auto checkSides = [&](PathFindingNode node, glm::ivec3 displacement)
-		{
-			auto found = positions->find(node.returnPos + displacement);
-			if (found == positions->end())
-			{
-				auto b = chunkCache.getBlockSafe(node.returnPos + displacement);
-				if (b && !b->isColidable())
-				{
-
-					auto bUp = chunkCache.getBlockSafe(node.returnPos + displacement + glm::ivec3(0, 1, 0));
-					if (!bUp || !bUp->isColidable())
-					{
-						auto bDown = chunkCache.getBlockSafe(node.returnPos + displacement + glm::ivec3(0, -1, 0));
-						auto bDown2 = chunkCache.getBlockSafe(node.returnPos + displacement + glm::ivec3(0, -2, 0));
-
-						if ((bDown && bDown->isColidable())
-							|| (bDown2 && bDown2->isColidable())
-							)
-						{
-							addNode(node, displacement);
-
-							if((!bDown || !bDown->isColidable()) && bDown2 && bDown2->isColidable())
-							{
-								checkDown(node, displacement);
-							}
-						}
-
-					}
-
-				}
-			}
-		};
-
-		auto checkUp = [&](PathFindingNode node, glm::ivec3 displacement)
-		{
-			auto found = positions->find(node.returnPos + displacement);
-			if (found == positions->end())
-			{
-				auto b = chunkCache.getBlockSafe(node.returnPos + displacement);
-				if (b && !b->isColidable())
-				{
-					addNode(node, displacement);
-				}
-			}
-		};
 
 
 		//if(0)
@@ -2827,37 +2740,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 				continue;
 			}
 
-			positions->clear();
-			if (positions->bucket_count() < 4096) { positions->reserve(4096); }
-			PathFindingNode root;
-			root.returnPos = rootPosition;
-			root.level = 0;
-			queue.push_back(root);
-			(*positions)[rootPosition] = root;
-
-			while (!queue.empty())
-			{
-				PathFindingNode node = queue.front();
-				queue.pop_front();
-
-				checkSides(node, {1,0,0});
-				checkSides(node, {-1,0,0});
-				checkSides(node, {0,0,1});
-				checkSides(node, {0,0,-1});
-
-				//checkDown(node, {});
-
-				auto bDown = chunkCache.getBlockSafe(node.returnPos + glm::ivec3(0,-1,0));
-				if (bDown && bDown->isColidable())
-				{
-					checkUp(node, {0,1,0});
-					checkUp(node, {0,2,0});
-					checkUp(node, {0,3,0});
-					checkUp(node, {0,4,0});
-					//checkUp(node, {0,5,0});
-				}
-
-			}
+			mie::navigation::buildField(*positions, rootPosition,
+				[&](glm::ivec3 position) { return chunkCache.getBlockSafe(position); }, queue);
 
 			client.navigationOrigin = rootPosition;
 			client.hasNavigationOrigin = true;
