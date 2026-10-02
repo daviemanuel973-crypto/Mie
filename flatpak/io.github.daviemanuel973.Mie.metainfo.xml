@@ -22,6 +22,11 @@
   <releases>
     <release version="0.11.0" date="2026-10-02">
       <description>
+        <p>Industrial machines, electricity and filtered item logistics with bounded sleeping networks, persistent energy and processing progress. Multiplayer protocol 6; existing content IDs and recipe discovery migrate safely.</p>
+      </description>
+    </release>
+    <release version="0.10.1" date="2026-09-10">
+      <description>
         <p>Low-first CPU optimizations for chunk rendering, bounded navigation, and scheduled native simulation. Save IDs, content and multiplayer protocol are preserved.</p>
       </description>
     </release>
