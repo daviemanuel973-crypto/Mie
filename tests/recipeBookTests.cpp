@@ -62,7 +62,7 @@ namespace
 
 int main()
 {
-	check(getCraftingRecipeCount() == 112,
+	check(getCraftingRecipeCount() == 124,
 		"v0.10 appends four recipes after the 108 stable v0.9 packet indexes");
 	check(!isCraftingRecipeDiscovered(-1, {}), "negative recipe indexes are rejected");
 	check(!isCraftingRecipeDiscovered(getCraftingRecipeCount(), {}),

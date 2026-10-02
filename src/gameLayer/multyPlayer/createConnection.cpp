@@ -399,8 +399,8 @@ void recieveDataClient(ENetEvent &event,
 
 
 				}
-				else if (blockHeader.blockType == BlockTypes::furnace &&
-					b->getType() == BlockTypes::furnace)
+				else if (isProcessingBlock(blockHeader.blockType) &&
+					b->getType() == blockHeader.blockType)
 				{
 					if (blockHeader.dataSize > size - pointer) { break; }
 					if (blockHeader.dataSize)
@@ -409,7 +409,7 @@ void recieveDataClient(ENetEvent &event,
 						size_t outSize = 0;
 						if (!furnace.readFromBuffer(reinterpret_cast<unsigned char *>(data) + pointer,
 							blockHeader.dataSize, outSize) || outSize != blockHeader.dataSize ||
-							!furnace.isDataValid())
+							!furnace.isDataValid() || furnace.blockType() != blockHeader.blockType)
 						{
 							break;
 						}
@@ -417,7 +417,9 @@ void recieveDataClient(ENetEvent &event,
 					}
 					else
 					{
-						chunk->blockData.furnaceBlocks[blockHash] = FurnaceBlock{};
+						FurnaceBlock empty;
+						if (isIndustryBlock(blockHeader.blockType)) { empty.processingType=blockHeader.blockType; }
+						chunk->blockData.furnaceBlocks[blockHash] = std::move(empty);
 					}
 				}
 				else
@@ -1302,7 +1304,7 @@ bool placeItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int
 	auto fromItem = inventory.getItemFromIndex(from, chestBlock, furnaceBlock);
 	auto toItem = inventory.getItemFromIndex(to, chestBlock, furnaceBlock);
 	if (!fromItem || !toItem) { return false; }
-	if (!inventory.canItemFit(*fromItem, to) || !canMoveItemToFurnaceIndex(*fromItem, to)) { return false; }
+	if (!inventory.canItemFit(*fromItem, to) || !(!furnaceBlock || canMoveItemToFurnaceIndex(*fromItem, to, furnaceBlock))) { return false; }
 
 	if (fromItem && toItem)
 	{
@@ -1400,8 +1402,8 @@ bool swapItems(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int
 	auto toPtr = inventory.getItemFromIndex(to, chestBlock, furnaceBlock);
 	if (!fromPtr || !toPtr) { return false; }
 
-	if (!inventory.canItemFit(*fromPtr, to) || !canMoveItemToFurnaceIndex(*fromPtr, to)) { return false; }
-	if (!inventory.canItemFit(*toPtr, from) || !canMoveItemToFurnaceIndex(*toPtr, from)) { return false; }
+	if (!inventory.canItemFit(*fromPtr, to) || !(!furnaceBlock || canMoveItemToFurnaceIndex(*fromPtr, to, furnaceBlock))) { return false; }
+	if (!inventory.canItemFit(*toPtr, from) || !(!furnaceBlock || canMoveItemToFurnaceIndex(*toPtr, from, furnaceBlock))) { return false; }
 
 	if (fromPtr && toPtr && fromPtr != toPtr)
 	{
@@ -1430,7 +1432,7 @@ bool grabItem(PlayerInventory &inventory, ChestBlock *chestBlock, int from, int 
 	auto toItem = inventory.getItemFromIndex(to, chestBlock, furnaceBlock);
 	if (!fromItem || !toItem) { return false; }
 
-	if (!inventory.canItemFit(*fromItem, to) || !canMoveItemToFurnaceIndex(*fromItem, to)) { return false; }
+	if (!inventory.canItemFit(*fromItem, to) || !(!furnaceBlock || canMoveItemToFurnaceIndex(*fromItem, to, furnaceBlock))) { return false; }
 
 	if (fromItem && toItem && (fromItem != toItem))
 	{
@@ -1476,7 +1478,7 @@ bool forceOverWriteItem(PlayerInventory &inventory, ChestBlock *chestBlock, int 
 
 	auto to = inventory.getItemFromIndex(index, chestBlock, furnaceBlock);
 
-	if (!inventory.canItemFit(item, index) || !canMoveItemToFurnaceIndex(item, index)) { return false; }
+	if (!inventory.canItemFit(item, index) || !(!furnaceBlock || canMoveItemToFurnaceIndex(item, index, furnaceBlock))) { return false; }
 
 	if (to)
 	{

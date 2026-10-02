@@ -2,6 +2,7 @@
 
 #include <config.h>
 #include <multyPlayer/server.h>
+#include <native/serverIndustry.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -198,7 +199,7 @@ RuntimeSmokeFrameResult runtimeSmokeFramePassed(double frameSeconds)
         std::cerr << "[runtime-smoke] timed out before stable runtime gate\n";
         return RuntimeSmokeFrameResult::failed;
     }
-    if (smokeFrames >= MIN_SMOKE_FRAMES && elapsed >= minimumSmokeRuntime)
+    if (smokeFrames >= MIN_SMOKE_FRAMES && elapsed >= minimumSmokeRuntime && industrySmokeVerified())
     {
         std::cout << "[runtime-smoke] runtime gate reached after " << smokeFrames << " frames\n";
         return RuntimeSmokeFrameResult::passed;
@@ -218,7 +219,7 @@ int finishRuntimeSmokeTest(bool runtimePassed)
     smokeBegan = false;
     smokeClockStarted = false;
 
-    if (runtimePassed && persisted)
+    if (runtimePassed && persisted && industrySmokeVerified())
     {
         std::cout << "[runtime-smoke] PASS: server, client, gameplay frames and world persistence\n";
         return 0;

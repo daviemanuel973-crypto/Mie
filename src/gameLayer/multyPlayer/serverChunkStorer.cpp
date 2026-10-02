@@ -1338,7 +1338,7 @@ Block *ServerChunkStorer::getBlockSafe(glm::ivec3 pos)
 
 	if (c)
 	{
-		if (pos.y > 0 && pos.y < CHUNK_HEIGHT)
+		if (pos.y >= 0 && pos.y < CHUNK_HEIGHT)
 		{
 			return &c->chunk.unsafeGet(modBlockToChunk(pos.x), pos.y, modBlockToChunk(pos.z));
 		}
@@ -1352,7 +1352,7 @@ ChestBlock *ServerChunkStorer::getChestBlock(glm::ivec3 pos, SavedChunk *&c)
 	c = getChunkOrGetNull(divideChunk(pos.x), divideChunk(pos.z));
 	if (!c) { return nullptr; }
 
-	if (pos.y > 0 && pos.y < CHUNK_HEIGHT)
+	if (pos.y >= 0 && pos.y < CHUNK_HEIGHT)
 	{
 		auto b = c->chunk.unsafeGet(modBlockToChunk(pos.x), pos.y, modBlockToChunk(pos.z));
 
@@ -1376,13 +1376,15 @@ FurnaceBlock *ServerChunkStorer::getFurnaceBlock(glm::ivec3 pos, SavedChunk *&c)
 	c = getChunkOrGetNull(divideChunk(pos.x), divideChunk(pos.z));
 	if (!c) { return nullptr; }
 
-	if (pos.y > 0 && pos.y < CHUNK_HEIGHT)
+	if (pos.y >= 0 && pos.y < CHUNK_HEIGHT)
 	{
 		auto &block = c->chunk.unsafeGet(modBlockToChunk(pos.x), pos.y, modBlockToChunk(pos.z));
-		if (block.getType() == BlockTypes::furnace)
+		if (isProcessingBlock(block.getType()))
 		{
-			return c->blockData.getOrCreateFurnaceBlock(modBlockToChunk(pos.x), pos.y,
+			auto *machine=c->blockData.getOrCreateFurnaceBlock(modBlockToChunk(pos.x), pos.y,
 				modBlockToChunk(pos.z));
+			if (isIndustryBlock(block.getType())) { machine->processingType=block.getType(); }
+			return machine;
 		}
 	}
 	return nullptr;
@@ -1394,7 +1396,7 @@ Block *ServerChunkStorer::getBlockSafeAndChunk(glm::ivec3 pos, SavedChunk *&c)
 
 	if (c)
 	{
-		if (pos.y > 0 && pos.y < CHUNK_HEIGHT)
+		if (pos.y >= 0 && pos.y < CHUNK_HEIGHT)
 		{
 			return &c->chunk.unsafeGet(modBlockToChunk(pos.x), pos.y, modBlockToChunk(pos.z));
 		}
@@ -1993,13 +1995,15 @@ void SavedChunk::removeBlockWithData(glm::ivec3 pos,
 			pos.y, pos.z));
 	}
 
+	if (isChest(blockType) || isProcessingBlock(blockType))
+	{ ++industryTopologyRevision; otherData.dirtyBlockData=true; }
 	if (isChest(blockType))
 	{
 		blockData.chestBlocks.erase(fromBlockPosInChunkToHashValue(pos.x,
 			pos.y, pos.z));
 	}
 
-	if (blockType == BlockTypes::furnace)
+	if (isProcessingBlock(blockType))
 	{
 		blockData.furnaceBlocks.erase(fromBlockPosInChunkToHashValue(pos.x,
 			pos.y, pos.z));
@@ -2018,6 +2022,9 @@ bool SavedChunk::normalize()
 				auto &b = chunk.blocks[x][z][y];
 
 				if (b.normalize()) { rez = 1; }
+				if (isChest(b.getType())) { blockData.getOrCreateChestBlock(x,y,z); }
+				if (isProcessingBlock(b.getType()) && !blockData.getFurnaceBlock(x,y,z))
+				{ blockData.getOrCreateFurnaceBlock(x,y,z)->processingType=isIndustryBlock(b.getType()) ? b.getType() : 0; otherData.dirtyBlockData=true; }
 			}
 
 	for (auto it = blockData.baseBlocks.begin(); it != blockData.baseBlocks.end(); )
@@ -2051,7 +2058,8 @@ bool SavedChunk::normalize()
 	for (auto it = blockData.furnaceBlocks.begin(); it != blockData.furnaceBlocks.end(); )
 	{
 		glm::ivec3 pos = fromHashValueToBlockPosinChunk(it->first);
-		if (chunk.blocks[pos.x][pos.z][pos.y].getType() != BlockTypes::furnace)
+		if (!isProcessingBlock(chunk.blocks[pos.x][pos.z][pos.y].getType()) ||
+			chunk.blocks[pos.x][pos.z][pos.y].getType() != it->second.blockType())
 		{
 			it = blockData.furnaceBlocks.erase(it);
 		}

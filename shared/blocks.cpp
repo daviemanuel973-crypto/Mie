@@ -51,6 +51,8 @@ int blockReorder[] = {
 	workBench, furnace, cookingPot, ladder, trainingDummy, target,
 	reinforcedBarricade, woodenSpikeTrap, campfire,
 
+	fuelGenerator, energyAccumulator, electricFurnace, oreCrusher, metalPress, woodSawmill, powerCable, itemPipe, itemExtractor,
+
 	// v0.10 crops
 	wheatCrop, strawberryCrop, chilliCrop, carrotCrop, potatoCrop,
 
@@ -691,6 +693,7 @@ bool isStainedGlass(BlockType type)
 
 unsigned char isInteractable(BlockType type)
 {
+	if (isIndustryBlock(type) && type != powerCable && type != itemPipe) { return InteractionTypes::furnace; }
 	int craftingStation = isCraftingStation(type);
 
 	if (craftingStation)

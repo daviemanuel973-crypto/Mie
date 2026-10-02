@@ -780,8 +780,9 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 		if (!savedChunk || !savedChunk->otherData.withinSimulationDistance) { continue; }
 		for (auto &furnaceEntry : savedChunk->blockData.furnaceBlocks)
 		{
+			if (furnaceEntry.second.processingType) { continue; }
 			auto update = furnaceEntry.second.tick(deltaTime);
-			if (update.changed) { savedChunk->otherData.dirtyBlockData = true; }
+			if (update.changed) { savedChunk->otherData.dirtyBlockData = true; ++savedChunk->industryActivityRevision; }
 			if (update.needsNetworkSync)
 			{
 				glm::ivec3 pos = fromHashValueToBlockPosinChunk(furnaceEntry.first);
@@ -849,6 +850,12 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 									i.t.pos.y, convertedZ}, lastBlock);
 								*b = block;
 								chunk->otherData.dirty = true;
+								if (isProcessingBlock(b->getType()) || isChest(b->getType()))
+								{ ++chunk->industryTopologyRevision; chunk->otherData.dirtyBlockData=true; }
+								if (isChest(b->getType())) { chunk->blockData.getOrCreateChestBlock(convertedX,i.t.pos.y,convertedZ); }
+								if (isProcessingBlock(b->getType()))
+								{ chunk->blockData.getOrCreateFurnaceBlock(convertedX,i.t.pos.y,convertedZ)->processingType=isIndustryBlock(b->getType()) ? b->getType() : 0; }
+
 
 								{
 									Packet packet;
@@ -1076,7 +1083,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 									{
 									FurnaceBlock removedFurnace;
 									bool hadFurnaceData = false;
-									if (lastBlock == BlockTypes::furnace)
+									if (isProcessingBlock(lastBlock))
 									{
 										auto found = chunk->blockData.furnaceBlocks.find(
 											fromBlockPosInChunkToHashValue(convertedX, i.t.pos.y, convertedZ));
@@ -1090,6 +1097,15 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 										i.t.pos.y, convertedZ}, lastBlock);
 									*b = actualPlacedBLock;
 									chunk->otherData.dirty = true;
+									if (isProcessingBlock(b->getType()) || isChest(b->getType()))
+									{ ++chunk->industryTopologyRevision; chunk->otherData.dirtyBlockData=true; }
+									if (isChest(b->getType())) { chunk->blockData.getOrCreateChestBlock(convertedX,i.t.pos.y,convertedZ); }
+									if (isProcessingBlock(b->getType()))
+									{
+										auto *machine=chunk->blockData.getOrCreateFurnaceBlock(convertedX,i.t.pos.y,convertedZ);
+										machine->processingType=isIndustryBlock(b->getType()) ? b->getType() : 0;
+										chunk->otherData.dirtyBlockData=true;
+									}
 
 									{
 										Packet packet;
@@ -1352,6 +1368,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 						{
 							if (!usesContainer || !containerChunk) { return; }
 							containerChunk->otherData.dirtyBlockData = true;
+							++containerChunk->industryActivityRevision;
 							if (chestBlock) { sendChestDataToOtherPlayers(client, *chestBlock, containerPos); }
 							if (furnaceBlock) { sendFurnaceData(client, *furnaceBlock, containerPos, false); }
 						};
@@ -1362,7 +1379,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							(!usesContainer || containerChunk) && i.t.blockCount > 0 &&
 							from->type == i.t.itemType && i.t.blockCount <= from->counter &&
 							client->playerData.inventory.canItemFit(*from, i.t.to) &&
-							canMoveItemToFurnaceIndex(*from, i.t.to);
+							(!furnaceBlock || canMoveItemToFurnaceIndex(*from, i.t.to, furnaceBlock));
 
 						if (allowed && to->type == 0)
 						{
@@ -1475,8 +1492,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							(!usesContainer || containerChunk) &&
 							client->playerData.inventory.canItemFit(*from, i.t.to) &&
 							client->playerData.inventory.canItemFit(*to, i.t.from) &&
-							canMoveItemToFurnaceIndex(*from, i.t.to) &&
-							canMoveItemToFurnaceIndex(*to, i.t.from);
+							(!furnaceBlock || canMoveItemToFurnaceIndex(*from, i.t.to, furnaceBlock)) &&
+							(!furnaceBlock || canMoveItemToFurnaceIndex(*to, i.t.from, furnaceBlock));
 
 						if (allowed)
 						{
@@ -1484,6 +1501,7 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 							if (usesContainer)
 							{
 								containerChunk->otherData.dirtyBlockData = true;
+							++containerChunk->industryActivityRevision;
 								if (chestBlock) { sendChestDataToOtherPlayers(client, *chestBlock, containerPos); }
 								if (furnaceBlock) { sendFurnaceData(client, *furnaceBlock, containerPos, false); }
 							}
@@ -1937,6 +1955,8 @@ void doGameTick(float deltaTime, int deltaTimeMs, std::uint64_t currentTimer,
 									isInteractable(blockType);
 								client->playerData.revisionNumberInteraction = revisionNumberInteraction;
 								client->playerData.currentBlockInteractWithPosition = pos;
+								if (client->playerData.interactingWithBlock == InteractionTypes::furnace)
+								{ SavedChunk *c=nullptr; if (auto *m=chunkCache.getFurnaceBlock(pos,c)) { sendFurnaceData(client,*m,pos,true); } }
 
 
 							}

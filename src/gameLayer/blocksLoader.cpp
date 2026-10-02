@@ -186,6 +186,16 @@ const char *texturesNames[] = {
 	"carrots_stage3",		//150 v0.10 carrot crop
 	"potatoes_stage3",		//151 v0.10 potato crop
 	"campfire_log_lit_static", //152 v0.10 campfire
+	"industry/fuelGenerator",
+	"industry/energyAccumulator",
+	"industry/electricFurnace",
+	"industry/oreCrusher",
+	"industry/metalPress",
+	"industry/woodSawmill",
+	"industry/powerCable",
+	"industry/itemPipe",
+	"industry/itemExtractor",
+
 
 
 };
@@ -678,6 +688,16 @@ uint16_t blocksLookupTable[] = {
 	150, 150, 150, 150, 150, 150, //carrot crop
 	151, 151, 151, 151, 151, 151, //potato crop
 	152, 152, 152, 152, 152, 152, //campfire
+	153, 153, 153, 153, 153, 153, //fuelGenerator
+	154, 154, 154, 154, 154, 154, //energyAccumulator
+	155, 155, 155, 155, 155, 155, //electricFurnace
+	156, 156, 156, 156, 156, 156, //oreCrusher
+	157, 157, 157, 157, 157, 157, //metalPress
+	158, 158, 158, 158, 158, 158, //woodSawmill
+	159, 159, 159, 159, 159, 159, //powerCable
+	160, 160, 160, 160, 160, 160, //itemPipe
+	161, 161, 161, 161, 161, 161, //itemExtractor
+
 
 };
 

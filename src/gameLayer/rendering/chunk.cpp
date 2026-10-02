@@ -2564,7 +2564,7 @@ void Chunk::removeBlockDataFromThisPos(Block lastBlock,
 		blockData.chestBlocks.erase(fromBlockPosInChunkToHashValue(x, y, z));
 	}
 
-	if (type == BlockTypes::furnace)
+	if (isProcessingBlock(type))
 	{
 		blockData.furnaceBlocks.erase(fromBlockPosInChunkToHashValue(x, y, z));
 	}
@@ -2598,7 +2598,7 @@ std::vector<unsigned char> Chunk::getExtraDataForThisPosAndRemoveIt(Block lastBl
 			blockData.chestBlocks.erase(found);
 		}
 	}
-	if (type == BlockTypes::furnace)
+	if (isProcessingBlock(type))
 	{
 		auto found = blockData.furnaceBlocks.find(fromBlockPosInChunkToHashValue(x, y, z));
 		if (found != blockData.furnaceBlocks.end())
@@ -2644,11 +2644,11 @@ void Chunk::addExtraDataToBlock(std::vector<unsigned char> &data, unsigned char 
 				*blockData.getOrCreateChestBlock(x, y, z) = std::move(chest);
 			}
 		}
-		else if (type == BlockTypes::furnace)
+		else if (isProcessingBlock(type))
 		{
 			FurnaceBlock furnace;
 			size_t read = 0;
-			if (furnace.readFromBuffer(data.data(), data.size(), read) && read == data.size())
+			if (furnace.readFromBuffer(data.data(), data.size(), read) && read == data.size() && furnace.blockType() == type)
 			{
 				*blockData.getOrCreateFurnaceBlock(x, y, z) = std::move(furnace);
 			}

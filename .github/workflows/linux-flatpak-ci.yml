@@ -192,8 +192,17 @@ jobs:
             tests/furnaceBlockTests.cpp \
             src/gameLayer/gameplay/furnaceRecipes.cpp \
             src/gameLayer/gameplay/blocks/furnaceBlock.cpp \
+            src/gameLayer/gameplay/industryRecipes.cpp \
             -o furnaceBlockTests
           ./furnaceBlockTests
+
+          c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror \
+            -Iinclude/gameLayer -Ishared -Ithirdparty/glm -Ithirdparty/glad/include \
+            tests/industryTests.cpp src/gameLayer/gameplay/furnaceRecipes.cpp \
+            src/gameLayer/gameplay/blocks/furnaceBlock.cpp \
+            src/gameLayer/gameplay/industryRecipes.cpp src/gameLayer/gameplay/industryNetwork.cpp \
+            -o industryTests
+          ./industryTests
 
           c++ -std=c++17 -O2 -DNDEBUG -Wall -Wextra -Werror -pedantic \
             -Iinclude/gameLayer \

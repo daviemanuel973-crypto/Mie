@@ -31,6 +31,13 @@ struct FurnaceBlock
 	// Runtime-only throttle; deliberately omitted from save/network payloads.
 	float networkSyncAccumulator = 0.f;
 
+	// Zero identifies the legacy format-1 furnace. Industry uses its own
+	// format-1 magic so the shipped furnace payload stays byte-compatible.
+	std::uint16_t processingType = 0;
+	std::uint32_t energyUnits = 0;
+	float energyRemainder = 0.f;
+	std::uint16_t blockType() const { return processingType ? processingType : static_cast<std::uint16_t>(BlockTypes::furnace); }
+
 	size_t formatIntoData(std::vector<unsigned char> &appendTo) const;
 	bool readFromBuffer(const unsigned char *data, size_t size, size_t &outReadSize);
 	bool isDataValid() const;
@@ -43,4 +50,4 @@ struct FurnaceBlock
 };
 
 bool isFurnaceInventoryIndex(int index);
-bool canMoveItemToFurnaceIndex(const Item &item, int index);
+bool canMoveItemToFurnaceIndex(const Item &item, int index, const FurnaceBlock *container = nullptr);

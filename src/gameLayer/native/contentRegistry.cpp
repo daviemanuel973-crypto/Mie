@@ -233,4 +233,31 @@ namespace mie::native
 		}
 		return registry;
 	}
+	ContentRegistry createV011ContentRegistry()
+	{
+		ContentRegistry registry = createV010ContentRegistry();
+		registry.registerContent({ContentKind::Block, 218, "mie:block/fuel_generator", false});
+		registry.registerContent({ContentKind::Block, 219, "mie:block/energy_accumulator", false});
+		registry.registerContent({ContentKind::Block, 220, "mie:block/electric_furnace", false});
+		registry.registerContent({ContentKind::Block, 221, "mie:block/ore_crusher", false});
+		registry.registerContent({ContentKind::Block, 222, "mie:block/metal_press", false});
+		registry.registerContent({ContentKind::Block, 223, "mie:block/wood_sawmill", false});
+		registry.registerContent({ContentKind::Block, 224, "mie:block/power_cable", false});
+		registry.registerContent({ContentKind::Block, 225, "mie:block/item_pipe", false});
+		registry.registerContent({ContentKind::Block, 226, "mie:block/item_extractor", false});
+		registry.registerContent({ContentKind::Item, 2199, "mie:item/copper_powder", false});
+		registry.registerContent({ContentKind::Item, 2200, "mie:item/lead_powder", false});
+		registry.registerContent({ContentKind::Item, 2201, "mie:item/iron_powder", false});
+		registry.registerContent({ContentKind::Item, 2202, "mie:item/silver_powder", false});
+		registry.registerContent({ContentKind::Item, 2203, "mie:item/gold_powder", false});
+		registry.registerContent({ContentKind::Item, 2204, "mie:item/copper_plate", false});
+		registry.registerContent({ContentKind::Item, 2205, "mie:item/iron_plate", false});
+		registry.registerContent({ContentKind::Item, 2206, "mie:item/copper_wire", false});
+		constexpr std::array<const char *,7> machines={"fuel_generator","energy_accumulator","electric_furnace","ore_crusher","metal_press","wood_sawmill","item_extractor"};
+		for (std::uint32_t i=0;i<machines.size();++i)
+			registry.registerContent({ContentKind::Machine,5u+i,std::string("mie:machine/")+machines[i],false});
+
+		return registry;
+	}
+
 }

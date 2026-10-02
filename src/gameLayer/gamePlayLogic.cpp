@@ -591,7 +591,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 						}
 
 					}
-					else if (e.originalBlock.getType() == BlockTypes::furnace)
+					else if (isProcessingBlock(e.originalBlock.getType()))
 					{
 						FurnaceBlock block;
 						size_t _ = 0;
@@ -1511,7 +1511,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 								gameData.insideInventoryMenu = false;
 								gameData.currentInventoryTab = 0;
 
-								if (isCraftingStation(b->getType()) != WorkStationType_None)
+								if (isCraftingStation(b->getType()) != WorkStationType_None || isIndustryBlock(b->getType()))
 								{
 									gameData.insideInventoryMenu = true;
 									gameData.currentInventoryTab = INVENTORY_TAB_CRAFTING;
@@ -2792,14 +2792,14 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 			}
 		}
 	}
-	else if (gameData.interaction.block == BlockTypes::furnace)
+	else if (isProcessingBlock(gameData.interaction.block))
 	{
 		Chunk *c = 0;
 		Block *b = gameData.chunkSystem.getBlockSafeAndChunk(
 			gameData.interaction.blockInteractionPosition.x,
 			gameData.interaction.blockInteractionPosition.y,
 			gameData.interaction.blockInteractionPosition.z, c);
-		if (!b || !c || b->getType() != BlockTypes::furnace)
+		if (!b || !c || b->getType() != gameData.interaction.block)
 		{
 			gameData.interaction = {};
 			gameData.insideInventoryMenu = false;
@@ -2810,6 +2810,7 @@ bool gameplayFrame(float deltaTime, int w, int h, ProgramData &programData)
 				gameData.interaction.blockInteractionPosition.y,
 				modBlockToChunk(gameData.interaction.blockInteractionPosition.z)};
 			currentFurnaceBlock = c->blockData.getOrCreateFurnaceBlock(pos.x, pos.y, pos.z);
+			if (isIndustryBlock(b->getType())) { currentFurnaceBlock->processingType=b->getType(); }
 		}
 	}
 

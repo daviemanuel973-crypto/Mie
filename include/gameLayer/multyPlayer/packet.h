@@ -23,7 +23,7 @@ using EventCounter = unsigned int;
 using RevisionNumber = unsigned int;
 // v0.10 appends block/item/recipe IDs and adds an explicit item-use action.
 // Reject older clients before either side can interpret the new packet layout.
-constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 5;
+constexpr std::uint32_t MULTIPLAYER_PROTOCOL_VERSION = 6;
 
 enum class ItemUseAction : std::uint8_t
 {

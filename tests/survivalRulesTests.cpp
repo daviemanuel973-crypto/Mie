@@ -64,7 +64,7 @@ int main()
 	REQUIRE(getBlockBaseMineDuration(BlockTypes::crate) <
 		getBlockBaseMineDuration(BlockTypes::wooden_plank));
 	REQUIRE(BlockTypes::wheatCrop == 212 && BlockTypes::campfire == 217 &&
-		BlockTypes::BlocksCount == 218);
+		BlockTypes::BlocksCount == 227);
 	REQUIRE(isCrossMesh(BlockTypes::wheatCrop) && isAnyPlant(BlockTypes::potatoCrop));
 	REQUIRE(!isColidable(BlockTypes::carrotCrop) && !isColidable(BlockTypes::campfire));
 	REQUIRE(isLightEmitor(BlockTypes::campfire) && isAnyHotSoundingBlock(BlockTypes::campfire));

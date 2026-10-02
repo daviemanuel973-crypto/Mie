@@ -9,6 +9,7 @@
 #include <gameplay/blocks/structureBaseBlock.h>
 #include <gameplay/blocks/chestBlock.h>
 #include <gameplay/blocks/furnaceBlock.h>
+#include <gameplay/industryRecipes.h>
 #include <gameplay/crafting.h>
 #include <gameplay/siege.h>
 #include <audioEngine.h>
@@ -851,8 +852,17 @@ void UiENgine::renderGameUI(float deltaTime, int w, int h
 							glm::vec4 titleBox = panel;
 							titleBox.y -= panel.w * 0.38f;
 							titleBox.w = oneItemSize * 0.55f;
-							renderer2d.renderText(titleBox, "Furnace - timed server processing",
+							renderer2d.renderText(titleBox, industryTitle(furnaceBlock->blockType()),
 								font, {1.f,0.92f,0.78f,1.f}, std::max(14.f, oneItemSize * 0.30f));
+							if (furnaceBlock->processingType)
+							{
+								titleBox.y += oneItemSize * 0.45f;
+								const auto energy = std::to_string(furnaceBlock->energyUnits) + " / " +
+									std::to_string(industryEnergyCapacity(furnaceBlock->processingType)) + " ME";
+								const auto status = furnaceBlock->processingType == itemExtractor ?
+									std::string("Filter is kept; 1 item/s. Tubes connect destinations.") : energy;
+								renderer2d.renderText(titleBox,status.c_str(),font,{0.65f,0.87f,1.f,1.f},std::max(12.f,oneItemSize*0.24f));
+							}
 						}
 						else if (currentInventoryTab == INVENTORY_TAB_CRAFTING)
 						{

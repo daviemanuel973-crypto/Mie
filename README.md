@@ -1,6 +1,6 @@
 # Mie Survival
 
-**Current development version: v0.10.1 (optimization candidate)**
+**Current development version: v0.11.0 (industrial content candidate)**
 
 Latest published stable version: [v0.10.0](https://github.com/daviemanuel973-crypto/Mie/releases/tag/v0.10.0).
 
@@ -21,6 +21,17 @@ Go check out the original development videos on [YouTube](https://www.youtube.co
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/fd5ad17e-1bee-441d-8747-d4df4fdb850c)
 
 ![image](https://github.com/meemknight/ourCraft/assets/36445656/3f6c8976-8f63-4259-a1de-3305c4c52467)
+
+## v0.11.0 industrial content
+
+The first industrial chain adds a fuel generator, accumulator, electric furnace,
+ore crusher, metal press, sawmill, power cables, item pipes and filtered extractors.
+Eight materials and twelve workbench recipes extend the stable registries.
+Machine inventories, energy and processing progress persist in the world;
+multiplayer protocol 6 and recipe-book migration preserve the older content IDs.
+Dormant components and bounded network work retain the Low-first runtime rules.
+
+See [recipes, connections, compatibility and validation](docs/V0.11.0_INDUSTRY.md).
 
 ## v0.10.1 Low-first optimization
 

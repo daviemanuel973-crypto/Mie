@@ -141,7 +141,7 @@ void appendFurnaceBlock(std::vector<unsigned char> &dataToAppend,
 
 	BlockDataHeader header = {};
 	header.pos = position;
-	header.blockType = BlockTypes::furnace;
+	header.blockType = furnaceBlock.blockType();
 	header.dataSize = static_cast<std::uint16_t>(wroteData);
 	std::memcpy(dataToAppend.data() + headerStart, &header, sizeof(header));
 }
@@ -267,12 +267,12 @@ bool BlocksWithDataHolder::loadBlockData(const std::vector<unsigned char> &data,
 			candidate.chestBlocks[fromBlockPosInChunkToHashValue(posInChunk.x,
 				posInChunk.y, posInChunk.z)] = std::move(c);
 		}
-		else if (header.blockType == BlockTypes::furnace)
+		else if (isProcessingBlock(header.blockType))
 		{
 			FurnaceBlock furnace;
 			size_t bytesRead = 0;
 			if (!furnace.readFromBuffer(data.data() + pointer, size, bytesRead) ||
-				bytesRead != size || !furnace.isDataValid())
+				bytesRead != size || furnace.blockType() != header.blockType || !furnace.isDataValid())
 			{
 				std::cout << "Error read from buffer in loadBlockData furnace!\n";
 				return false;

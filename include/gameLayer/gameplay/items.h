@@ -205,7 +205,15 @@ enum ItemTypes : unsigned short
 	vegetableStew,       // 2197
 	berryPorridge,       // 2198
 
-	lastItem,            // 2199
+	copperPowder,        // 2199
+	leadPowder,
+	ironPowder,
+	silverPowder,
+	goldPowder,
+	copperPlate,
+	ironPlate,
+	copperWire,          // 2206
+	lastItem,            // 2207
 
 };
 
@@ -214,7 +222,8 @@ static_assert(ItemTypes::bronzeSword == 2192, "v0.7 bronze sword ID changed");
 static_assert(ItemTypes::bedroll == 2193, "v0.9 bedroll ID changed");
 static_assert(ItemTypes::carrot == 2194, "v0.10 item range must start after v0.9");
 static_assert(ItemTypes::berryPorridge == 2198, "v0.10 food IDs changed");
-static_assert(ItemTypes::lastItem == 2199, "v0.10 item range changed");
+static_assert(ItemTypes::copperPowder == 2199 && ItemTypes::lastItem == 2207,
+	"v0.11 item range changed");
 
 const char *getItemTextureName(int itemId);
 

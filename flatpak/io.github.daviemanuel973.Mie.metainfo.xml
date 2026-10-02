@@ -20,7 +20,7 @@
     <name>Mie contributors</name>
   </developer>
   <releases>
-    <release version="0.10.1" date="2026-09-10">
+    <release version="0.11.0" date="2026-10-02">
       <description>
         <p>Low-first CPU optimizations for chunk rendering, bounded navigation, and scheduled native simulation. Save IDs, content and multiplayer protocol are preserved.</p>
       </description>
