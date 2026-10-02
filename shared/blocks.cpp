@@ -784,6 +784,7 @@ float getBlockBaseMineDuration(BlockType type)
 {
 
 	if (!isBlock(type)) { return 0; }
+	if (isIndustryBlock(type)) { return type==powerCable || type==itemPipe ? 1.f : 3.5f; }
 	if (type == water) { return 0; }
 	if (isFragileContainer(type)) { return 0.12f; }
 
@@ -907,6 +908,7 @@ bool canBeMinedByHand(std::uint16_t type)
 bool canBeMinedByPickaxe(std::uint16_t type)
 {
 	if (!isBlock(type)) { return 0; }
+	if (isIndustryBlock(type)) { return true; }
 
 	if (
 		isAnySemiHardBlock(type) || type == testBlock ||
