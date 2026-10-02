@@ -1,5 +1,6 @@
 #include "multyPlayer/enetServerFunction.h"
 #include <atomic>
+#include <runtimeSmoke.h>
 #include <cstdlib>
 #include <thread>
 #include <enet/enet.h>
@@ -1379,6 +1380,9 @@ void enetServerFunction(std::string path)
 
 		float deltaTime = (std::chrono::duration_cast<std::chrono::microseconds>(stop - start)).count() / 1000000.0f;
 		start = std::chrono::high_resolution_clock::now();
+		static const bool smokeDiagnostics=runtimeSmokeRequested();
+		if (smokeDiagnostics && deltaTime>5.f)
+			std::cerr<<"[network-smoke] server service gap seconds="<<deltaTime<<"\n";
 		tickTimer += deltaTime;
 		playerAutosaveTimer -= deltaTime;
 
@@ -1418,6 +1422,11 @@ void enetServerFunction(std::string path)
 					std::cout << "disconnect from server: "
 						<< event.peer->address.host << " "
 						<< event.peer->address.port << "\n\n";
+					if (smokeDiagnostics)
+						std::cerr<<"[network-smoke] server disconnect data="<<event.data
+						<<" service_gap_s="<<deltaTime<<" rtt_ms="<<event.peer->roundTripTime
+						<<" reliable_bytes="<<event.peer->reliableDataInTransit
+						<<" lost_packets="<<event.peer->packetsLost<<"\n";
 					removeConnection(server, event, worldSaver);
 					break;
 				}

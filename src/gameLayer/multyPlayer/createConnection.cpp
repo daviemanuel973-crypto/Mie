@@ -17,6 +17,8 @@
 #include <lightSystem.h>
 #include <multyPlayer/packetValidation.h>
 #include <multyPlayer/dataIntegrity.h>
+#include <runtimeSmoke.h>
+#include <chrono>
 
 static ConnectionData clientData;
 
@@ -1026,6 +1028,16 @@ void clientMessageLoop(EventCounter &validatedEvent, RevisionNumber &invalidateR
 {
 	ENetEvent event;
 	int packetCount = 0;
+	static const bool diagnostics=runtimeSmokeRequested();
+	double serviceGap=0.;
+	if (diagnostics)
+	{
+		static auto lastService=std::chrono::steady_clock::now();
+		const auto serviceNow=std::chrono::steady_clock::now();
+		serviceGap=std::chrono::duration<double>(serviceNow-lastService).count();
+		lastService=serviceNow;
+		if (serviceGap>5.) { std::cerr<<"[network-smoke] client service gap seconds="<<serviceGap<<"\n"; }
+	}
 
 	//ENetPacket *nextPacket = clientData.server->incomingDataTotal;
 	for (int i = 0; i < 50; i++)
@@ -1051,6 +1063,11 @@ void clientMessageLoop(EventCounter &validatedEvent, RevisionNumber &invalidateR
 				case ENET_EVENT_TYPE_DISCONNECT:
 				{
 					std::cout << "Disconect from client\n";
+					if (diagnostics)
+						std::cerr<<"[network-smoke] client disconnect data="<<event.data
+						<<" service_gap_s="<<serviceGap<<" rtt_ms="<<event.peer->roundTripTime
+						<<" reliable_bytes="<<event.peer->reliableDataInTransit
+						<<" lost_packets="<<event.peer->packetsLost<<"\n";
 					disconnect = 1;
 					break;
 				}

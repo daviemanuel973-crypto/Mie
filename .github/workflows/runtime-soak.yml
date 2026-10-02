@@ -143,6 +143,7 @@ jobs:
             flatpak-soak-build.log
             flatpak-runtime-soak.log
             flatpak-recovery-*.log
+            ~/.var/app/io.github.daviemanuel973.Mie/data/ourcraft/mie-runtime-smoke-metrics.json
           if-no-files-found: warn
           retention-days: 7
 
