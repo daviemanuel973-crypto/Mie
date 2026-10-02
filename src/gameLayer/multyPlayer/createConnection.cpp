@@ -1042,6 +1042,12 @@ void clientMessageLoop(EventCounter &validatedEvent, RevisionNumber &invalidateR
 	//ENetPacket *nextPacket = clientData.server->incomingDataTotal;
 	for (int i = 0; i < 50; i++)
 	{
+		// ENet resets a disconnected peer before returning the event. Capture
+		// its counters before service, otherwise diagnostics report defaults.
+		const auto diagnosticRtt=diagnostics ? clientData.server->roundTripTime : 0;
+		const auto diagnosticBytes=diagnostics ? clientData.server->reliableDataInTransit : 0;
+		const auto diagnosticLost=diagnostics ? clientData.server->packetsLost : 0;
+		const auto diagnosticReceiveAge=diagnostics ? enet_time_get()-clientData.server->lastReceiveTime : 0;
 		if (enet_host_service(clientData.client, &event, 0) > 0)
 		{
 			switch (event.type)
@@ -1065,9 +1071,9 @@ void clientMessageLoop(EventCounter &validatedEvent, RevisionNumber &invalidateR
 					std::cout << "Disconect from client\n";
 					if (diagnostics)
 						std::cerr<<"[network-smoke] client disconnect data="<<event.data
-						<<" service_gap_s="<<serviceGap<<" rtt_ms="<<event.peer->roundTripTime
-						<<" reliable_bytes="<<event.peer->reliableDataInTransit
-						<<" lost_packets="<<event.peer->packetsLost<<"\n";
+						<<" service_gap_s="<<serviceGap<<" rtt_ms="<<diagnosticRtt
+						<<" reliable_bytes="<<diagnosticBytes
+						<<" lost_packets="<<diagnosticLost<<" receive_age_ms="<<diagnosticReceiveAge<<"\n";
 					disconnect = 1;
 					break;
 				}
