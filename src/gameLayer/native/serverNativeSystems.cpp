@@ -21,7 +21,7 @@
 
 namespace mie::native
 {
-	static_assert(BlockTypes::BlocksCount == V010_BLOCK_COUNT,
+	static_assert(BlockTypes::BlocksCount == V011_BLOCK_COUNT,
 		"v0.5 block IDs changed; add new blocks only after the frozen legacy range");
 	static_assert(BlockTypes::reinforcedBarricade == 210 && BlockTypes::woodenSpikeTrap == 211,
 		"v0.5 defence block IDs must remain stable");
@@ -33,7 +33,8 @@ namespace mie::native
 		ItemTypes::bronzeSword + 1 == V07_LAST_ITEM_EXCLUSIVE &&
 		ItemTypes::bedroll == V09_FIRST_ITEM_ID &&
 		ItemTypes::carrot == V010_FIRST_ITEM_ID &&
-		ItemTypes::lastItem == V010_LAST_ITEM_EXCLUSIVE,
+		ItemTypes::berryPorridge + 1 == V010_LAST_ITEM_EXCLUSIVE &&
+		ItemTypes::lastItem == V011_LAST_ITEM_EXCLUSIVE,
 		"persisted item IDs changed; append new content after the frozen legacy range");
 	static_assert(EntitiesTypesCount == V05_ENTITY_TYPE_COUNT,
 		"v0.5 entity type namespace changed without a migration");
@@ -42,7 +43,7 @@ namespace mie::native
 	{
 		struct ServerNativeState
 		{
-			ContentRegistry contentRegistry = createV010ContentRegistry();
+			ContentRegistry contentRegistry = createV011ContentRegistry();
 			ProcessingRecipeRegistry processingRecipes =
 				createV07ProcessingRecipeRegistry(contentRegistry);
 			WorldSchemaManifest manifest = makeV06WorldSchemaManifest();

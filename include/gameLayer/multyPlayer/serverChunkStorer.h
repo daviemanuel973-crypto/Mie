@@ -10,6 +10,7 @@
 #include <gameplay/physics.h>
 #include <gameplay/blocks/blocksWithData.h>
 #include <optional>
+#include <atomic>
 #include <gameplay/lootTables.h>
 
 struct BlockInChunkPos
@@ -74,6 +75,9 @@ struct GhostBlock
 //0.25 MB
 struct SavedChunk
 {
+	inline static std::atomic<std::uint64_t> nextIndustryGeneration{1};
+	std::uint64_t industryGeneration=nextIndustryGeneration.fetch_add(1);
+	std::uint64_t industryTopologyRevision=1, industryActivityRevision=1;
 
 	ChunkData chunk;
 

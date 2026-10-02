@@ -76,7 +76,7 @@ Block *ChunkSystem::getBlockAndData(glm::ivec3 blockPos, std::vector<unsigned ch
 		}
 
 	}
-	else if (type == BlockTypes::furnace)
+	else if (isProcessingBlock(type))
 	{
 		auto foundBlock = chunk->blockData.getFurnaceBlock(chunkPos.x, chunkPos.y, chunkPos.z);
 		if (foundBlock)

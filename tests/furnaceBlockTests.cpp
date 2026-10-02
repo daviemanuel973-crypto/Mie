@@ -7,43 +7,7 @@
 #include <iostream>
 #include <limits>
 
-// Focused Item adapters keep this unit test independent from rendering/audio
-// dependencies while exercising the exact FurnaceBlock state machine and format.
-std::size_t Item::formatIntoData(std::vector<unsigned char> &data)
-{
-	const size_t start = data.size();
-	const std::uint32_t metadataSize = static_cast<std::uint32_t>(metaData.size());
-	data.resize(start + sizeof(type) + sizeof(counter) + sizeof(metadataSize) + metadataSize);
-	size_t pointer = start;
-	std::memcpy(data.data() + pointer, &type, sizeof(type)); pointer += sizeof(type);
-	std::memcpy(data.data() + pointer, &counter, sizeof(counter)); pointer += sizeof(counter);
-	std::memcpy(data.data() + pointer, &metadataSize, sizeof(metadataSize)); pointer += sizeof(metadataSize);
-	if (metadataSize) { std::memcpy(data.data() + pointer, metaData.data(), metadataSize); }
-	return data.size() - start;
-}
-
-int Item::readFromData(void *input, size_t size)
-{
-	if (!input || size < sizeof(type) + sizeof(counter) + sizeof(std::uint32_t)) { return -1; }
-	const auto *data = static_cast<unsigned char *>(input);
-	size_t pointer = 0;
-	std::uint32_t metadataSize = 0;
-	std::memcpy(&type, data + pointer, sizeof(type)); pointer += sizeof(type);
-	std::memcpy(&counter, data + pointer, sizeof(counter)); pointer += sizeof(counter);
-	std::memcpy(&metadataSize, data + pointer, sizeof(metadataSize)); pointer += sizeof(metadataSize);
-	if (metadataSize > size - pointer) { return -1; }
-	metaData.assign(data + pointer, data + pointer + metadataSize);
-	pointer += metadataSize;
-	return static_cast<int>(pointer);
-}
-
-void Item::sanitize()
-{
-	if (type == 0 || counter == 0) { *this = {}; }
-	else if (counter > getStackSize()) { counter = getStackSize(); }
-}
-
-unsigned short Item::getStackSize() { return 999; }
+#include "processingItemAdapters.h"
 
 namespace
 {

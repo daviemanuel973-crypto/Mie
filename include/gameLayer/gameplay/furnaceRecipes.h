@@ -24,7 +24,7 @@ struct FurnaceRecipeDefinition
 	float durationSeconds = 0.f;
 };
 
-constexpr std::size_t FURNACE_RECIPE_COUNT = 8;
+constexpr std::size_t FURNACE_RECIPE_COUNT = 13;
 
 const std::array<FurnaceRecipeDefinition, FURNACE_RECIPE_COUNT> &getFurnaceRecipes();
 

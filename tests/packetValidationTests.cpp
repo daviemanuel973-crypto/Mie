@@ -20,7 +20,7 @@ int main()
 {
 	REQUIRE(headerUpdateGuideProgress != headerUpdateWorldDifficulty);
 	REQUIRE(headerUpdateGuideProgress == 52);
-	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 5);
+	REQUIRE(MULTIPLAYER_PROTOCOL_VERSION == 6);
 	Packet_ClientUsedItem plant = {};
 	plant.useAction = ItemUseAction::PlantCrop;
 	REQUIRE(isKnownItemUseAction(plant.useAction));

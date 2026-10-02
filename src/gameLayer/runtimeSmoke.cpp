@@ -2,6 +2,7 @@
 
 #include <config.h>
 #include <multyPlayer/server.h>
+#include <native/serverIndustry.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -96,6 +97,11 @@ void writeSmokeMetrics()
         ? std::chrono::duration<double>(std::chrono::steady_clock::now() - smokeStarted).count()
         : 0.0;
 
+    std::cerr << "[runtime-smoke] metrics frames=" << smokeFrames
+        << " duration_s=" << durationSeconds
+        << " max_frame_ms=" << (sorted.empty() ? 0. : sorted.back()*1000.)
+        << " p99_frame_ms=" << percentile(sorted,.99)*1000. << "\n";
+
     std::ofstream report("mie-runtime-smoke-metrics.json", std::ios::trunc);
     if (!report)
     {
@@ -130,6 +136,7 @@ bool runtimeSmokeReusesExistingWorld()
 
 bool beginRuntimeSmokeTest()
 {
+    std::cout.setf(std::ios::unitbuf);
     const bool reuseWorld = runtimeSmokeReusesExistingWorld();
     if (!reuseWorld)
     {
@@ -198,7 +205,7 @@ RuntimeSmokeFrameResult runtimeSmokeFramePassed(double frameSeconds)
         std::cerr << "[runtime-smoke] timed out before stable runtime gate\n";
         return RuntimeSmokeFrameResult::failed;
     }
-    if (smokeFrames >= MIN_SMOKE_FRAMES && elapsed >= minimumSmokeRuntime)
+    if (smokeFrames >= MIN_SMOKE_FRAMES && elapsed >= minimumSmokeRuntime && industrySmokeVerified())
     {
         std::cout << "[runtime-smoke] runtime gate reached after " << smokeFrames << " frames\n";
         return RuntimeSmokeFrameResult::passed;
@@ -218,7 +225,7 @@ int finishRuntimeSmokeTest(bool runtimePassed)
     smokeBegan = false;
     smokeClockStarted = false;
 
-    if (runtimePassed && persisted)
+    if (runtimePassed && persisted && industrySmokeVerified())
     {
         std::cout << "[runtime-smoke] PASS: server, client, gameplay frames and world persistence\n";
         return 0;

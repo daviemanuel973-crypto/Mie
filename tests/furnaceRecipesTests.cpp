@@ -23,7 +23,7 @@ namespace
 int main()
 {
 	const auto &recipes = getFurnaceRecipes();
-	check(recipes.size() == 8, "the shipped eight furnace recipes remain registered");
+	check(recipes.size() == 13, "the shipped eight furnace recipes remain registered");
 	check(recipes[0].inputs[0].type == BlockTypes::copperOre &&
 		recipes[0].inputs[0].count == 2 && recipes[0].output.type == ItemTypes::copperIngot,
 		"copper keeps the v0.7 contract");

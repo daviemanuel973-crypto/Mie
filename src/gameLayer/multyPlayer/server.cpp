@@ -35,6 +35,7 @@
 #include <gameplay/spawnPressure.h>
 #include <gameplay/worldDifficulty.h>
 #include <native/serverNativeSystems.h>
+#include <native/serverIndustry.h>
 #include <profiler.h>
 #include <magic_enum.hpp>
 #include <cmath>
@@ -467,6 +468,7 @@ bool serverStartupStuff(const std::string &path)
 	resetServerSiegeRuntime();
 	resetServerWorldDifficultySettings();
 	mie::native::resetServerNativeSystems();
+	resetServerIndustry();
 
 
 	//start enet server
@@ -876,6 +878,7 @@ void serverWorkerUpdate(
 		splitUpdatesLogic(fixedTickDeltaTime, fixedTickDeltaTimeMs,
 			tickCurrentTimer, sd.chunkCache, rng(), clients, worldSaver, serverTask,
 			serverProfiler);
+		updateServerIndustry(sd.chunkCache,fixedTickDeltaTime);
 	}
 	if (catchUpTicks == 4 && sd.tickTimer >= fixedTickDeltaTime)
 	{

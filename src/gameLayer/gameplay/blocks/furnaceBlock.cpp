@@ -1,6 +1,7 @@
 #include <gameplay/blocks/furnaceBlock.h>
 
 #include <gameplay/furnaceRecipes.h>
+#include <gameplay/industryRecipes.h>
 
 #include <algorithm>
 #include <cmath>
@@ -82,8 +83,12 @@ namespace
 size_t FurnaceBlock::formatIntoData(std::vector<unsigned char> &appendTo) const
 {
 	const size_t start = appendTo.size();
-	appendTo.insert(appendTo.end(), FORMAT_MAGIC, FORMAT_MAGIC + sizeof(FORMAT_MAGIC));
+	const char industrialMagic[4] = {'M','I','E','I'};
+	const char *magic = processingType ? industrialMagic : FORMAT_MAGIC;
+	appendTo.insert(appendTo.end(), magic, magic + 4);
 	appendValue(appendTo, FORMAT_VERSION);
+	if (processingType)
+	{ appendValue(appendTo, processingType); appendValue(appendTo, energyUnits); appendValue(appendTo, energyRemainder); }
 	appendValue(appendTo, progressSeconds);
 	appendValue(appendTo, fuelSecondsRemaining);
 	appendValue(appendTo, fuelSecondsTotal);
@@ -100,12 +105,17 @@ bool FurnaceBlock::readFromBuffer(const unsigned char *data, size_t size, size_t
 {
 	outReadSize = 0;
 	if (!data || size < sizeof(FORMAT_MAGIC) + sizeof(FORMAT_VERSION)) { return false; }
-	if (std::memcmp(data, FORMAT_MAGIC, sizeof(FORMAT_MAGIC)) != 0) { return false; }
+	const bool industrial = std::memcmp(data, "MIEI", 4) == 0;
+	if (!industrial && std::memcmp(data, FORMAT_MAGIC, sizeof(FORMAT_MAGIC)) != 0) { return false; }
 
 	FurnaceBlock candidate;
 	size_t pointer = sizeof(FORMAT_MAGIC);
 	std::uint16_t version = 0;
 	if (!readValue(data, size, pointer, version) || version != FORMAT_VERSION) { return false; }
+	if (industrial && (!readValue(data,size,pointer,candidate.processingType) ||
+		!readValue(data,size,pointer,candidate.energyUnits) ||
+		!readValue(data,size,pointer,candidate.energyRemainder) ||
+		!isIndustryBlock(candidate.processingType))) { return false; }
 	if (!readValue(data, size, pointer, candidate.progressSeconds) ||
 		!readValue(data, size, pointer, candidate.fuelSecondsRemaining) ||
 		!readValue(data, size, pointer, candidate.fuelSecondsTotal) ||
@@ -143,6 +153,13 @@ bool FurnaceBlock::isDataValid() const
 	{
 		return false;
 	}
+	if (processingType)
+	{
+		return isIndustryBlock(processingType) && energyUnits <= industryEnergyCapacity(processingType) &&
+			std::isfinite(energyRemainder) && energyRemainder >= 0.f && energyRemainder < 1.f &&
+			(activeRecipe == INVALID_RECIPE || (processingType == electricFurnace && activeRecipe < getFurnaceRecipes().size()) ||
+			(processingType >= oreCrusher && processingType <= woodSawmill && activeRecipe >= 100 && activeRecipe < 108));
+	}
 	return activeRecipe == INVALID_RECIPE || activeRecipe < getFurnaceRecipes().size();
 }
 
@@ -155,7 +172,7 @@ void FurnaceBlock::normalize()
 	progressSeconds = std::max(0.f, std::min(MAX_FURNACE_TIME, progressSeconds));
 	fuelSecondsRemaining = std::max(0.f, std::min(MAX_FURNACE_TIME, fuelSecondsRemaining));
 	fuelSecondsTotal = std::max(0.f, std::min(MAX_FURNACE_TIME, fuelSecondsTotal));
-	if (activeRecipe >= getFurnaceRecipes().size())
+	if (!processingType && activeRecipe >= getFurnaceRecipes().size())
 	{
 		activeRecipe = INVALID_RECIPE;
 		progressSeconds = 0.f;
@@ -167,6 +184,7 @@ void FurnaceBlock::normalize()
 
 FurnaceTickResult FurnaceBlock::tick(float deltaTime)
 {
+	if (processingType) { return tickIndustryMachine(*this, deltaTime); }
 	FurnaceTickResult result;
 	if (!std::isfinite(deltaTime) || deltaTime <= 0.f) { return result; }
 	deltaTime = std::min(deltaTime, 1.f);
@@ -246,6 +264,7 @@ FurnaceTickResult FurnaceBlock::tick(float deltaTime)
 
 float FurnaceBlock::progressFraction() const
 {
+	if (processingType) { return industryProgressFraction(*this); }
 	if (activeRecipe == INVALID_RECIPE || activeRecipe >= getFurnaceRecipes().size()) { return 0.f; }
 	const float duration = getFurnaceRecipes()[activeRecipe].durationSeconds;
 	return duration > 0.f ? std::max(0.f, std::min(1.f, progressSeconds / duration)) : 0.f;
@@ -253,6 +272,8 @@ float FurnaceBlock::progressFraction() const
 
 float FurnaceBlock::fuelFraction() const
 {
+	if (processingType && processingType != fuelGenerator)
+	{ const auto cap = industryEnergyCapacity(processingType); return cap ? static_cast<float>(energyUnits)/cap : 0.f; }
 	return fuelSecondsTotal > 0.f
 		? std::max(0.f, std::min(1.f, fuelSecondsRemaining / fuelSecondsTotal))
 		: 0.f;
@@ -260,6 +281,7 @@ float FurnaceBlock::fuelFraction() const
 
 bool FurnaceBlock::canPlaceInSlot(const Item &item, int slot) const
 {
+	if (processingType) { return industrySlotAccepts(*this,item,slot); }
 	if (item.type == 0) { return true; }
 	if (slot >= 0 && slot < FURNACE_INPUT_CAPACITY) { return isFurnaceInput(item.type); }
 	if (slot == FURNACE_FUEL_SLOT) { return isFurnaceFuel(item.type); }
@@ -272,9 +294,10 @@ bool isFurnaceInventoryIndex(int index)
 		index < PlayerInventory::CHEST_START_INDEX + FURNACE_CAPACITY;
 }
 
-bool canMoveItemToFurnaceIndex(const Item &item, int index)
+bool canMoveItemToFurnaceIndex(const Item &item, int index, const FurnaceBlock *container)
 {
 	if (!isFurnaceInventoryIndex(index)) { return true; }
+	if (container) { return container->canPlaceInSlot(item,index - PlayerInventory::CHEST_START_INDEX); }
 	if (item.type == 0) { return true; }
 	const int slot = index - PlayerInventory::CHEST_START_INDEX;
 	if (slot < FURNACE_INPUT_CAPACITY) { return isFurnaceInput(item.type); }

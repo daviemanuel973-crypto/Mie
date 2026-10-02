@@ -21,7 +21,7 @@ option(OURCRAFT_ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(OURCRAFT_INSTALLABLE "Build with relocatable/installable resources" OFF)
 option(OURCRAFT_LOW_END_BUILD "Tune runtime defaults for low-end hardware" OFF)
 option(OURCRAFT_FLATPAK "Enable Flatpak runtime compatibility renderer" OFF)
-set(OURCRAFT_VERSION "0.10.1" CACHE STRING "Mie Survival release version")
+set(OURCRAFT_VERSION "0.11.0" CACHE STRING "Mie Survival release version")
 
 # Keep the MSVC runtime statically linked for the Windows build.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -335,13 +335,26 @@ if (BUILD_TESTING)
 	add_executable(furnaceBlockTests
 		tests/furnaceBlockTests.cpp
 		src/gameLayer/gameplay/furnaceRecipes.cpp
-		src/gameLayer/gameplay/blocks/furnaceBlock.cpp)
+		src/gameLayer/gameplay/blocks/furnaceBlock.cpp
+		src/gameLayer/gameplay/industryRecipes.cpp)
 	target_include_directories(furnaceBlockTests PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
 		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
 		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
 	add_test(NAME furnace-block-runtime COMMAND furnaceBlockTests)
+
+	add_executable(industryTests tests/industryTests.cpp
+		src/gameLayer/gameplay/furnaceRecipes.cpp
+		src/gameLayer/gameplay/blocks/furnaceBlock.cpp
+		src/gameLayer/gameplay/industryRecipes.cpp
+		src/gameLayer/gameplay/industryNetwork.cpp)
+	target_include_directories(industryTests PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/gameLayer/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/shared/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glm/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glad/include/")
+	add_test(NAME industry-runtime-contracts COMMAND industryTests)
 
 	add_executable(recipeDiscoveryTests
 		tests/recipeDiscoveryTests.cpp
@@ -504,6 +517,7 @@ if (BUILD_TESTING)
 		survival-rules
 		furnace-recipes
 		furnace-block-runtime
+		industry-runtime-contracts
 		recipe-discovery-persistence
 		recipe-book-discovery
 		farming-persistence

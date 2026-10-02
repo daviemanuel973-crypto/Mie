@@ -22,6 +22,11 @@ namespace
 			{ItemTypes::tinIngot, 1}, 6.f},
 		{{ingredient(ItemTypes::copperIngot, 3), ingredient(ItemTypes::tinIngot, 1),
 			ingredient(ItemTypes::charcoal, 1)}, {ItemTypes::bronzeIngot, 4}, 10.f},
+		{{ingredient(ItemTypes::copperPowder, 1)}, {ItemTypes::copperIngot, 1}, 6.f},
+		{{ingredient(ItemTypes::leadPowder, 1)}, {ItemTypes::leadIngot, 1}, 6.f},
+		{{ingredient(ItemTypes::ironPowder, 1)}, {ItemTypes::ironIngot, 1}, 6.f},
+		{{ingredient(ItemTypes::silverPowder, 1)}, {ItemTypes::silverIngot, 1}, 6.f},
+		{{ingredient(ItemTypes::goldPowder, 1)}, {ItemTypes::goldIngot, 1}, 6.f},
 	}};
 
 	bool matches(const FurnaceIngredient &needed, const FurnaceStack &available)

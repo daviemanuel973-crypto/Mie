@@ -1,5 +1,6 @@
 #include "multyPlayer/enetServerFunction.h"
 #include <atomic>
+#include <runtimeSmoke.h>
 #include <cstdlib>
 #include <thread>
 #include <enet/enet.h>
@@ -1379,6 +1380,9 @@ void enetServerFunction(std::string path)
 
 		float deltaTime = (std::chrono::duration_cast<std::chrono::microseconds>(stop - start)).count() / 1000000.0f;
 		start = std::chrono::high_resolution_clock::now();
+		static const bool smokeDiagnostics=runtimeSmokeRequested();
+		if (smokeDiagnostics && deltaTime>5.f)
+			std::cerr<<"[network-smoke] server service gap seconds="<<deltaTime<<"\n";
 		tickTimer += deltaTime;
 		playerAutosaveTimer -= deltaTime;
 
@@ -1389,6 +1393,11 @@ void enetServerFunction(std::string path)
 		serverProfiler.startSubProfile("Recieve Network Updates");
 		int waitTime = 1;
 		int tries = 10;
+		const auto *diagnosticPeer=smokeDiagnostics && !getAllClientsReff().empty() ? getAllClientsReff().begin()->second.peer : nullptr;
+		const auto diagnosticRtt=diagnosticPeer ? diagnosticPeer->roundTripTime : 0;
+		const auto diagnosticBytes=diagnosticPeer ? diagnosticPeer->reliableDataInTransit : 0;
+		const auto diagnosticLost=diagnosticPeer ? diagnosticPeer->packetsLost : 0;
+		const auto diagnosticReceiveAge=diagnosticPeer ? enet_time_get()-diagnosticPeer->lastReceiveTime : 0;
 		while (((enet_host_service(server, &event, waitTime) > 0) || (waitTime=0, tries-- > 0) ) 
 			&& enetServerRunning)
 		{
@@ -1418,6 +1427,11 @@ void enetServerFunction(std::string path)
 					std::cout << "disconnect from server: "
 						<< event.peer->address.host << " "
 						<< event.peer->address.port << "\n\n";
+					if (smokeDiagnostics)
+						std::cerr<<"[network-smoke] server disconnect data="<<event.data
+						<<" service_gap_s="<<deltaTime<<" rtt_ms="<<diagnosticRtt
+						<<" reliable_bytes="<<diagnosticBytes
+						<<" lost_packets="<<diagnosticLost<<" receive_age_ms="<<diagnosticReceiveAge<<"\n";
 					removeConnection(server, event, worldSaver);
 					break;
 				}

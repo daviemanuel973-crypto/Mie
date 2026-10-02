@@ -265,12 +265,32 @@ enum BlockTypes : unsigned short
 	potatoCrop,
 	campfire,
 
+	// v0.11 industry: IDs 218..226 are append-only.
+	fuelGenerator,
+	energyAccumulator,
+	electricFurnace,
+	oreCrusher,
+	metalPress,
+	woodSawmill,
+	powerCable,
+	itemPipe,
+	itemExtractor,
+
 	BlocksCount
 };
 
 int getBlockReorder(int index);
 
 using BlockType = uint16_t;
+
+inline bool isIndustryBlock(BlockType type)
+{
+	return type >= BlockTypes::fuelGenerator && type <= BlockTypes::itemExtractor;
+}
+inline bool isProcessingBlock(BlockType type)
+{
+	return type == BlockTypes::furnace || isIndustryBlock(type);
+}
 
 //todo look into this
 bool isBlockMesh(BlockType type);

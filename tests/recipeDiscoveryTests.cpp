@@ -82,12 +82,20 @@ int main()
 	earlyV010[4] = 2;
 	earlyV010[5] = static_cast<unsigned char>(RecipeDiscovery::LegacyV010StorageBytes);
 	setPayloadBit(earlyV010, 212 +
-		(RecipeDiscovery::LastItemTypeExclusive - 1 - RecipeDiscovery::FirstItemType));
+		(2198 - RecipeDiscovery::FirstItemType));
 	RecipeDiscovery migratedEarlyV010;
 	check(migratedEarlyV010.readFromData(earlyV010.data(), earlyV010.size()) ==
 		static_cast<int>(earlyV010.size()), "an early v0.10 discovery payload migrates");
-	check(migratedEarlyV010.knowsType(RecipeDiscovery::LastItemTypeExclusive - 1),
+	check(migratedEarlyV010.knowsType(2198),
 		"early v0.10 food discoveries survive the block-bit offset migration");
+
+	std::vector<unsigned char> released(RecipeDiscovery::HeaderBytes + 47, 0);
+	released[0]='M'; released[1]='I'; released[2]='E'; released[3]='R'; released[4]=3; released[5]=47;
+	setPayloadBit(released,217); setPayloadBit(released,218); setPayloadBit(released,218+2198-2048);
+	RecipeDiscovery fromReleased;
+	check(fromReleased.readFromData(released.data(),released.size())==static_cast<int>(released.size()),"released v0.10.0/v0.10.1 format 3 migrates");
+	check(fromReleased.knowsType(217) && fromReleased.knowsType(2048) && fromReleased.knowsType(2198),"every released discovery offset keeps its stable ID");
+	check(!fromReleased.knowsType(218) && !fromReleased.knowsType(2199),"industrial content is not learned by offset reinterpretation");
 
 	for (std::size_t size = 0; size < payload.size(); ++size)
 	{
@@ -101,7 +109,7 @@ int main()
 	check(decoded.readFromData(badMagic.data(), badMagic.size()) < 0,
 		"invalid discovery magic is rejected");
 	auto badVersion = payload;
-	badVersion[4] = 4;
+	badVersion[4] = 99;
 	check(decoded.readFromData(badVersion.data(), badVersion.size()) < 0,
 		"future discovery versions are rejected safely");
 	auto badLength = payload;

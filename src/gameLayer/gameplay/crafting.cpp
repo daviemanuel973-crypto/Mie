@@ -171,11 +171,25 @@ static CraftingRecepie recepies[] =
 	recepie<3>(Item(ItemTypes::vegetableStew, 1), {Item(ItemTypes::carrot, 1), Item(ItemTypes::potato, 1), Item(ItemTypes::wheat, 1)}).setRequiresCookingPot(),
 	recepie<2>(Item(ItemTypes::berryPorridge, 1), {Item(ItemTypes::wheat, 2), Item(ItemTypes::strawberry, 2)}).setRequiresCookingPot(),
 	recepie<3>(Item(BlockTypes::campfire, 1), {Item(BlockTypes::wooden_plank, 3), Item(BlockTypes::cobblestone, 2), Item(ItemTypes::charcoal, 1)}).setAnyWood().setRequiresWorkBench(),
+	// v0.11: all 112 earlier network recipe indexes remain fixed.
+	recepie<3>(Item(BlockTypes::fuelGenerator, 1), {Item(BlockTypes::furnace, 1), Item(ItemTypes::copperIngot, 4), Item(ItemTypes::ironIngot, 4)}).setRequiresWorkBench(),
+	recepie<3>(Item(BlockTypes::energyAccumulator, 1), {Item(ItemTypes::ironIngot, 4), Item(ItemTypes::leadIngot, 4), Item(ItemTypes::copperWire, 4)}).setRequiresWorkBench(),
+	recepie<3>(Item(BlockTypes::electricFurnace, 1), {Item(BlockTypes::furnace, 1), Item(ItemTypes::copperWire, 4), Item(ItemTypes::ironPlate, 2)}).setRequiresWorkBench(),
+	recepie<3>(Item(BlockTypes::oreCrusher, 1), {Item(BlockTypes::cobblestone, 8), Item(ItemTypes::ironIngot, 6), Item(ItemTypes::copperWire, 2)}).setRequiresWorkBench(),
+	recepie<3>(Item(BlockTypes::metalPress, 1), {Item(ItemTypes::ironIngot, 8), Item(ItemTypes::copperWire, 2), Item(ItemTypes::bronzeIngot, 2)}).setRequiresWorkBench(),
+	recepie<3>(Item(BlockTypes::woodSawmill, 1), {Item(ItemTypes::ironIngot, 4), Item(BlockTypes::wooden_plank, 6), Item(ItemTypes::copperWire, 2)}).setRequiresWorkBench(),
+	recepie<2>(Item(BlockTypes::powerCable, 4), {Item(ItemTypes::copperWire, 2), Item(ItemTypes::cloth, 1)}).setRequiresWorkBench(),
+	recepie<2>(Item(BlockTypes::itemPipe, 4), {Item(ItemTypes::copperPlate, 2), Item(BlockTypes::glass, 1)}).setRequiresWorkBench(),
+	recepie<3>(Item(BlockTypes::itemExtractor, 1), {Item(BlockTypes::itemPipe, 1), Item(ItemTypes::ironPlate, 2), Item(ItemTypes::copperWire, 2)}).setRequiresWorkBench(),
+	recepie<1>(Item(ItemTypes::copperWire, 2), {Item(ItemTypes::copperIngot, 2)}).setRequiresWorkBench(),
+	recepie<1>(Item(ItemTypes::copperPlate, 1), {Item(ItemTypes::copperIngot, 2)}).setRequiresWorkBench(),
+	recepie<1>(Item(ItemTypes::ironPlate, 1), {Item(ItemTypes::ironIngot, 2)}).setRequiresWorkBench(),
+
 };
 
 constexpr int LegacyCraftingRecipeCount = 103;
-static_assert(sizeof(recepies) / sizeof(recepies[0]) == 112,
-	"v0.10 crafting recipes changed unexpectedly");
+static_assert(sizeof(recepies) / sizeof(recepies[0]) == 124,
+	"v0.11 crafting recipes changed unexpectedly");
 
 int getCraftingRecipeCount()
 {

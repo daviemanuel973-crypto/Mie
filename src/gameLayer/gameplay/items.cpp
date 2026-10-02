@@ -959,6 +959,15 @@ const char *itemsNamesTextures[] =
 	"food/bakedPotato.png",
 	"food/vegetableStew.png",
 	"food/berryPorridge.png",
+	"industry/copperPowder.png",
+	"industry/leadPowder.png",
+	"industry/ironPowder.png",
+	"industry/silverPowder.png",
+	"industry/goldPowder.png",
+	"industry/copperPlate.png",
+	"industry/ironPlate.png",
+	"industry/copperWire.png",
+
 };
 
 const char *itemsNames[] =
@@ -1128,6 +1137,15 @@ const char *itemsNames[] =
 	"Baked Potato",
 	"Vegetable Stew",
 	"Berry Porridge",
+	"Copper Powder",
+	"Lead Powder",
+	"Iron Powder",
+	"Silver Powder",
+	"Gold Powder",
+	"Copper Plate",
+	"Iron Plate",
+	"Copper Wire",
+
 };
 
 const char *getItemTextureName(int itemId)
@@ -1481,6 +1499,16 @@ const char *blockNames[] = {
 	"Carrot Crop",
 	"Potato Crop",
 	"Campfire",
+	"Fuel Generator",
+	"Energy Accumulator",
+	"Electric Furnace",
+	"Ore Crusher",
+	"Metal Press",
+	"Wood Sawmill",
+	"Power Cable",
+	"Item Pipe",
+	"Item Extractor",
+
 };
 
 std::string Item::getItemName()

@@ -68,5 +68,10 @@ namespace mie::native
 	ContentRegistry createV06ContentRegistry();
 	ContentRegistry createV07ContentRegistry();
 	ContentRegistry createV09ContentRegistry();
+	constexpr std::uint32_t V011_FIRST_BLOCK_ID = V010_BLOCK_COUNT;
+	constexpr std::uint32_t V011_BLOCK_COUNT = V011_FIRST_BLOCK_ID + 9;
+	constexpr std::uint32_t V011_FIRST_ITEM_ID = V010_LAST_ITEM_EXCLUSIVE;
+	constexpr std::uint32_t V011_LAST_ITEM_EXCLUSIVE = V011_FIRST_ITEM_ID + 8;
 	ContentRegistry createV010ContentRegistry();
+	ContentRegistry createV011ContentRegistry();
 }

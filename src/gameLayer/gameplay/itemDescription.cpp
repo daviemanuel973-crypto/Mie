@@ -117,7 +117,17 @@ const char *itemsDescriptions[] =
 	"A sturdy root crop. Better after cooking.",                         // potato (2195)
 	"Warm, filling and ready for the trail.",                            // baked potato (2196)
 	"A hearty mix of roots and grain.",                                 // vegetable stew (2197)
-	"A sweet bowl of berries and grain."                                 // berry porridge (2198)
+	"A sweet bowl of berries and grain.",
+
+	// v0.11 industrial materials, IDs 2199-2206.
+	"Crushed copper ore. Smelt it into a copper ingot.",
+	"Crushed lead ore. Smelt it into a lead ingot.",
+	"Crushed iron ore. Smelt it into an iron ingot.",
+	"Crushed silver ore. Smelt it into a silver ingot.",
+	"Crushed gold ore. Smelt it into a gold ingot.",
+	"A copper plate for cables, pipes and industrial construction.",
+	"An iron plate for electric machines and extractors.",
+	"Copper wire for connecting Mie Energy machines."                                 // berry porridge (2198)
 };
 
 std::string Item::getItemDescription()

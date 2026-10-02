@@ -9,7 +9,7 @@ namespace
 	constexpr std::array<unsigned char, 4> discoveryMagic = {'M', 'I', 'E', 'R'};
 	constexpr std::uint8_t legacyV09DiscoveryVersion = 1;
 	constexpr std::uint8_t legacyV010DiscoveryVersion = 2;
-	constexpr std::uint8_t discoveryVersion = 3;
+	constexpr std::uint8_t discoveryVersion = 4;
 	constexpr std::uint16_t legacyBlockTypeCount = 212;
 	constexpr std::uint16_t legacyV09LastItemExclusive = 2194;
 
@@ -113,8 +113,9 @@ int RecipeDiscovery::readFromData(const void *data, std::size_t size)
 		payloadSize == LegacyV09StorageBytes;
 	const bool legacyV010Payload = version == legacyV010DiscoveryVersion &&
 		payloadSize == LegacyV010StorageBytes;
+	const bool releasedV010Payload = version == 3 && payloadSize == LegacyV010ReleasedStorageBytes;
 	const bool currentPayload = version == discoveryVersion && payloadSize == StorageBytes;
-	if ((!legacyV09Payload && !legacyV010Payload && !currentPayload) ||
+	if ((!legacyV09Payload && !legacyV010Payload && !releasedV010Payload && !currentPayload) ||
 		size < HeaderBytes + payloadSize) { return -1; }
 
 	if (currentPayload)
@@ -124,15 +125,15 @@ int RecipeDiscovery::readFromData(const void *data, std::size_t size)
 	else
 	{
 		const unsigned char *legacy = bytes + HeaderBytes;
-		for (std::uint16_t type = 1; type < legacyBlockTypeCount; ++type)
+		for (std::uint16_t type = 1; type < (releasedV010Payload ? 218 : legacyBlockTypeCount); ++type)
 		{
 			if (sourceBitIsSet(legacy, payloadSize, type)) { learnType(type); }
 		}
 		const std::uint16_t legacyLastItem = legacyV09Payload ?
-			legacyV09LastItemExclusive : LastItemTypeExclusive;
+			legacyV09LastItemExclusive : 2199;
 		for (std::uint16_t type = FirstItemType; type < legacyLastItem; ++type)
 		{
-			const std::size_t oldIndex = legacyBlockTypeCount +
+			const std::size_t oldIndex = (releasedV010Payload ? 218 : legacyBlockTypeCount) +
 				static_cast<std::size_t>(type - FirstItemType);
 			if (sourceBitIsSet(legacy, payloadSize, oldIndex)) { learnType(type); }
 		}

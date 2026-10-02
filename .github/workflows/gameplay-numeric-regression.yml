@@ -120,9 +120,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -F 'else if (type == BlockTypes::furnace)' src/gameLayer/chunkSystem.cpp
+          grep -F 'else if (isProcessingBlock(type))' src/gameLayer/chunkSystem.cpp
           grep -F 'getFurnaceBlock(chunkPos.x, chunkPos.y, chunkPos.z)' src/gameLayer/chunkSystem.cpp
-          grep -F 'e.originalBlock.getType() == BlockTypes::furnace' src/gameLayer/gamePlayLogic.cpp
+          grep -F 'isProcessingBlock(e.originalBlock.getType())' src/gameLayer/gamePlayLogic.cpp
           grep -F 'getFurnaceBlock(modBlockToChunk(e.blockPos.x), e.blockPos.y,' src/gameLayer/gamePlayLogic.cpp
           grep -F 'workerThreadsForBaking = 1' include/gameLayer/rendering/renderSettings.h
           grep -F 'chunkVectorCopyNoNullsOnlyToBake.resize(100 + threadPool.currentCounter);' src/gameLayer/chunkSystem.cpp
